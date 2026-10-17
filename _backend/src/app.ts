@@ -5,6 +5,7 @@ import { AppDataSource } from "./config/data-source.js";
 import { closeRedis, redis } from "./config/redis.js";
 import { Routes } from "./routes.js";
 import { CustomResponse } from "./utils/customResponse.js";
+import { i18nMiddleware } from "./middlewares/i18nMiddleware.js";
 
 interface HttpError extends Error {
   status?: number;
@@ -27,6 +28,7 @@ export class App {
     this.app.use(cors());
     this.app.use(express.json());
     this.app.use(express.urlencoded({ extended: true }));
+    this.app.use(i18nMiddleware);
 
     // Request logger for development
     if (process.env.NODE_ENV !== "production") {
@@ -65,7 +67,12 @@ export class App {
 
     // 404 Handler
     this.app.use((req: Request, res: Response) => {
-      CustomResponse.error(res, `Not Found - ${req.originalUrl}`, null, 404);
+      CustomResponse.error(
+        res,
+        t("common.notFound", { path: req.originalUrl }),
+        null,
+        404,
+      );
     });
   }
 
@@ -76,7 +83,7 @@ export class App {
         console.error("Unhandled Error:", err);
         CustomResponse.error(
           res,
-          err.message || "Internal Server Error",
+          err.message || t("common.internalServerError"),
           (err as any).errors ?? null,
           err.status || 500
         );

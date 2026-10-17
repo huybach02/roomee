@@ -11,7 +11,7 @@ export function validate(schema: ZodType) {
         field: issue.path.join(".") || "body",
         message: issue.message,
       }));
-      return CustomResponse.error(res, "Validation failed", errors, 400);
+      return CustomResponse.error(res, t("validation.failed"), errors, 400);
     }
 
     req.body = result.data;

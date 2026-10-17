@@ -1,15 +1,11 @@
-import {
-  Entity,
-  PrimaryGeneratedColumn,
-  Column,
-  CreateDateColumn,
-  UpdateDateColumn,
-} from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column } from "typeorm";
+import { Mixin } from "ts-mixer";
 import { Gender, UserRole } from "../utils/constanst.js";
+import { AuditableTrait } from "../mixins/auditableTrait.js";
 
 @Entity({ name: "users" })
-export class User {
-  @PrimaryGeneratedColumn("uuid")
+export class User extends Mixin(AuditableTrait) {
+  @PrimaryGeneratedColumn()
   id: string;
 
   @Column({ type: "varchar", length: 255, unique: true })
@@ -47,9 +43,6 @@ export class User {
   @Column({ type: "boolean", default: true })
   isActive: boolean;
 
-  @CreateDateColumn({ type: "timestamp with time zone" })
-  createdAt: Date;
-
-  @UpdateDateColumn({ type: "timestamp with time zone" })
-  updatedAt: Date;
+  @Column({ type: "varchar", length: 100, default: "vi", nullable: true })
+  language: string | null;
 }

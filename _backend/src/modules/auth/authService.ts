@@ -13,6 +13,7 @@ export class AuthService {
     username: string,
     email: string,
     password: string,
+    language: string = "vi",
   ): Promise<{ user: User; token: string }> {
     // const hashedPassword = await bcrypt.hash(password, this.saltRounds);
     // const newUser = await this.userRepository.save(
@@ -20,18 +21,20 @@ export class AuthService {
     //     username,
     //     email,
     //     password: hashedPassword,
+    //     language,
     //   }),
     // );
     // const token = jwt.sign({ id: newUser.id }, this.jwtSecret, {
     //   expiresIn: "1h",
     // });
     // return { user: newUser, token };
-    return { user: {} as User, token: "dummy_token" }; // Placeholder implementation
+    return { user: { language } as User, token: "dummy_token" }; // Placeholder implementation
   }
 
   public async login(
     email: string,
     password: string,
+    language?: string,
   ): Promise<{ user: User; token: string }> {
     // const user = await this.userRepository.findOneBy({ email });
     // if (!user) {

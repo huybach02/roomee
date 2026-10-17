@@ -1,0 +1,23 @@
+{
+  "common": {
+    "success": "Thành công",
+    "internalServerError": "Đã có lỗi xảy ra từ máy chủ.",
+    "notFound": "Không tìm thấy tài nguyên yêu cầu: {path}",
+    "unauthorized": "Bạn chưa được cấp quyền truy cập.",
+    "badRequest": "Yêu cầu không hợp lệ."
+  },
+  "auth": {
+    "registerSuccess": "Đăng ký tài khoản thành công.",
+    "registerError": "Đã xảy ra lỗi khi đăng ký tài khoản.",
+    "loginSuccess": "Đăng nhập thành công.",
+    "loginError": "Đã xảy ra lỗi khi đăng nhập.",
+    "userNotFound": "Tài khoản không tồn tại.",
+    "invalidCredentials": "Email hoặc mật khẩu không chính xác.",
+    "emailAlreadyExists": "Email này đã được sử dụng."
+  },
+  "validation": {
+    "failed": "Dữ liệu gửi lên không hợp lệ.",
+    "required": "{field} không được để trống.",
+    "invalidEmail": "Email không đúng định dạng."
+  }
+}

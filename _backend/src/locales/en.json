@@ -1,0 +1,23 @@
+{
+  "common": {
+    "success": "Success",
+    "internalServerError": "An internal server error occurred.",
+    "notFound": "Resource not found: {path}",
+    "unauthorized": "You are not authorized to perform this action.",
+    "badRequest": "Bad request."
+  },
+  "auth": {
+    "registerSuccess": "User registered successfully.",
+    "registerError": "Error registering user.",
+    "loginSuccess": "User logged in successfully.",
+    "loginError": "Error logging in user.",
+    "userNotFound": "User not found.",
+    "invalidCredentials": "Invalid email or password.",
+    "emailAlreadyExists": "Email is already in use."
+  },
+  "validation": {
+    "failed": "Validation failed.",
+    "required": "{field} is required.",
+    "invalidEmail": "Invalid email address format."
+  }
+}
