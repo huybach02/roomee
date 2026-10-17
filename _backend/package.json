@@ -18,7 +18,9 @@
     "migration:show": "tsx ./node_modules/typeorm/cli.js migration:show -d src/config/data-source.ts",
     "migration:run:prod": "node ./node_modules/typeorm/cli.js migration:run -d dist/config/data-source.js",
     "migration:revert:prod": "node ./node_modules/typeorm/cli.js migration:revert -d dist/config/data-source.js",
-    "migration:show:prod": "node ./node_modules/typeorm/cli.js migration:show -d dist/config/data-source.js"
+    "migration:show:prod": "node ./node_modules/typeorm/cli.js migration:show -d dist/config/data-source.js",
+    "seed": "tsx src/commands/seeder.ts",
+    "seed:prod": "node dist/commands/seeder.js"
   },
   "keywords": [
     "nodejs",

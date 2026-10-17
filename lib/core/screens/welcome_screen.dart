@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:roomee/core/bloc/locale/locale_cubit.dart';
 import 'package:roomee/core/configs/app_theme.dart';
 import 'package:roomee/core/localization/app_localizations.dart';
+import 'package:roomee/core/router/app_router.dart';
 import 'package:roomee/core/widgets/app_button.dart';
 import 'package:roomee/utils/constanst.dart';
 
@@ -63,13 +65,13 @@ class WelcomeScreen extends StatelessWidget {
                 children: [
                   AppButton(
                     text: t('register'),
-                    onPressed: onRegisterPressed ?? () {},
+                    onPressed: onRegisterPressed ?? () => context.push(AppRoutes.register),
                     type: AppButtonType.primary,
                   ),
                   const SizedBox(height: 12),
                   AppButton(
                     text: t('login'),
-                    onPressed: onLoginPressed ?? () {},
+                    onPressed: onLoginPressed ?? () => context.push(AppRoutes.login),
                     type: AppButtonType.outline,
                   ),
                 ],

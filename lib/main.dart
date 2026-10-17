@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:go_router/go_router.dart';
 import 'package:roomee/core/bloc/locale/locale_cubit.dart';
 import 'package:roomee/core/configs/app_theme.dart';
 import 'package:roomee/core/localization/app_localizations.dart';
-import 'package:roomee/core/screens/welcome_screen.dart';
+import 'package:roomee/core/router/app_router.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,8 +24,13 @@ void main() async {
 
 class MyApp extends StatelessWidget {
   final Locale initialLocale;
+  final GoRouter? router;
 
-  const MyApp({super.key, this.initialLocale = const Locale('vi')});
+  const MyApp({
+    super.key,
+    this.initialLocale = const Locale('vi'),
+    this.router,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +38,7 @@ class MyApp extends StatelessWidget {
       create: (_) => LocaleCubit(initialLocale: initialLocale),
       child: BlocBuilder<LocaleCubit, Locale>(
         builder: (context, locale) {
-          return MaterialApp(
+          return MaterialApp.router(
             debugShowCheckedModeBanner: false,
             theme: AppTheme.mainTheme,
             locale: locale,
@@ -43,7 +49,7 @@ class MyApp extends StatelessWidget {
               GlobalCupertinoLocalizations.delegate,
             ],
             supportedLocales: AppLocalizations.supportedLocales,
-            home: const WelcomeScreen(),
+            routerConfig: router ?? appRouter,
           );
         },
       ),

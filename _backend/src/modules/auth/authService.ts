@@ -28,7 +28,7 @@ export class AuthService {
     //   expiresIn: "1h",
     // });
     // return { user: newUser, token };
-    return { user: { language } as User, token: "dummy_token" }; // Placeholder implementation
+    return { user: { language } as unknown as User, token: "dummy_token" }; // Placeholder implementation
   }
 
   public async login(

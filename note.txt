@@ -1,0 +1,15 @@
+*** Clear database ***
+npm run typeorm schema:drop
+
+*** Tao migration ***
+npm run migration:generate
+
+*** Chay migrate db
+npm run migration:run
+
+*** Seed data ***
+# Seed all
+npm run seed
+
+# Truyền tên trực tiếp
+npm run seed DataUnitsSeeder

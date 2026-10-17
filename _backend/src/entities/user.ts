@@ -1,7 +1,9 @@
-import { Entity, PrimaryGeneratedColumn, Column } from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, type Relation } from "typeorm";
 import { Mixin } from "ts-mixer";
 import { Gender, UserRole } from "../utils/constanst.js";
 import { AuditableTrait } from "../mixins/auditableTrait.js";
+import { Province } from "./province.js";
+import { Ward } from "./ward.js";
 
 @Entity({ name: "users" })
 export class User extends Mixin(AuditableTrait) {
@@ -43,6 +45,23 @@ export class User extends Mixin(AuditableTrait) {
   @Column({ type: "boolean", default: true })
   isActive: boolean;
 
-  @Column({ type: "varchar", length: 100, default: "vi", nullable: true })
-  language: string | null;
+  @Column({ type: "integer", nullable: true })
+  provinceId: number | null;
+
+  @ManyToOne(() => Province, (province) => province.users, {
+    nullable: true,
+    onDelete: "SET NULL",
+  })
+  @JoinColumn({ name: "provinceId" })
+  province: Relation<Province> | null;
+
+  @Column({ type: "integer", nullable: true })
+  wardId: number | null;
+
+  @ManyToOne(() => Ward, (ward) => ward.users, {
+    nullable: true,
+    onDelete: "SET NULL",
+  })
+  @JoinColumn({ name: "wardId" })
+  ward: Relation<Ward> | null;
 }
