@@ -1,5 +1,9 @@
 import express, { Application, Request, Response, NextFunction } from "express";
 import cors from "cors";
+import { container } from "tsyringe";
+import { AppDataSource } from "./data-source.js";
+import { Routes } from "./routes.js";
+import { CustomResponse } from "./utils/customResponse.js";
 
 interface HttpError extends Error {
   status?: number;
@@ -48,17 +52,18 @@ export class App {
     this.app.get("/api/health", (req: Request, res: Response) => {
       res.json({
         status: "UP",
+        database: AppDataSource.isInitialized ? "connected" : "disconnected",
         timestamp: new Date().toISOString(),
         uptime: `${Math.floor(process.uptime())}s`,
       });
     });
 
+    // API routes
+    container.resolve(Routes).register(this.app);
+
     // 404 Handler
     this.app.use((req: Request, res: Response) => {
-      res.status(404).json({
-        success: false,
-        message: `Not Found - ${req.originalUrl}`,
-      });
+      CustomResponse.error(res, `Not Found - ${req.originalUrl}`, null, 404);
     });
   }
 
@@ -67,10 +72,12 @@ export class App {
     this.app.use(
       (err: HttpError, req: Request, res: Response, next: NextFunction) => {
         console.error("Unhandled Error:", err);
-        res.status(err.status || 500).json({
-          success: false,
-          message: err.message || "Internal Server Error",
-        });
+        CustomResponse.error(
+          res,
+          err.message || "Internal Server Error",
+          (err as any).errors ?? null,
+          err.status || 500
+        );
       }
     );
   }
@@ -82,8 +89,12 @@ export class App {
     });
 
     // Graceful shutdown
-    const shutdown = (signal: string) => {
+    const shutdown = async (signal: string) => {
       console.log(`\nReceived ${signal}. Shutting down gracefully...`);
+      if (AppDataSource.isInitialized) {
+        await AppDataSource.destroy();
+        console.log("Database connection closed.");
+      }
       server.close(() => {
         console.log("Server closed successfully.");
         process.exit(0);

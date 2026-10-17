@@ -1,8 +1,23 @@
+import "reflect-metadata";
 import "dotenv/config";
 import App from "./app.js";
+import { AppDataSource } from "./data-source.js";
 import { DEFAULT_PORT } from "./utils/constanst.js";
 
 const PORT = Number(process.env.PORT) || DEFAULT_PORT;
 
-const server = new App(PORT);
-server.listen();
+async function bootstrap() {
+  try {
+    console.log("⏳ Initializing TypeORM database connection...");
+    await AppDataSource.initialize();
+    console.log("📦 Connected to PostgreSQL database via TypeORM successfully");
+
+    const server = new App(PORT);
+    server.listen();
+  } catch (error) {
+    console.error("❌ Failed to connect to database:", error);
+    process.exit(1);
+  }
+}
+
+bootstrap();

@@ -1,0 +1,30 @@
+{
+  "mcpServers": {
+    "context7": {
+      "transport": "stdio",
+      "enabled": true,
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp"
+      ]
+    },
+    "dart-flutter": {
+      "transport": "stdio",
+      "enabled": true,
+      "command": "dart",
+      "args": [
+        "mcp-server"
+      ]
+    },
+    "dbhub": {
+      "transport": "stdio",
+      "enabled": true,
+      "command": "bash",
+      "args": [
+        "-c",
+        "d=$PWD; while [ \"$d\" != / ] && [ ! -f \"$d/_backend/.env\" ]; do d=$(dirname \"$d\"); done; set -a; . \"$d/_backend/.env\"; set +a; export DSN=\"$DATABASE_URL\"; exec npx -y @bytebase/dbhub@latest --transport stdio"
+      ]
+    }
+  }
+}
