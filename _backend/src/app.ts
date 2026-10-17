@@ -1,7 +1,8 @@
 import express, { Application, Request, Response, NextFunction } from "express";
 import cors from "cors";
 import { container } from "tsyringe";
-import { AppDataSource } from "./data-source.js";
+import { AppDataSource } from "./config/data-source.js";
+import { closeRedis, redis } from "./config/redis.js";
 import { Routes } from "./routes.js";
 import { CustomResponse } from "./utils/customResponse.js";
 
@@ -53,6 +54,7 @@ export class App {
       res.json({
         status: "UP",
         database: AppDataSource.isInitialized ? "connected" : "disconnected",
+        redis: redis.status === "ready" ? "connected" : "disconnected",
         timestamp: new Date().toISOString(),
         uptime: `${Math.floor(process.uptime())}s`,
       });
@@ -95,6 +97,8 @@ export class App {
         await AppDataSource.destroy();
         console.log("Database connection closed.");
       }
+      await closeRedis();
+      console.log("Redis connection closed.");
       server.close(() => {
         console.log("Server closed successfully.");
         process.exit(0);

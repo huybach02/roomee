@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { injectable } from "tsyringe";
 import { AuthService } from "./authService.js";
+import { LoginDto, RegisterDto } from "./authSchema.js";
 import { CustomResponse } from "../../utils/customResponse.js";
 
 @injectable()
@@ -8,7 +9,7 @@ export class AuthController {
   constructor(private authService: AuthService) {}
 
   public registerUser = async (req: Request, res: Response): Promise<void> => {
-    const { username, email, password } = req.body;
+    const { username, email, password } = req.body as RegisterDto;
 
     try {
       const result = await this.authService.register(username, email, password);
@@ -25,7 +26,7 @@ export class AuthController {
   };
 
   public loginUser = async (req: Request, res: Response): Promise<void> => {
-    const { email, password } = req.body;
+    const { email, password } = req.body as LoginDto;
 
     try {
       const result = await this.authService.login(email, password);

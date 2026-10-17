@@ -10,15 +10,15 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
-    "typeorm": "tsx ./node_modules/typeorm/cli.js -d src/data-source.ts",
+    "typeorm": "tsx ./node_modules/typeorm/cli.js -d src/config/data-source.ts",
     "migration:create": "tsx ./node_modules/typeorm/cli.js migration:create",
-    "migration:generate": "tsx ./node_modules/typeorm/cli.js migration:generate -d src/data-source.ts",
-    "migration:run": "tsx ./node_modules/typeorm/cli.js migration:run -d src/data-source.ts",
-    "migration:revert": "tsx ./node_modules/typeorm/cli.js migration:revert -d src/data-source.ts",
-    "migration:show": "tsx ./node_modules/typeorm/cli.js migration:show -d src/data-source.ts",
-    "migration:run:prod": "node ./node_modules/typeorm/cli.js migration:run -d dist/data-source.js",
-    "migration:revert:prod": "node ./node_modules/typeorm/cli.js migration:revert -d dist/data-source.js",
-    "migration:show:prod": "node ./node_modules/typeorm/cli.js migration:show -d dist/data-source.js"
+    "migration:generate": "tsx ./node_modules/typeorm/cli.js migration:generate -d src/config/data-source.ts",
+    "migration:run": "tsx ./node_modules/typeorm/cli.js migration:run -d src/config/data-source.ts",
+    "migration:revert": "tsx ./node_modules/typeorm/cli.js migration:revert -d src/config/data-source.ts",
+    "migration:show": "tsx ./node_modules/typeorm/cli.js migration:show -d src/config/data-source.ts",
+    "migration:run:prod": "node ./node_modules/typeorm/cli.js migration:run -d dist/config/data-source.js",
+    "migration:revert:prod": "node ./node_modules/typeorm/cli.js migration:revert -d dist/config/data-source.js",
+    "migration:show:prod": "node ./node_modules/typeorm/cli.js migration:show -d dist/config/data-source.js"
   },
   "keywords": [
     "nodejs",
@@ -29,11 +29,14 @@
     "cors": "^2.8.6",
     "dotenv": "^18.0.8",
     "express": "^5.3.0",
+    "install": "^0.13.0",
+    "ioredis": "^5.11.1",
     "pg": "^8.23.1",
     "reflect-metadata": "^0.2.2",
     "ts-mixer": "^6.0.4",
     "tsyringe": "^4.10.0",
-    "typeorm": "^1.1.2"
+    "typeorm": "^1.1.2",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

@@ -5,12 +5,7 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
 } from "typeorm";
-
-export enum UserRole {
-  ADMIN = "admin",
-  LANDLORD = "landlord",
-  TENANT = "tenant",
-}
+import { Gender, UserRole } from "../utils/constanst.js";
 
 @Entity({ name: "users" })
 export class User {
@@ -34,6 +29,13 @@ export class User {
 
   @Column({ type: "text", nullable: true })
   bio: string | null;
+
+  @Column({
+    type: "enum",
+    enum: Gender,
+    default: Gender.MALE,
+  })
+  gender: Gender;
 
   @Column({
     type: "enum",

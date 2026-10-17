@@ -68,7 +68,7 @@ src/
     <module>Service.ts           # + schema Zod của module nếu cần
   migrations/
   utils/                         # customResponse.ts, constanst.ts, functionHelper.ts
-  data-source.ts
+  config/                        # data-source.ts (TypeORM DataSource), redis.ts (ioredis client)
   routes.ts                      # nơi đăng ký toàn bộ routes
   app.ts                         # Express app, middleware, error handler
   index.ts                       # bootstrap (kết nối DB rồi listen)

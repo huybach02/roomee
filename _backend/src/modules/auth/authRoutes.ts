@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { injectable } from "tsyringe";
 import { AuthController } from "./authController.js";
+import { loginSchema, registerSchema } from "./authSchema.js";
+import { validate } from "../../middlewares/validateMiddleware.js";
 
 @injectable()
 export class AuthRoutes {
@@ -12,8 +14,16 @@ export class AuthRoutes {
   }
 
   private initializeRoutes(): void {
-    this.router.post("/login", this.authController.loginUser);
-    this.router.post("/register", this.authController.registerUser);
+    this.router.post(
+      "/login",
+      validate(loginSchema),
+      this.authController.loginUser,
+    );
+    this.router.post(
+      "/register",
+      validate(registerSchema),
+      this.authController.registerUser,
+    );
   }
 }
 

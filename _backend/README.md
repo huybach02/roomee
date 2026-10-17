@@ -9,15 +9,17 @@ Server backend được xây dựng với **Node.js**, **Express.js**, **TypeScr
 ```text
 _backend/
 ├── src/
-│   ├── config/           # Cấu hình hệ thống (nếu có)
+│   ├── config/
+│   │   ├── data-source.ts # Khai báo DataSource chính của TypeORM
+│   │   └── redis.ts      # Redis client (ioredis) khởi tạo từ REDIS_URL
 │   ├── entities/         # Khai báo TypeORM Entities
 │   │   ├── index.ts      # Export tất cả entities
 │   │   └── user.ts       # Entity người dùng mẫu
+│   ├── middlewares/      # Middleware dùng chung (validate Zod,...)
 │   ├── migrations/       # Các file migration do TypeORM sinh ra
 │   ├── modules/          # Các module tính năng (auth, room,...)
-│   │   └── auth/
+│   │   └── auth/         # authController.ts, authRoutes.ts, authService.ts, authSchema.ts
 │   ├── app.ts            # Cấu hình Express app, middlewares, error handler
-│   ├── data-source.ts    # Khai báo DataSource chính của TypeORM
 │   └── index.ts          # Entry point khởi chạy HTTP server và kết nối DB
 ├── scripts/
 │   └── dev.mjs           # Dev runner đa nền tảng (tsc --watch + node --watch)
@@ -55,6 +57,7 @@ Cấu hình các biến trong `.env`:
 PORT=5000
 NODE_ENV=development
 DATABASE_URL="postgresql://username:password@host:port/database"
+REDIS_URL="redis://username:password@host:port/database"
 ```
 
 ---
@@ -119,6 +122,22 @@ npm run migration:show:prod
 
 ---
 
+## 🧠 Redis
+
+Client Redis dùng **ioredis**, khởi tạo trong `src/config/redis.ts` từ biến môi trường `REDIS_URL` (không hardcode cấu hình).
+
+```env
+# redis://user:password@host:port/db  — dùng rediss:// nếu server bật TLS
+REDIS_URL="redis://username:password@host:port/0"
+```
+
+- Client được tạo với `lazyConnect: true`, kết nối tường minh qua `connectRedis()` khi server khởi động (sau khi kết nối PostgreSQL). Nếu không kết nối được, server dừng ngay (`exit 1`) để phát hiện lỗi cấu hình sớm.
+- Runtime tự động reconnect khi mất kết nối; đóng kết nối trong graceful shutdown (`closeRedis()`).
+- Trạng thái Redis được phản ánh ở `GET /api/health` (field `redis`).
+- Dùng chung client `redis` (import từ `src/config/redis.ts`) cho cache, Socket.io adapter, BullMQ,...
+
+---
+
 ## 🖥️ Các lệnh chạy server
 
 - **Chế độ phát triển (tự build lại và tự khởi động lại khi sửa file `.ts`):**
@@ -157,7 +176,52 @@ npm run migration:show:prod
 | ----------- | ------------- | ----------------------------------------------------------- |
 | `GET`       | `/`           | Thông tin cơ bản server                                     |
 | `GET`       | `/api`        | Root endpoint của API                                       |
-| `GET`       | `/api/health` | Kiểm tra tình trạng server và trạng thái kết nối PostgreSQL |
+| `GET`       | `/api/health` | Kiểm tra tình trạng server, kết nối PostgreSQL và Redis     |
+| `POST`      | `/api/v1/auth/register` | Đăng ký tài khoản (body: `username`, `email`, `password`) |
+| `POST`      | `/api/v1/auth/login`    | Đăng nhập (body: `email`, `password`) |
+
+---
+
+## ✅ Validate dữ liệu đầu vào (Zod)
+
+Mọi input từ client (`req.body`) đều được validate bằng **Zod** qua middleware `validate` (`src/middlewares/validateMiddleware.ts`) trước khi vào controller.
+
+- Schema khai báo theo module, ví dụ `src/modules/auth/authSchema.ts`; type DTO suy ra trực tiếp từ schema bằng `z.infer` (`RegisterDto`, `LoginDto`).
+- Các rule dùng chung khai báo tại `src/utils/ruleValidate.ts` để tái sử dụng giữa các module, ví dụ:
+
+  ```ts
+  username: requiredString("Username", { min: 3, max: 50 }),
+  email: emailRule,
+  password: passwordRule(),
+  gender: enumRule("Gender", ["male", "female", "other"]),
+  phoneNumber: phoneRule(),
+  ```
+
+  - `requiredString(label, { min, max, trim })`: chuỗi bắt buộc, tự trim (mặc định), tự sinh message theo `label` (`"Username is required"`, `"Username must be at least 3 characters"`,...). `min` mặc định là 1 nên chuỗi rỗng luôn bị chặn.
+  - `optionalString(label, { min, max, trim })`: như `requiredString` nhưng cho phép bỏ qua field hoặc gửi `null`.
+  - `emailRule`: `requiredString("Email", { max: 255 })` rồi `.pipe(z.email(...))` — trim trước, kiểm tra định dạng sau.
+  - `passwordRule({ label, min, max })`: mật khẩu không trim, mặc định `min = 6`, `max = 255`; field đăng nhập dùng `passwordRule({ min: 1 })`.
+  - `phoneRule(label)`: số điện thoại VN (`0xxxxxxxxx` hoặc `+84xxxxxxxxx`).
+  - `uuidRule(label)`: UUID, `label` mặc định là `Id`.
+  - `enumRule(label, values)`: enum theo mảng giá trị, dùng được với TS enum qua `Object.values(UserRole)`.
+  - `numberRule(label, { min, max, int })`: số; `int: true` để bắt buộc số nguyên.
+  - `dateRule(label)`: ngày dạng `YYYY-MM-DD`.
+- Gắn vào route, ví dụ:
+
+  ```ts
+  this.router.post("/login", validate(loginSchema), this.authController.loginUser);
+  ```
+
+- Sau khi parse hợp lệ, dữ liệu sạch được gán lại vào `req.body` (các field không khai báo trong schema bị loại bỏ).
+- Lỗi validate trả về `400` theo format `CustomResponse.error`:
+
+  ```json
+  {
+    "success": false,
+    "message": "Validation failed",
+    "errors": [{ "field": "email", "message": "Invalid email address" }]
+  }
+  ```
 
 ---
 
@@ -165,4 +229,6 @@ npm run migration:show:prod
 
 - **Runtime:** `express`, `cors`, `dotenv`
 - **Database & ORM:** `typeorm`, `reflect-metadata`, `pg`
+- **Redis:** `ioredis` (client Redis, dùng chung cho BullMQ/Valkey, Socket.io adapter,...)
+- **Validation:** `zod`
 - **TypeScript & Tooling:** `typescript`, `@types/node`, `@types/express`, `@types/pg`, `tsx`
