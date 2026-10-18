@@ -5,9 +5,9 @@
   "main": "dist/index.js",
   "type": "module",
   "scripts": {
-    "predev": "tsc && cp -r src/locales dist/locales",
+    "predev": "tsc && cp -r src/locales/. dist/locales/",
     "dev": "node scripts/dev.mjs",
-    "build": "tsc && cp -r src/locales dist/locales",
+    "build": "tsc && cp -r src/locales/. dist/locales/",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
     "typeorm": "tsx ./node_modules/typeorm/cli.js -d src/config/data-source.ts",

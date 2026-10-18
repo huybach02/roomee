@@ -1,33 +1,22 @@
 import 'package:roomee/core/network/network.dart';
+import 'package:roomee/features/auth/data/auth_dto.dart';
 
 class AuthRemoteDataSource extends BaseService {
   AuthRemoteDataSource({super.client});
 
-  Future<ApiResponse<Map<String, dynamic>>> login({
-    required String email,
-    required String password,
-  }) async {
-    return postData<Map<String, dynamic>>(
+  Future<ApiResponse<AuthData>> login(LoginRequest request) {
+    return postData<AuthData>(
       '/auth/login',
-      data: {
-        'email': email,
-        'password': password,
-      },
+      data: request.toJson(),
+      fromJsonT: (json) => AuthData.fromJson(json as Map<String, dynamic>),
     );
   }
 
-  Future<ApiResponse<Map<String, dynamic>>> register({
-    required String username,
-    required String email,
-    required String password,
-  }) async {
-    return postData<Map<String, dynamic>>(
+  Future<ApiResponse<AuthData>> register(RegisterRequest request) {
+    return postData<AuthData>(
       '/auth/register',
-      data: {
-        'username': username,
-        'email': email,
-        'password': password,
-      },
+      data: request.toJson(),
+      fromJsonT: (json) => AuthData.fromJson(json as Map<String, dynamic>),
     );
   }
 }

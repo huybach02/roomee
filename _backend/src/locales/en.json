@@ -15,6 +15,10 @@
     "invalidCredentials": "Invalid email or password.",
     "emailAlreadyExists": "Email is already in use."
   },
+  "general": {
+    "provincesSuccess": "Provinces fetched successfully.",
+    "wardsSuccess": "Wards fetched successfully."
+  },
   "validation": {
     "failed": "Validation failed.",
     "required": "{field} is required.",

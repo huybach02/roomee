@@ -56,14 +56,24 @@ class _AppDatePickerFieldState extends State<AppDatePickerField> {
     super.didUpdateWidget(oldWidget);
     if (widget.selectedDate != oldWidget.selectedDate ||
         widget.dateFormat != oldWidget.dateFormat) {
-      _updateControllerText();
+      _updateControllerText(isPostFrame: true);
     }
   }
 
-  void _updateControllerText() {
-    if (widget.selectedDate != null) {
-      _effectiveController.text =
-          DateFormat(widget.dateFormat).format(widget.selectedDate!);
+  void _updateControllerText({bool isPostFrame = false}) {
+    final newText = widget.selectedDate != null
+        ? DateFormat(widget.dateFormat).format(widget.selectedDate!)
+        : '';
+    if (_effectiveController.text != newText) {
+      if (isPostFrame) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _effectiveController.text = newText;
+          }
+        });
+      } else {
+        _effectiveController.text = newText;
+      }
     }
   }
 

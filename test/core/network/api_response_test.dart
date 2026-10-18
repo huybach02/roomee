@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:roomee/core/localization/app_localizations.dart';
 import 'package:roomee/core/network/network.dart';
 
 void main() {
@@ -135,6 +136,35 @@ void main() {
       final exception = ApiException.fromDioException(dioException);
       expect(exception, isA<ServerException>());
       expect(exception.statusCode, 500);
+    });
+
+    test('default messages resolve to localized strings when preloaded', () async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      await AppLocalizations.preload();
+
+      const noInternet = NoInternetException();
+      expect(noInternet.message, 'Không có kết nối Internet. Vui lòng kiểm tra lại mạng.');
+
+      const timeout = TimeoutException();
+      expect(timeout.message, 'Hết thời gian chờ kết nối. Vui lòng thử lại.');
+
+      const unauthorized = UnauthorizedException();
+      expect(unauthorized.message, 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+
+      const forbidden = ForbiddenException();
+      expect(forbidden.message, 'Bạn không có quyền thực hiện thao tác này.');
+
+      const notFound = NotFoundException();
+      expect(notFound.message, 'Không tìm thấy tài nguyên yêu cầu.');
+
+      const badRequest = ClientException();
+      expect(badRequest.message, 'Yêu cầu không hợp lệ.');
+
+      const serverError = ServerException();
+      expect(serverError.message, 'Lỗi máy chủ nội bộ. Vui lòng thử lại sau.');
+
+      const unexpected = UnexpectedException();
+      expect(unexpected.message, 'Đã xảy ra lỗi không xác định. Vui lòng thử lại.');
     });
   });
 }

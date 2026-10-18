@@ -168,6 +168,11 @@ test/
 ### 4.2 Đa ngôn ngữ (i18n Mobile)
 - File dịch: `assets/translations/vi.json` và `assets/translations/en.json`.
 - Khởi tạo nạp trước vào cache tại `main.dart` bằng `await AppLocalizations.preload()`.
+- **Cấu trúc phân nhóm key trong từ điển (`vi.json` & `en.json`):**
+  - `fields`: Gom nhãn trường nhập liệu (`label`) và gợi ý (`hint`), ví dụ: `t('fields.fullName')`, `t('fields.emailHint')`.
+  - `validateErrors`: Gom thông báo lỗi validation dữ liệu form, ví dụ: `t('validateErrors.fieldRequired')`, `t('validateErrors.invalidEmail')`.
+  - `errors`: Gom thông báo lỗi hệ thống, mạng, HTTP status và ngoại lệ API (`api_exceptions.dart`), ví dụ: `t('errors.noInternet')`, `t('errors.timeout')`, `t('errors.unauthorized')`.
+  - Cấp root (cấp ngoài): Gom các key chung như tiêu đề (`welcomeTitle`), nút bấm (`register`, `login`), tùy chọn lựa chọn vai trò/giới tính (`genderMale`, `roleTenant`,...).
 - **Cú pháp dịch:**
   - Dùng hàm toàn cục `t('key', [params])`: **không cần `BuildContext`**, gọi được ở mọi nơi (Widget, Bloc, Repo, Service, Model, Utils).
   - Hoặc dùng extension `context.tr('key', [params])`.
@@ -207,7 +212,7 @@ test/
 
 - [ ] Đúng scope, không thêm gì ngoài yêu cầu.
 - [ ] Tái sử dụng đúng Design System widgets (`lib/core/widgets/`) & `DefaultColors`.
-- [ ] Mọi chuỗi hiển thị đều qua i18n (`t(...)` / `context.tr(...)`), bổ sung đủ cả 2 file `vi.json` và `en.json`.
+- [ ] Mọi chuỗi hiển thị đều qua i18n (`t(...)` / `context.tr(...)`), bổ sung đủ cả 2 file `vi.json` và `en.json` tuân thủ đúng cấu trúc phân nhóm (`fields`, `validateErrors`, `errors`).
 - [ ] Backend input validate qua Zod & `ruleValidates`.
 - [ ] Backend response chuẩn theo `CustomResponse.success(res, data, message)` / `CustomResponse.error(res, message, errors)`.
 - [ ] Typecheck (`npm run typecheck`) / analyze (`flutter analyze`) / test (`flutter test`) đều pass.

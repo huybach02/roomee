@@ -7,6 +7,8 @@ import 'package:roomee/core/bloc/locale/locale_cubit.dart';
 import 'package:roomee/core/configs/app_theme.dart';
 import 'package:roomee/core/localization/app_localizations.dart';
 import 'package:roomee/core/router/app_router.dart';
+import 'package:roomee/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:roomee/features/general/presentation/bloc/general_bloc.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,17 +27,31 @@ void main() async {
 class MyApp extends StatelessWidget {
   final Locale initialLocale;
   final GoRouter? router;
+  final AuthBloc? authBloc;
+  final GeneralBloc? generalBloc;
 
   const MyApp({
     super.key,
     this.initialLocale = const Locale('vi'),
     this.router,
+    this.authBloc,
+    this.generalBloc,
   });
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (_) => LocaleCubit(initialLocale: initialLocale),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(
+          create: (_) => LocaleCubit(initialLocale: initialLocale),
+        ),
+        BlocProvider(
+          create: (_) => generalBloc ?? GeneralBloc(),
+        ),
+        BlocProvider(
+          create: (_) => authBloc ?? (AuthBloc()..add(const AuthCheckEvent())),
+        ),
+      ],
       child: BlocBuilder<LocaleCubit, Locale>(
         builder: (context, locale) {
           return MaterialApp.router(

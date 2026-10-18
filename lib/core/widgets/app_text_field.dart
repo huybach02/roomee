@@ -79,8 +79,13 @@ class AppTextField extends StatelessWidget {
         prefixIcon: prefixIcon,
         suffixIcon: suffixIcon,
         filled: true,
-        fillColor: enabled ? DefaultColors.background : DefaultColors.disabled.withValues(alpha: 0.1),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        fillColor: enabled
+            ? DefaultColors.background
+            : DefaultColors.disabled.withValues(alpha: 0.1),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: DefaultColors.border),
@@ -91,7 +96,10 @@ class AppTextField extends StatelessWidget {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: DefaultColors.primary, width: 1.5),
+          borderSide: const BorderSide(
+            color: DefaultColors.primary,
+            width: 1.5,
+          ),
         ),
         disabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -99,11 +107,11 @@ class AppTextField extends StatelessWidget {
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: DefaultColors.error),
+          borderSide: const BorderSide(color: DefaultColors.danger),
         ),
         focusedErrorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: DefaultColors.error, width: 1.5),
+          borderSide: const BorderSide(color: DefaultColors.danger, width: 1.5),
         ),
       ),
     );

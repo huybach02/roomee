@@ -9,22 +9,15 @@ export class AuthController {
   constructor(private authService: AuthService) {}
 
   public registerUser = async (req: Request, res: Response): Promise<void> => {
-    const { username, email, password, language } = req.body as RegisterDto;
-    const userLanguage = language || req.locale;
+    const dtoData = req.body as RegisterDto;
 
     try {
-      const result = await this.authService.register(
-        username,
-        email,
-        password,
-        userLanguage,
-      );
-      // Gọi trực tiếp hàm global t()
+      const result = await this.authService.register(dtoData);
       return CustomResponse.success(
         res,
         result,
         t("auth.registerSuccess"),
-        201,
+        200,
       );
     } catch (error) {
       console.error("Error registering user:", error);
@@ -38,18 +31,12 @@ export class AuthController {
   };
 
   public loginUser = async (req: Request, res: Response): Promise<void> => {
-    const { email, password, language } = req.body as LoginDto;
-    const userLanguage = language || req.locale;
+    const { email, password } = req.body as LoginDto;
 
     try {
-      const result = await this.authService.login(email, password, userLanguage);
+      const result = await this.authService.login(email, password);
       // Gọi trực tiếp hàm global t()
-      return CustomResponse.success(
-        res,
-        result,
-        t("auth.loginSuccess"),
-        200,
-      );
+      return CustomResponse.success(res, result, t("auth.loginSuccess"), 200);
     } catch (error) {
       console.error("Error logging in user:", error);
       return CustomResponse.error(

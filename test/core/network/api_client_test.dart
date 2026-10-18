@@ -4,7 +4,9 @@ import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:roomee/core/network/network.dart';
+import 'package:roomee/features/auth/data/auth_dto.dart';
 import 'package:roomee/features/auth/data/auth_remote_datasource.dart';
+import 'package:roomee/utils/constanst.dart';
 
 void main() {
   group('AuthInterceptor', () {
@@ -416,22 +418,24 @@ void main() {
       final remoteSource = AuthRemoteDataSource(client: client);
 
       final result = await remoteSource.login(
-        email: 'test@roomee.vn',
-        password: 'secret123',
+        const LoginRequest(email: 'test@roomee.vn', password: 'secret123'),
       );
 
       expect(result.success, isTrue);
-      expect(result.data?['token'], 'jwt_xyz');
+      expect(result.data?.token, 'jwt_xyz');
     });
 
-    test('register sends username, email and password', () async {
+    test('register sends fullName, email and password', () async {
       final dio = Dio();
       dio.interceptors.add(
         InterceptorsWrapper(
           onRequest: (options, handler) {
             expect(options.path, '/auth/register');
-            expect(options.data['username'], 'admin');
+            expect(options.data['fullName'], 'admin');
             expect(options.data['email'], 'admin@roomee.vn');
+            expect(options.data['phoneNumber'], '0901234567');
+            expect(options.data['gender'], 'female');
+            expect(options.data['role'], 'landlord');
             return handler.resolve(
               Response(
                 requestOptions: options,
@@ -439,7 +443,10 @@ void main() {
                 data: {
                   'success': true,
                   'message': 'Đăng ký thành công',
-                  'data': {'userId': 'uuid-1'},
+                  'data': {
+                    'token': 'reg_token',
+                    'user': {'id': 'uuid-1', 'email': 'admin@roomee.vn'},
+                  },
                 },
               ),
             );
@@ -451,13 +458,19 @@ void main() {
       final remoteSource = AuthRemoteDataSource(client: client);
 
       final result = await remoteSource.register(
-        username: 'admin',
-        email: 'admin@roomee.vn',
-        password: 'password123',
+        const RegisterRequest(
+          fullName: 'admin',
+          email: 'admin@roomee.vn',
+          password: 'password123',
+          phoneNumber: '0901234567',
+          gender: Gender.female,
+          role: UserRole.landlord,
+        ),
       );
 
       expect(result.success, isTrue);
-      expect(result.data?['userId'], 'uuid-1');
+      expect(result.data?.token, 'reg_token');
+      expect(result.data?.user?.id, 'uuid-1');
     });
   });
 }

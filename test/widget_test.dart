@@ -5,17 +5,39 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:roomee/core/bloc/locale/locale_cubit.dart';
 import 'package:roomee/core/localization/app_localizations.dart';
+import 'package:roomee/core/models/models.dart';
 import 'package:roomee/core/router/app_router.dart';
+import 'package:roomee/features/general/data/general_repository.dart';
+import 'package:roomee/features/general/presentation/bloc/general_bloc.dart';
 import 'package:roomee/core/screens/welcome_screen.dart';
 import 'package:roomee/core/widgets/app_button.dart';
 import 'package:roomee/core/widgets/app_card_select.dart';
 import 'package:roomee/core/widgets/app_date_picker_field.dart';
+import 'package:roomee/core/widgets/app_dropdown_field.dart';
 import 'package:roomee/core/widgets/app_segmented_select.dart';
 import 'package:roomee/core/widgets/app_text_field.dart';
 import 'package:roomee/features/auth/presentation/screens/login_screen.dart';
 import 'package:roomee/features/auth/presentation/screens/register_screen.dart';
 import 'package:roomee/main.dart';
 import 'package:roomee/utils/constanst.dart';
+
+class _FakeGeneralRepository implements IGeneralRepository {
+  @override
+  Future<List<ProvinceModel>> getProvinces() async => const [
+        ProvinceModel(id: 1, code: 79, fullName: 'TP HCM', codeName: 'hcm'),
+      ];
+
+  @override
+  Future<List<WardModel>> getWardsByProvince(int provinceId) async => const [
+        WardModel(
+          id: 10,
+          code: 1,
+          provinceId: 1,
+          fullName: 'Phường 1',
+          codeName: 'p1',
+        ),
+      ];
+}
 
 void main() {
   setUp(() async {
@@ -157,7 +179,12 @@ void main() {
     'WelcomeScreen navigates to LoginScreen and RegisterScreen using router',
     (WidgetTester tester) async {
       final router = createAppRouter();
-      await tester.pumpWidget(MyApp(router: router));
+      await tester.pumpWidget(
+        MyApp(
+          router: router,
+          generalBloc: GeneralBloc(repository: _FakeGeneralRepository()),
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(find.byType(WelcomeScreen), findsOneWidget);
@@ -187,7 +214,12 @@ void main() {
     WidgetTester tester,
   ) async {
     final router = createAppRouter(initialLocation: AppRoutes.register);
-    await tester.pumpWidget(MyApp(router: router));
+    await tester.pumpWidget(
+      MyApp(
+        router: router,
+        generalBloc: GeneralBloc(repository: _FakeGeneralRepository()),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(find.byType(RegisterScreen), findsOneWidget);
@@ -203,7 +235,9 @@ void main() {
     expect(find.text('Số điện thoại'), findsOneWidget);
     expect(find.text('Mật khẩu'), findsOneWidget);
     expect(find.text('Xác nhận mật khẩu'), findsOneWidget);
-    expect(find.text('Địa chỉ'), findsOneWidget);
+    expect(find.text('Địa chỉ'), findsNothing);
+    expect(find.text('Tỉnh/Thành phố'), findsOneWidget);
+    expect(find.text('Phường/Xã'), findsOneWidget);
     expect(find.text('Ngày sinh'), findsOneWidget);
     expect(find.text('Giới tính'), findsOneWidget);
 
@@ -220,6 +254,36 @@ void main() {
 
     // Verify validation errors appear
     expect(find.text('Vui lòng nhập trường này'), findsWidgets);
+
+    // Verify phone number validation
+    final phoneField = find.widgetWithText(AppTextField, 'Số điện thoại');
+    await tester.ensureVisible(phoneField);
+    await tester.enterText(phoneField, '0123456789'); // Đầu số không hợp lệ theo chuẩn VN
+    await tester.ensureVisible(submitButton);
+    await tester.tap(submitButton);
+    await tester.pumpAndSettle();
+    expect(find.text('Số điện thoại không hợp lệ'), findsOneWidget);
+
+    await tester.enterText(phoneField, '0901234567'); // 10 số hợp lệ
+    await tester.ensureVisible(submitButton);
+    await tester.tap(submitButton);
+    await tester.pumpAndSettle();
+    expect(find.text('Số điện thoại không hợp lệ'), findsNothing);
+
+    await tester.enterText(phoneField, '+84901234567'); // Chuẩn +84 hợp lệ
+    await tester.ensureVisible(submitButton);
+    await tester.tap(submitButton);
+    await tester.pumpAndSettle();
+    expect(find.text('Số điện thoại không hợp lệ'), findsNothing);
+
+    // Select Province
+    final provinceField = find.widgetWithText(AppTextField, 'Tỉnh/Thành phố');
+    await tester.ensureVisible(provinceField);
+    await tester.tap(provinceField);
+    await tester.pumpAndSettle();
+    expect(find.text('TP HCM'), findsOneWidget);
+    await tester.tap(find.text('TP HCM'));
+    await tester.pumpAndSettle();
   });
 
   testWidgets(
@@ -462,7 +526,12 @@ void main() {
     WidgetTester tester,
   ) async {
     final router = createAppRouter(initialLocation: AppRoutes.login);
-    await tester.pumpWidget(MyApp(router: router));
+    await tester.pumpWidget(
+      MyApp(
+        router: router,
+        generalBloc: GeneralBloc(repository: _FakeGeneralRepository()),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(find.byType(LoginScreen), findsOneWidget);
@@ -484,5 +553,51 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(RegisterScreen), findsOneWidget);
+  });
+
+  testWidgets('AppDropdownField opens sheet and selects an option', (
+    WidgetTester tester,
+  ) async {
+    String? selected;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: StatefulBuilder(
+            builder: (context, setState) {
+              return AppDropdownField<String>(
+                value: selected,
+                labelText: 'Tỉnh/Thành phố',
+                hintText: 'Chọn tỉnh/thành phố',
+                searchHint: 'Tìm kiếm...',
+                emptyText: 'Không có dữ liệu',
+                options: const [
+                  AppDropdownOption(value: 'hcm', label: 'TP Hồ Chí Minh'),
+                  AppDropdownOption(value: 'hn', label: 'Hà Nội'),
+                ],
+                onChanged: (value) {
+                  setState(() {
+                    selected = value;
+                  });
+                },
+              );
+            },
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Tỉnh/Thành phố'), findsOneWidget);
+
+    await tester.tap(find.byType(AppDropdownField<String>));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Hà Nội'), findsOneWidget);
+
+    await tester.tap(find.text('Hà Nội'));
+    await tester.pumpAndSettle();
+
+    expect(selected, 'hn');
+    expect(find.text('Hà Nội'), findsOneWidget);
   });
 }

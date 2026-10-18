@@ -28,6 +28,9 @@ export class User extends Mixin(AuditableTrait) {
   @Column({ type: "text", nullable: true })
   bio: string | null;
 
+  @Column({ type: "date", nullable: true })
+  birthday: string | null;
+
   @Column({
     type: "enum",
     enum: Gender,

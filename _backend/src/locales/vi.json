@@ -15,6 +15,10 @@
     "invalidCredentials": "Email hoặc mật khẩu không chính xác.",
     "emailAlreadyExists": "Email này đã được sử dụng."
   },
+  "general": {
+    "provincesSuccess": "Lấy danh sách tỉnh/thành thành công.",
+    "wardsSuccess": "Lấy danh sách phường/xã thành công."
+  },
   "validation": {
     "failed": "Dữ liệu gửi lên không hợp lệ.",
     "required": "{field} không được để trống.",

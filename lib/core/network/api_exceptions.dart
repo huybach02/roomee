@@ -1,16 +1,21 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
+import 'package:roomee/core/localization/app_localizations.dart';
 
 abstract class ApiException implements Exception {
-  final String message;
+  final String? rawMessage;
   final int? statusCode;
   final dynamic errors;
 
   const ApiException({
-    required this.message,
+    String? message,
     this.statusCode,
     this.errors,
-  });
+  }) : rawMessage = message;
+
+  String get defaultMessage => t('errors.unexpected');
+
+  String get message => rawMessage ?? defaultMessage;
 
   @override
   String toString() => '$runtimeType: $message (statusCode: $statusCode)';
@@ -21,7 +26,7 @@ abstract class ApiException implements Exception {
       case DioExceptionType.sendTimeout:
       case DioExceptionType.receiveTimeout:
         return TimeoutException(
-          message: 'Hết thời gian chờ kết nối. Vui lòng kiểm tra lại đường truyền mạng.',
+          message: t('errors.connectionTimeout'),
         );
 
       case DioExceptionType.connectionError:
@@ -30,7 +35,7 @@ abstract class ApiException implements Exception {
       case DioExceptionType.badResponse:
         final response = dioException.response;
         final statusCode = response?.statusCode;
-        String message = 'Đã có lỗi xảy ra từ máy chủ.';
+        String? message;
         dynamic errors;
 
         if (response?.data is Map<String, dynamic>) {
@@ -53,23 +58,19 @@ abstract class ApiException implements Exception {
             );
           case 401:
             return UnauthorizedException(
-              message: message.isNotEmpty
-                  ? message
-                  : 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+              message: message,
               statusCode: 401,
               errors: errors,
             );
           case 403:
             return ForbiddenException(
-              message: message.isNotEmpty
-                  ? message
-                  : 'Bạn không có quyền thực hiện thao tác này.',
+              message: message,
               statusCode: 403,
               errors: errors,
             );
           case 404:
             return NotFoundException(
-              message: message.isNotEmpty ? message : 'Không tìm thấy tài nguyên yêu cầu.',
+              message: message,
               statusCode: 404,
               errors: errors,
             );
@@ -91,13 +92,13 @@ abstract class ApiException implements Exception {
         }
 
       case DioExceptionType.cancel:
-        return const UnexpectedException(
-          message: 'Yêu cầu tới máy chủ đã bị hủy.',
+        return UnexpectedException(
+          message: t('errors.requestCancelled'),
         );
 
       case DioExceptionType.badCertificate:
-        return const UnexpectedException(
-          message: 'Chứng chỉ bảo mật máy chủ không hợp lệ.',
+        return UnexpectedException(
+          message: t('errors.badCertificate'),
         );
 
       case DioExceptionType.unknown:
@@ -106,7 +107,7 @@ abstract class ApiException implements Exception {
           return const NoInternetException();
         }
         return UnexpectedException(
-          message: dioException.message ?? 'Đã xảy ra lỗi không xác định. Vui lòng thử lại.',
+          message: dioException.message,
         );
     }
   }
@@ -115,71 +116,95 @@ abstract class ApiException implements Exception {
 /// Khi không có kết nối Internet hoặc DNS/mạng lỗi (Offline mode trigger)
 class NoInternetException extends ApiException {
   const NoInternetException({
-    super.message = 'Không có kết nối Internet. Vui lòng kiểm tra lại mạng.',
+    super.message,
     super.statusCode,
     super.errors,
   });
+
+  @override
+  String get defaultMessage => t('errors.noInternet');
 }
 
 /// Khi request bị timeout (connect, send, receive)
 class TimeoutException extends ApiException {
   const TimeoutException({
-    super.message = 'Hết thời gian chờ kết nối. Vui lòng thử lại.',
+    super.message,
     super.statusCode,
     super.errors,
   });
+
+  @override
+  String get defaultMessage => t('errors.timeout');
 }
 
 /// Lỗi 401 Unauthorized (Token hết hạn hoặc không hợp lệ)
 class UnauthorizedException extends ApiException {
   const UnauthorizedException({
-    super.message = 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+    super.message,
     super.statusCode = 401,
     super.errors,
   });
+
+  @override
+  String get defaultMessage => t('errors.unauthorized');
 }
 
 /// Lỗi 403 Forbidden (Không có quyền truy cập)
 class ForbiddenException extends ApiException {
   const ForbiddenException({
-    super.message = 'Bạn không có quyền thực hiện thao tác này.',
+    super.message,
     super.statusCode = 403,
     super.errors,
   });
+
+  @override
+  String get defaultMessage => t('errors.forbidden');
 }
 
 /// Lỗi 404 Not Found
 class NotFoundException extends ApiException {
   const NotFoundException({
-    super.message = 'Không tìm thấy tài nguyên yêu cầu.',
+    super.message,
     super.statusCode = 404,
     super.errors,
   });
+
+  @override
+  String get defaultMessage => t('errors.notFound');
 }
 
 /// Lỗi 400 Bad Request / 422 Unprocessable Entity (Validate lỗi)
 class ClientException extends ApiException {
   const ClientException({
-    required super.message,
+    super.message,
     super.statusCode = 400,
     super.errors,
   });
+
+  @override
+  String get defaultMessage => t('errors.badRequest');
 }
 
 /// Lỗi 5xx từ máy chủ
 class ServerException extends ApiException {
   const ServerException({
-    super.message = 'Lỗi máy chủ nội bộ. Vui lòng thử lại sau.',
+    super.message,
     super.statusCode = 500,
     super.errors,
   });
+
+  @override
+  String get defaultMessage => t('errors.internalServerError');
 }
 
 /// Lỗi không xác định khác
 class UnexpectedException extends ApiException {
   const UnexpectedException({
-    super.message = 'Đã xảy ra lỗi không xác định. Vui lòng thử lại.',
+    super.message,
     super.statusCode,
     super.errors,
   });
+
+  @override
+  String get defaultMessage => t('errors.unexpected');
 }
