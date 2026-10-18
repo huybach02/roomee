@@ -39,8 +39,9 @@ void main() {
     expect(find.byType(MyApp), findsOneWidget);
   });
 
-  testWidgets('WelcomeScreen displays logo and action buttons',
-      (WidgetTester tester) async {
+  testWidgets('WelcomeScreen displays logo and action buttons', (
+    WidgetTester tester,
+  ) async {
     bool registerPressed = false;
     bool loginPressed = false;
 
@@ -92,8 +93,9 @@ void main() {
     expect(loginPressed, isTrue);
   });
 
-  testWidgets('WelcomeScreen toggles language between VI and EN',
-      (WidgetTester tester) async {
+  testWidgets('WelcomeScreen toggles language between VI and EN', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(
       BlocProvider(
         create: (_) => LocaleCubit(),
@@ -138,16 +140,12 @@ void main() {
     expect(find.text('Đăng ký'), findsOneWidget);
   });
 
-  testWidgets('AppButton shows loading indicator when isLoading is true',
-      (WidgetTester tester) async {
+  testWidgets('AppButton shows loading indicator when isLoading is true', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(
       const MaterialApp(
-        home: Scaffold(
-          body: AppButton(
-            text: 'Tiếp tục',
-            isLoading: true,
-          ),
-        ),
+        home: Scaffold(body: AppButton(text: 'Tiếp tục', isLoading: true)),
       ),
     );
 
@@ -155,36 +153,39 @@ void main() {
     expect(find.text('Tiếp tục'), findsNothing);
   });
 
-  testWidgets('WelcomeScreen navigates to LoginScreen and RegisterScreen using router',
-      (WidgetTester tester) async {
-    final router = createAppRouter();
-    await tester.pumpWidget(MyApp(router: router));
-    await tester.pumpAndSettle();
+  testWidgets(
+    'WelcomeScreen navigates to LoginScreen and RegisterScreen using router',
+    (WidgetTester tester) async {
+      final router = createAppRouter();
+      await tester.pumpWidget(MyApp(router: router));
+      await tester.pumpAndSettle();
 
-    expect(find.byType(WelcomeScreen), findsOneWidget);
+      expect(find.byType(WelcomeScreen), findsOneWidget);
 
-    final loginButton = find.widgetWithText(AppButton, 'Đăng nhập');
-    await tester.tap(loginButton);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-    expect(find.byType(SlideTransition), findsWidgets);
-    await tester.pumpAndSettle();
+      final loginButton = find.widgetWithText(AppButton, 'Đăng nhập');
+      await tester.tap(loginButton);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.byType(SlideTransition), findsWidgets);
+      await tester.pumpAndSettle();
 
-    expect(find.byType(LoginScreen), findsOneWidget);
+      expect(find.byType(LoginScreen), findsOneWidget);
 
-    router.go(AppRoutes.welcome);
-    await tester.pumpAndSettle();
-    expect(find.byType(WelcomeScreen), findsOneWidget);
+      router.go(AppRoutes.welcome);
+      await tester.pumpAndSettle();
+      expect(find.byType(WelcomeScreen), findsOneWidget);
 
-    final registerButton = find.widgetWithText(AppButton, 'Đăng ký');
-    await tester.tap(registerButton);
-    await tester.pumpAndSettle();
+      final registerButton = find.widgetWithText(AppButton, 'Đăng ký');
+      await tester.tap(registerButton);
+      await tester.pumpAndSettle();
 
-    expect(find.byType(RegisterScreen), findsOneWidget);
-  });
+      expect(find.byType(RegisterScreen), findsOneWidget);
+    },
+  );
 
-  testWidgets('RegisterScreen displays all form fields and validates inputs',
-      (WidgetTester tester) async {
+  testWidgets('RegisterScreen displays all form fields and validates inputs', (
+    WidgetTester tester,
+  ) async {
     final router = createAppRouter(initialLocation: AppRoutes.register);
     await tester.pumpWidget(MyApp(router: router));
     await tester.pumpAndSettle();
@@ -221,94 +222,100 @@ void main() {
     expect(find.text('Vui lòng nhập trường này'), findsWidgets);
   });
 
-  testWidgets('AppTextField renders properly and handles input and validation',
-      (WidgetTester tester) async {
-    final controller = TextEditingController();
+  testWidgets(
+    'AppTextField renders properly and handles input and validation',
+    (WidgetTester tester) async {
+      final controller = TextEditingController();
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: Form(
-            child: Builder(
-              builder: (context) {
-                return Column(
-                  children: [
-                    AppTextField(
-                      controller: controller,
-                      labelText: 'Họ và tên',
-                      hintText: 'Nhập họ và tên',
-                      prefixIcon: const Icon(Icons.person),
-                      validator: (val) => val == null || val.isEmpty ? 'Bắt buộc nhập' : null,
-                    ),
-                    ElevatedButton(
-                      onPressed: () {
-                        Form.of(context).validate();
-                      },
-                      child: const Text('Validate'),
-                    ),
-                  ],
-                );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Form(
+              child: Builder(
+                builder: (context) {
+                  return Column(
+                    children: [
+                      AppTextField(
+                        controller: controller,
+                        labelText: 'Họ và tên',
+                        hintText: 'Nhập họ và tên',
+                        prefixIcon: const Icon(Icons.person),
+                        validator: (val) =>
+                            val == null || val.isEmpty ? 'Bắt buộc nhập' : null,
+                      ),
+                      ElevatedButton(
+                        onPressed: () {
+                          Form.of(context).validate();
+                        },
+                        child: const Text('Validate'),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Họ và tên'), findsOneWidget);
+      expect(find.text('Nhập họ và tên'), findsOneWidget);
+      expect(find.byIcon(Icons.person), findsOneWidget);
+
+      await tester.tap(find.text('Validate'));
+      await tester.pumpAndSettle();
+      expect(find.text('Bắt buộc nhập'), findsOneWidget);
+
+      await tester.enterText(find.byType(AppTextField), 'Nguyễn Văn A');
+      await tester.pumpAndSettle();
+      expect(controller.text, 'Nguyễn Văn A');
+
+      await tester.tap(find.text('Validate'));
+      await tester.pumpAndSettle();
+      expect(find.text('Bắt buộc nhập'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'AppDatePickerField renders formatted date and opens date picker on tap',
+    (WidgetTester tester) async {
+      DateTime? selectedDate = DateTime(2000, 5, 15);
+      final controller = TextEditingController();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: AppDatePickerField(
+              controller: controller,
+              selectedDate: selectedDate,
+              labelText: 'Ngày sinh',
+              hintText: 'Chọn ngày sinh',
+              onDateSelected: (date) {
+                selectedDate = date;
               },
             ),
           ),
         ),
-      ),
-    );
+      );
 
-    expect(find.text('Họ và tên'), findsOneWidget);
-    expect(find.text('Nhập họ và tên'), findsOneWidget);
-    expect(find.byIcon(Icons.person), findsOneWidget);
+      expect(find.text('15/05/2000'), findsOneWidget);
+      expect(find.text('Ngày sinh'), findsOneWidget);
 
-    await tester.tap(find.text('Validate'));
-    await tester.pumpAndSettle();
-    expect(find.text('Bắt buộc nhập'), findsOneWidget);
+      await tester.tap(find.byType(AppDatePickerField));
+      await tester.pumpAndSettle();
 
-    await tester.enterText(find.byType(AppTextField), 'Nguyễn Văn A');
-    await tester.pumpAndSettle();
-    expect(controller.text, 'Nguyễn Văn A');
+      expect(find.byType(DatePickerDialog), findsOneWidget);
 
-    await tester.tap(find.text('Validate'));
-    await tester.pumpAndSettle();
-    expect(find.text('Bắt buộc nhập'), findsNothing);
-  });
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
 
-  testWidgets('AppDatePickerField renders formatted date and opens date picker on tap',
-      (WidgetTester tester) async {
-    DateTime? selectedDate = DateTime(2000, 5, 15);
-    final controller = TextEditingController();
+      expect(find.byType(DatePickerDialog), findsNothing);
+    },
+  );
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: AppDatePickerField(
-            controller: controller,
-            selectedDate: selectedDate,
-            labelText: 'Ngày sinh',
-            hintText: 'Chọn ngày sinh',
-            onDateSelected: (date) {
-              selectedDate = date;
-            },
-          ),
-        ),
-      ),
-    );
-
-    expect(find.text('15/05/2000'), findsOneWidget);
-    expect(find.text('Ngày sinh'), findsOneWidget);
-
-    await tester.tap(find.byType(AppDatePickerField));
-    await tester.pumpAndSettle();
-
-    expect(find.byType(DatePickerDialog), findsOneWidget);
-
-    await tester.tap(find.text('OK'));
-    await tester.pumpAndSettle();
-
-    expect(find.byType(DatePickerDialog), findsNothing);
-  });
-
-  testWidgets('AppSegmentedSelect renders options and notifies when selected',
-      (WidgetTester tester) async {
+  testWidgets('AppSegmentedSelect renders options and notifies when selected', (
+    WidgetTester tester,
+  ) async {
     String selectedValue = 'male';
 
     await tester.pumpWidget(
@@ -350,53 +357,56 @@ void main() {
     expect(selectedValue, 'other');
   });
 
-  testWidgets('AppSegmentedSelect.multiple supports selecting and deselecting multiple options',
-      (WidgetTester tester) async {
-    Set<String> selectedValues = {'wifi'};
+  testWidgets(
+    'AppSegmentedSelect.multiple supports selecting and deselecting multiple options',
+    (WidgetTester tester) async {
+      Set<String> selectedValues = {'wifi'};
 
-    await tester.pumpWidget(
-      StatefulBuilder(
-        builder: (context, setState) {
-          return MaterialApp(
-            home: Scaffold(
-              body: AppSegmentedSelect<String>.multiple(
-                labelText: 'Tiện ích',
-                selectedValues: selectedValues,
-                options: const [
-                  AppSelectOption(value: 'wifi', label: 'Wifi'),
-                  AppSelectOption(value: 'parking', label: 'Bãi đỗ xe'),
-                  AppSelectOption(value: 'ac', label: 'Điều hòa'),
-                ],
-                onMultiChanged: (newSet) {
-                  setState(() {
-                    selectedValues = newSet;
-                  });
-                },
+      await tester.pumpWidget(
+        StatefulBuilder(
+          builder: (context, setState) {
+            return MaterialApp(
+              home: Scaffold(
+                body: AppSegmentedSelect<String>.multiple(
+                  labelText: 'Tiện ích',
+                  selectedValues: selectedValues,
+                  options: const [
+                    AppSelectOption(value: 'wifi', label: 'Wifi'),
+                    AppSelectOption(value: 'parking', label: 'Bãi đỗ xe'),
+                    AppSelectOption(value: 'ac', label: 'Điều hòa'),
+                  ],
+                  onMultiChanged: (newSet) {
+                    setState(() {
+                      selectedValues = newSet;
+                    });
+                  },
+                ),
               ),
-            ),
-          );
-        },
-      ),
-    );
+            );
+          },
+        ),
+      );
 
-    expect(find.text('Tiện ích'), findsOneWidget);
-    expect(find.text('Wifi'), findsOneWidget);
-    expect(find.text('Bãi đỗ xe'), findsOneWidget);
-    expect(find.text('Điều hòa'), findsOneWidget);
+      expect(find.text('Tiện ích'), findsOneWidget);
+      expect(find.text('Wifi'), findsOneWidget);
+      expect(find.text('Bãi đỗ xe'), findsOneWidget);
+      expect(find.text('Điều hòa'), findsOneWidget);
 
-    expect(selectedValues, {'wifi'});
+      expect(selectedValues, {'wifi'});
 
-    await tester.tap(find.text('Bãi đỗ xe'));
-    await tester.pumpAndSettle();
-    expect(selectedValues, {'wifi', 'parking'});
+      await tester.tap(find.text('Bãi đỗ xe'));
+      await tester.pumpAndSettle();
+      expect(selectedValues, {'wifi', 'parking'});
 
-    await tester.tap(find.text('Wifi'));
-    await tester.pumpAndSettle();
-    expect(selectedValues, {'parking'});
-  });
+      await tester.tap(find.text('Wifi'));
+      await tester.pumpAndSettle();
+      expect(selectedValues, {'parking'});
+    },
+  );
 
-  testWidgets('AppCardSelect renders cards and toggles selection properly',
-      (WidgetTester tester) async {
+  testWidgets('AppCardSelect renders cards and toggles selection properly', (
+    WidgetTester tester,
+  ) async {
     UserRole selectedRole = UserRole.tenant;
 
     await tester.pumpWidget(
@@ -448,8 +458,9 @@ void main() {
     expect(selectedRole, UserRole.tenant);
   });
 
-  testWidgets('LoginScreen renders all fields and validates inputs',
-      (WidgetTester tester) async {
+  testWidgets('LoginScreen renders all fields and validates inputs', (
+    WidgetTester tester,
+  ) async {
     final router = createAppRouter(initialLocation: AppRoutes.login);
     await tester.pumpWidget(MyApp(router: router));
     await tester.pumpAndSettle();
