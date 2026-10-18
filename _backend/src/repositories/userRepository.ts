@@ -10,4 +10,11 @@ export class UserRepository extends Repository<User> {
   }
 
   // Add custom methods for complex queries if needed
+
+  public async findByEmailWithPassword(email: string): Promise<User | null> {
+    return this.createQueryBuilder("user")
+      .where("user.email = :email", { email })
+      .addSelect("user.password")
+      .getOne();
+  }
 }

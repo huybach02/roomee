@@ -11,11 +11,7 @@ export class GeneralController {
   public getProvinces = async (req: Request, res: Response): Promise<void> => {
     try {
       const provinces = await this.generalService.getProvinces();
-      return CustomResponse.success(
-        res,
-        provinces,
-        t("general.provincesSuccess"),
-      );
+      return CustomResponse.success(res, provinces, t("common.success"));
     } catch (error) {
       console.error("Error fetching provinces:", error);
       return CustomResponse.error(
@@ -44,7 +40,7 @@ export class GeneralController {
       const wards = await this.generalService.getWardsByProvince(
         parsed.data.provinceId,
       );
-      return CustomResponse.success(res, wards, t("general.wardsSuccess"));
+      return CustomResponse.success(res, wards, t("common.success"));
     } catch (error) {
       console.error("Error fetching wards:", error);
       return CustomResponse.error(

@@ -2,33 +2,69 @@ import { injectable } from "tsyringe";
 import { User } from "../../entities/user.js";
 import { UserRepository } from "../../repositories/userRepository.js";
 import { RegisterDto } from "./authSchema.js";
+import argon2 from "argon2";
+import { CODE_RESPONSE, Gender, UserRole } from "../../utils/constanst.js";
+import { MailService } from "../mail/mailService.js";
+import { OtpService } from "./otpService.js";
 
 @injectable()
 export class AuthService {
-  private readonly saltRounds = 10;
   private readonly jwtSecret = process.env.JWT_SECRET || "default_secret";
 
-  constructor(private userRepository: UserRepository) {}
+  constructor(
+    private userRepository: UserRepository,
+    private mailService: MailService,
+    private otpService: OtpService,
+  ) {}
 
   public async register(
     dtoData: RegisterDto,
-  ): Promise<{ user: User; token: string }> {
-    console.log("Registering user with data:", dtoData);
-    // const hashedPassword = await bcrypt.hash(password, this.saltRounds);
-    // const newUser = await this.userRepository.save(
-    //   this.userRepository.create({
-    //     ...dtoData,
-    //     password: hashedPassword,
-    //   }),
-    // );
-    // const token = jwt.sign({ id: newUser.id }, this.jwtSecret, {
-    //   expiresIn: "1h",
-    // });
-    // return { user: newUser, token };
+  ): Promise<{ user: User; code: string }> {
+    // Check if the email already exists
+    const existingUser = await this.userRepository.findOneBy({
+      email: dtoData.email,
+    });
+    if (existingUser) {
+      throw new Error(t("emailAlreadyExists"));
+    }
+
+    const hashedPassword = await argon2.hash(dtoData.password);
+    const user = this.userRepository.create({
+      email: dtoData.email,
+      password: hashedPassword,
+      fullName: dtoData.fullName || null,
+      phoneNumber: dtoData.phoneNumber || null,
+      avatarUrl: dtoData.avatarUrl || null,
+      bio: dtoData.bio || null,
+      birthday: dtoData.birthday || null,
+      gender: dtoData.gender || Gender.MALE,
+      role: dtoData.role || UserRole.TENANT,
+      isActive: true,
+      provinceId: dtoData.provinceId || null,
+      wardId: dtoData.wardId || null,
+    });
+
+    const savedUser = await this.userRepository.save(user);
+
+    // Tạo mã OTP 6 số và lưu vào Redis (hết hạn sau 10 phút)
+    const otp = await this.otpService.generateAndSaveOtp(
+      savedUser.email,
+      "register",
+      600,
+    );
+
+    // Gửi email chứa mã OTP xác thực
+    await this.mailService.sendOtpEmail({
+      to: savedUser.email,
+      otp,
+      fullName: savedUser.fullName,
+      expiresInMinutes: 10,
+    });
+
     return {
-      user: {} as User,
-      token: "dummy_token",
-    }; // Placeholder implementation
+      user: savedUser as User,
+      code: CODE_RESPONSE.NEED_VERIFY_EMAIL,
+    };
   }
 
   public async login(

@@ -6,6 +6,11 @@
     "unauthorized": "Bạn chưa được cấp quyền truy cập.",
     "badRequest": "Yêu cầu không hợp lệ."
   },
+  "validation": {
+    "failed": "Dữ liệu gửi lên không hợp lệ.",
+    "required": "{field} không được để trống.",
+    "invalidEmail": "Email không đúng định dạng."
+  },
   "auth": {
     "registerSuccess": "Đăng ký tài khoản thành công.",
     "registerError": "Đã xảy ra lỗi khi đăng ký tài khoản.",
@@ -15,13 +20,16 @@
     "invalidCredentials": "Email hoặc mật khẩu không chính xác.",
     "emailAlreadyExists": "Email này đã được sử dụng."
   },
-  "general": {
-    "provincesSuccess": "Lấy danh sách tỉnh/thành thành công.",
-    "wardsSuccess": "Lấy danh sách phường/xã thành công."
+  "mail": {
+    "verifyOtpSubject": "Mã xác thực tài khoản Roomee",
+    "tagline": "Hệ thống quản lý thuê trọ thông minh",
+    "greeting": "Xin chào {name},",
+    "otpVerifyIntro": "Cảm ơn bạn đã đăng ký tài khoản Roomee. Vui lòng sử dụng mã xác thực (OTP) dưới đây để hoàn tất đăng ký:",
+    "otpLabel": "Mã xác thực (OTP)",
+    "otpExpireNote": "Mã xác thực có hiệu lực trong {minutes} phút. Tuyệt đối không chia sẻ mã này cho bất kỳ ai để bảo vệ tài khoản.",
+    "footerNote": "Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email.",
+    "otpEmailText": "Mã OTP xác thực của bạn là: {otp}. Mã này có hiệu lực trong {minutes} phút.",
+    "copyright": "Tất cả các quyền được bảo lưu."
   },
-  "validation": {
-    "failed": "Dữ liệu gửi lên không hợp lệ.",
-    "required": "{field} không được để trống.",
-    "invalidEmail": "Email không đúng định dạng."
-  }
+  "emailAlreadyExists": "Email đã tồn tại."
 }

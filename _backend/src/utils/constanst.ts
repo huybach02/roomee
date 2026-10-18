@@ -14,3 +14,7 @@ export enum Gender {
   FEMALE = "female",
   OTHER = "other",
 }
+
+export const CODE_RESPONSE = {
+  NEED_VERIFY_EMAIL: "NEED_VERIFY_EMAIL",
+};

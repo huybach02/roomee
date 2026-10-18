@@ -6,22 +6,30 @@
     "unauthorized": "You are not authorized to perform this action.",
     "badRequest": "Bad request."
   },
-  "auth": {
-    "registerSuccess": "User registered successfully.",
-    "registerError": "Error registering user.",
-    "loginSuccess": "User logged in successfully.",
-    "loginError": "Error logging in user.",
-    "userNotFound": "User not found.",
-    "invalidCredentials": "Invalid email or password.",
-    "emailAlreadyExists": "Email is already in use."
-  },
-  "general": {
-    "provincesSuccess": "Provinces fetched successfully.",
-    "wardsSuccess": "Wards fetched successfully."
-  },
   "validation": {
     "failed": "Validation failed.",
     "required": "{field} is required.",
     "invalidEmail": "Invalid email address format."
-  }
+  },
+  "auth": {
+    "registerSuccess": "Account registered successfully.",
+    "registerError": "An error occurred while registering account.",
+    "loginSuccess": "Logged in successfully.",
+    "loginError": "An error occurred while logging in.",
+    "userNotFound": "User not found.",
+    "invalidCredentials": "Incorrect email or password.",
+    "emailAlreadyExists": "This email is already in use."
+  },
+  "mail": {
+    "verifyOtpSubject": "Your Roomee Verification Code",
+    "tagline": "Smart rental management system",
+    "greeting": "Hello {name},",
+    "otpVerifyIntro": "Thank you for registering an account on Roomee. Please use the verification code (OTP) below to complete your registration:",
+    "otpLabel": "Verification Code (OTP)",
+    "otpExpireNote": "This verification code will expire in {minutes} minutes. For security reasons, do not share this code with anyone.",
+    "footerNote": "If you did not request this, please ignore this email.",
+    "otpEmailText": "Your verification OTP is: {otp}. This code is valid for {minutes} minutes.",
+    "copyright": "All rights reserved."
+  },
+  "emailAlreadyExists": "Email already exists."
 }

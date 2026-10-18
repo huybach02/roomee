@@ -1,4 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, type Relation } from "typeorm";
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  JoinColumn,
+  type Relation,
+} from "typeorm";
 import { Mixin } from "ts-mixer";
 import { Gender, UserRole } from "../utils/constanst.js";
 import { AuditableTrait } from "../mixins/auditableTrait.js";
@@ -13,7 +20,7 @@ export class User extends Mixin(AuditableTrait) {
   @Column({ type: "varchar", length: 255, unique: true })
   email: string;
 
-  @Column({ type: "varchar", length: 255 })
+  @Column({ type: "varchar", length: 255, select: false })
   password: string;
 
   @Column({ type: "varchar", length: 100, nullable: true })

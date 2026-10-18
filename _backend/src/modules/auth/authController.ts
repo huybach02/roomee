@@ -13,20 +13,13 @@ export class AuthController {
 
     try {
       const result = await this.authService.register(dtoData);
-      return CustomResponse.success(
-        res,
-        result,
-        t("auth.registerSuccess"),
-        200,
-      );
+      return CustomResponse.success(res, result, t("common.success"), 200);
     } catch (error) {
-      console.error("Error registering user:", error);
-      return CustomResponse.error(
-        res,
-        t("auth.registerError"),
-        error instanceof Error ? error.message : error,
-        500,
-      );
+      const message =
+        error instanceof Error
+          ? error.message
+          : t("common.internalServerError");
+      return CustomResponse.error(res, message, null, 500);
     }
   };
 
@@ -35,16 +28,13 @@ export class AuthController {
 
     try {
       const result = await this.authService.login(email, password);
-      // Gọi trực tiếp hàm global t()
-      return CustomResponse.success(res, result, t("auth.loginSuccess"), 200);
+      return CustomResponse.success(res, result, t("common.success"), 200);
     } catch (error) {
-      console.error("Error logging in user:", error);
-      return CustomResponse.error(
-        res,
-        t("auth.loginError"),
-        error instanceof Error ? error.message : error,
-        500,
-      );
+      const message =
+        error instanceof Error
+          ? error.message
+          : t("common.internalServerError");
+      return CustomResponse.error(res, message, null, 500);
     }
   };
 }
