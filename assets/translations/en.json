@@ -23,14 +23,17 @@
     "ward": "Ward/Commune",
     "wardHint": "Select ward/commune",
     "searchHint": "Search...",
-    "noOptions": "No data"
+    "noOptions": "No data",
+    "otp": "OTP Code",
+    "otpHint": "Enter 6-digit code"
   },
   "validateErrors": {
     "fieldRequired": "This field is required",
     "invalidEmail": "Invalid email address",
     "invalidPhone": "Invalid phone number",
     "passwordTooShort": "Password must be at least 6 characters",
-    "passwordsDoNotMatch": "Passwords do not match"
+    "passwordsDoNotMatch": "Passwords do not match",
+    "otpInvalid": "Please enter all 6 digits of the OTP"
   },
   "errors": {
     "noInternet": "No internet connection. Please check your network.",
@@ -54,6 +57,7 @@
   "languageEnglish": "English",
   "registerTitle": "Create an Account",
   "registerSubtitle": "Enter your personal details to get started with Roomee",
+  "registerSuccessMessage": "Registration successful! Please check your email to verify your account.",
   "loginTitle": "Welcome Back",
   "loginSubtitle": "Sign in to continue managing your rental",
   "genderMale": "Male",
@@ -66,5 +70,14 @@
   "loginNow": "Log in now",
   "registerNow": "Register now",
   "forgotPassword": "Forgot password?",
-  "loginSuccess": "Login successful"
+  "loginSuccess": "Login successful",
+  "otpTitle": "OTP Verification",
+  "otpSubtitle": "Enter the 6-digit verification code sent to {target}",
+  "otpDefaultSubtitle": "Enter the 6-digit verification code sent to you",
+  "verify": "Verify",
+  "resendCode": "Resend code",
+  "resendCodeIn": "Resend code in {seconds}s",
+  "didNotReceiveCode": "Didn't receive code?",
+  "otpSentSuccess": "A new verification code has been sent successfully",
+  "otpVerifiedSuccess": "Account verified successfully! Please log in."
 }

@@ -78,23 +78,24 @@ class RegisterRequest {
 
   @override
   int get hashCode => Object.hash(
-        fullName,
-        email,
-        password,
-        phoneNumber,
-        gender,
-        role,
-        provinceId,
-        wardId,
-        birthday,
-      );
+    fullName,
+    email,
+    password,
+    phoneNumber,
+    gender,
+    role,
+    provinceId,
+    wardId,
+    birthday,
+  );
 }
 
 class AuthData {
   final UserModel? user;
   final String token;
+  final String? code;
 
-  const AuthData({this.user, required this.token});
+  const AuthData({this.user, required this.token, required this.code});
 
   factory AuthData.fromJson(Map<String, dynamic> json) {
     return AuthData(
@@ -102,11 +103,16 @@ class AuthData {
           ? UserModel.fromJson(json['user'] as Map<String, dynamic>)
           : null,
       token: json['token'] as String? ?? '',
+      code: json['code'] as String? ?? '',
     );
   }
 
   Map<String, dynamic> toJson() {
-    return {if (user != null) 'user': user!.toJson(), 'token': token};
+    return {
+      if (user != null) 'user': user!.toJson(),
+      'token': token,
+      'code': code,
+    };
   }
 
   @override

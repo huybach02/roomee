@@ -74,4 +74,7 @@ export class User extends Mixin(AuditableTrait) {
   })
   @JoinColumn({ name: "wardId" })
   ward: Relation<Ward> | null;
+
+  @Column({ type: "boolean", default: false })
+  isEmailVerified: boolean;
 }

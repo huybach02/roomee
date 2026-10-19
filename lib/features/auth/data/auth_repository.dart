@@ -9,6 +9,9 @@ abstract class IAuthRepository {
 
   Future<AuthData> register(RegisterRequest request);
 
+  Future<void> resendOtp(String email);
+  Future<void> verifyOtp({required String email, required String otp});
+
   Future<UserModel?> getCurrentUser();
   Future<bool> isLoggedIn();
   Future<String?> getToken();
@@ -61,6 +64,16 @@ class AuthRepository implements IAuthRepository {
     }
 
     return authData;
+  }
+
+  @override
+  Future<void> resendOtp(String email) async {
+    await _remoteDataSource.resendOtp(email);
+  }
+
+  @override
+  Future<void> verifyOtp({required String email, required String otp}) async {
+    await _remoteDataSource.verifyOtp(email: email, otp: otp);
   }
 
   @override

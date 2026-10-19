@@ -18,6 +18,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<AuthLoginEvent>(_onAuthLogin);
     on<AuthRegisterEvent>(_onAuthRegister);
     on<AuthLogoutEvent>(_onAuthLogout);
+    on<AuthVerifyOtpEvent>(_onAuthVerifyOtp);
+    on<AuthResendOtpEvent>(_onAuthResendOtp);
   }
 
   Future<void> _onAuthCheck(
@@ -66,8 +68,14 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(const AuthLoading());
     try {
       final authData = await _authRepository.register(event.request);
-      if (authData.token.isNotEmpty) {
-        emit(Authenticated(user: authData.user, token: authData.token));
+      if (authData.code == AuthOtpRequired.needVerifyEmail) {
+        emit(
+          AuthOtpRequired(
+            destination: event.request.email,
+            purpose: 'register',
+            user: authData.user,
+          ),
+        );
       } else {
         emit(const Unauthenticated());
       }
@@ -93,6 +101,48 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       await _authRepository.logout();
     } finally {
       emit(const Unauthenticated());
+    }
+  }
+
+  Future<void> _onAuthVerifyOtp(
+    AuthVerifyOtpEvent event,
+    Emitter<AuthState> emit,
+  ) async {
+    emit(const AuthLoading());
+    try {
+      await _authRepository.verifyOtp(email: event.email, otp: event.otp);
+      emit(const AuthOtpVerified());
+    } on ApiException catch (e) {
+      emit(
+        AuthFailure(
+          message: e.message,
+          statusCode: e.statusCode,
+          errors: e.errors,
+        ),
+      );
+    } catch (e) {
+      emit(AuthFailure(message: e.toString()));
+    }
+  }
+
+  Future<void> _onAuthResendOtp(
+    AuthResendOtpEvent event,
+    Emitter<AuthState> emit,
+  ) async {
+    emit(const AuthLoading());
+    try {
+      await _authRepository.resendOtp(event.email);
+      emit(const AuthOtpSent());
+    } on ApiException catch (e) {
+      emit(
+        AuthFailure(
+          message: e.message,
+          statusCode: e.statusCode,
+          errors: e.errors,
+        ),
+      );
+    } catch (e) {
+      emit(AuthFailure(message: e.toString()));
     }
   }
 }

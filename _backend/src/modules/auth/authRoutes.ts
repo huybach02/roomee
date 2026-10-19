@@ -1,7 +1,12 @@
 import { Router } from "express";
 import { injectable } from "tsyringe";
 import { AuthController } from "./authController.js";
-import { loginSchema, registerSchema } from "./authSchema.js";
+import {
+  loginSchema,
+  registerSchema,
+  resendOtpSchema,
+  verifyOtpSchema,
+} from "./authSchema.js";
 import { validate } from "../../middlewares/validateMiddleware.js";
 
 @injectable()
@@ -23,6 +28,16 @@ export class AuthRoutes {
       "/register",
       validate(registerSchema),
       this.authController.registerUser,
+    );
+    this.router.post(
+      "/resend-otp",
+      validate(resendOtpSchema),
+      this.authController.resendOtp,
+    );
+    this.router.post(
+      "/verify-otp",
+      validate(verifyOtpSchema),
+      this.authController.verifyOtp,
     );
   }
 }

@@ -19,4 +19,21 @@ class AuthRemoteDataSource extends BaseService {
       fromJsonT: (json) => AuthData.fromJson(json as Map<String, dynamic>),
     );
   }
+
+  Future<ApiResponse<dynamic>> resendOtp(String email) {
+    return postData<dynamic>(
+      '/auth/resend-otp',
+      data: {'email': email},
+    );
+  }
+
+  Future<ApiResponse<dynamic>> verifyOtp({
+    required String email,
+    required String otp,
+  }) {
+    return postData<dynamic>(
+      '/auth/verify-otp',
+      data: {'email': email, 'otp': otp},
+    );
+  }
 }

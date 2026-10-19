@@ -49,6 +49,7 @@ class MyApp extends StatelessWidget {
           create: (_) => generalBloc ?? GeneralBloc(),
         ),
         BlocProvider(
+          lazy: false,
           create: (_) => authBloc ?? (AuthBloc()..add(const AuthCheckEvent())),
         ),
       ],

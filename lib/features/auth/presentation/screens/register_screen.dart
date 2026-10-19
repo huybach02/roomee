@@ -11,6 +11,7 @@ import 'package:roomee/core/widgets/app_button.dart';
 import 'package:roomee/core/widgets/app_card_select.dart';
 import 'package:roomee/core/widgets/app_date_picker_field.dart';
 import 'package:roomee/core/widgets/app_dropdown_field.dart';
+import 'package:roomee/core/widgets/app_notification.dart';
 import 'package:roomee/core/widgets/app_segmented_select.dart';
 import 'package:roomee/core/widgets/app_text_field.dart';
 import 'package:roomee/features/auth/data/auth_dto.dart';
@@ -112,30 +113,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ? generalState.error
               : null;
           if (message != null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(message),
-                backgroundColor: DefaultColors.danger,
-              ),
-            );
+            AppNotification.showError(context, message);
           }
         },
         child: BlocConsumer<AuthBloc, AuthState>(
+          listenWhen: (previous, current) => previous is AuthLoading,
           listener: (context, state) {
-            if (state is Authenticated) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(t('registerTitle')),
-                  backgroundColor: DefaultColors.primary,
-                ),
+            if (state is AuthOtpRequired) {
+              AppNotification.showSuccess(
+                context,
+                t('registerSuccessMessage'),
+              );
+              context.pushReplacement(
+                AppRoutes.otp,
+                extra: {
+                  'destination': state.destination,
+                  'purpose': state.purpose,
+                },
               );
             } else if (state is AuthFailure) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(state.message),
-                  backgroundColor: DefaultColors.danger,
-                ),
-              );
+              AppNotification.showError(context, state.message);
             }
           },
           builder: (context, state) {
@@ -376,6 +373,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               AppDropdownField<int>(
                                 value: _selectedProvince?.id,
                                 options: provinceOptions,
+                                isLoading: generalLoaded.isLoadingProvinces,
+                                onTap: () {
+                                  if (provinceOptions.isEmpty) {
+                                    context.read<GeneralBloc>().add(
+                                      const GeneralProvincesLoadEvent(),
+                                    );
+                                  }
+                                },
                                 labelText: t('fields.province'),
                                 hintText: t('fields.provinceHint'),
                                 searchHint: t('fields.searchHint'),
@@ -407,6 +412,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 value: _selectedWard?.id,
                                 options: wardOptions,
                                 enabled: _selectedProvince != null,
+                                isLoading: generalLoaded.isLoadingWards,
+                                onTap: () {
+                                  if (_selectedProvince != null &&
+                                      wardOptions.isEmpty) {
+                                    context.read<GeneralBloc>().add(
+                                      GeneralWardsLoadEvent(
+                                        _selectedProvince!.id,
+                                      ),
+                                    );
+                                  }
+                                },
                                 labelText: t('fields.ward'),
                                 hintText: t('fields.wardHint'),
                                 searchHint: t('fields.searchHint'),
@@ -423,9 +439,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 },
                                 onChanged: (id) {
                                   setState(() {
-                                    _selectedWard = generalLoaded.wards.firstWhere(
-                                      (w) => w.id == id,
-                                    );
+                                    _selectedWard = generalLoaded.wards
+                                        .firstWhere((w) => w.id == id);
                                   });
                                 },
                               ),

@@ -1,12 +1,17 @@
 import { injectable } from "tsyringe";
 import { redis } from "../../config/redis.js";
 import { FunctionHelper } from "../../utils/functionHelper.js";
+import { TTL_OTP_SECONDS } from "../../utils/constanst.js";
 
-export type OtpPurpose = "register" | "forgot_password" | "change_email";
+export type OtpPurpose =
+  | "register"
+  | "forgot_password"
+  | "change_email"
+  | "resend";
 
 @injectable()
 export class OtpService {
-  private readonly defaultTtlSeconds = 600; // 10 phút
+  private readonly defaultTtlSeconds = TTL_OTP_SECONDS; // 10 phút
 
   /**
    * Sinh key lưu trong Redis theo mục đích và định danh (email/phone)

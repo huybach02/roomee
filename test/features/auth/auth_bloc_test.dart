@@ -17,7 +17,7 @@ class _FakeAuthRepository implements IAuthRepository {
     loggedIn = true;
     token = 'login_token_123';
     currentUser = UserModel(id: '1', email: request.email);
-    return AuthData(user: currentUser, token: token!);
+    return AuthData(user: currentUser, token: token!, code: null);
   }
 
   @override
@@ -30,7 +30,11 @@ class _FakeAuthRepository implements IAuthRepository {
       email: request.email,
       fullName: request.fullName,
     );
-    return AuthData(user: currentUser, token: token!);
+    return AuthData(
+      user: currentUser,
+      token: token!,
+      code: 'NEED_VERIFY_EMAIL',
+    );
   }
 
   @override
@@ -54,6 +58,23 @@ class _FakeAuthRepository implements IAuthRepository {
     currentUser = null;
     token = null;
   }
+
+  String? lastResentEmail;
+  String? lastVerifiedEmail;
+  String? lastVerifiedOtp;
+
+  @override
+  Future<void> resendOtp(String email) async {
+    if (errorToThrow != null) throw errorToThrow!;
+    lastResentEmail = email;
+  }
+
+  @override
+  Future<void> verifyOtp({required String email, required String otp}) async {
+    if (errorToThrow != null) throw errorToThrow!;
+    lastVerifiedEmail = email;
+    lastVerifiedOtp = otp;
+  }
 }
 
 void main() {
@@ -75,12 +96,7 @@ void main() {
 
   group('AuthCheckEvent', () {
     test('emits [Unauthenticated] when not logged in', () async {
-      expectLater(
-        authBloc.stream,
-        emitsInOrder([
-          const Unauthenticated(),
-        ]),
-      );
+      expectLater(authBloc.stream, emitsInOrder([const Unauthenticated()]));
 
       authBloc.add(const AuthCheckEvent());
     });
@@ -117,9 +133,11 @@ void main() {
         ]),
       );
 
-      authBloc.add(const AuthLoginEvent(
-        LoginRequest(email: 'user@roomee.vn', password: 'password123'),
-      ));
+      authBloc.add(
+        const AuthLoginEvent(
+          LoginRequest(email: 'user@roomee.vn', password: 'password123'),
+        ),
+      );
     });
 
     test('emits [AuthLoading, AuthFailure] on login error', () async {
@@ -139,33 +157,45 @@ void main() {
         ]),
       );
 
-      authBloc.add(const AuthLoginEvent(
-        LoginRequest(email: 'user@roomee.vn', password: 'wrong_password'),
-      ));
+      authBloc.add(
+        const AuthLoginEvent(
+          LoginRequest(email: 'user@roomee.vn', password: 'wrong_password'),
+        ),
+      );
     });
   });
 
   group('AuthRegisterEvent', () {
-    test('emits [AuthLoading, Authenticated] on successful registration', () async {
-      expectLater(
-        authBloc.stream,
-        emitsInOrder([
-          const AuthLoading(),
-          const Authenticated(
-            user: UserModel(id: '2', email: 'new@roomee.vn', fullName: 'New User'),
-            token: 'reg_token_456',
-          ),
-        ]),
-      );
+    test(
+      'emits [AuthLoading, AuthOtpRequired] on successful registration',
+      () async {
+        expectLater(
+          authBloc.stream,
+          emitsInOrder([
+            const AuthLoading(),
+            const AuthOtpRequired(
+              destination: 'new@roomee.vn',
+              purpose: 'register',
+              user: UserModel(
+                id: '2',
+                email: 'new@roomee.vn',
+                fullName: 'New User',
+              ),
+            ),
+          ]),
+        );
 
-      authBloc.add(const AuthRegisterEvent(
-        RegisterRequest(
-          fullName: 'New User',
-          email: 'new@roomee.vn',
-          password: 'password123',
-        ),
-      ));
-    });
+        authBloc.add(
+          const AuthRegisterEvent(
+            RegisterRequest(
+              fullName: 'New User',
+              email: 'new@roomee.vn',
+              password: 'password123',
+            ),
+          ),
+        );
+      },
+    );
 
     test('emits [AuthLoading, AuthFailure] on registration error', () async {
       fakeRepo.errorToThrow = const ClientException(
@@ -184,13 +214,15 @@ void main() {
         ]),
       );
 
-      authBloc.add(const AuthRegisterEvent(
-        RegisterRequest(
-          fullName: 'Test',
-          email: 'existing@roomee.vn',
-          password: 'password123',
+      authBloc.add(
+        const AuthRegisterEvent(
+          RegisterRequest(
+            fullName: 'Test',
+            email: 'existing@roomee.vn',
+            password: 'password123',
+          ),
         ),
-      ));
+      );
     });
   });
 
@@ -201,13 +233,95 @@ void main() {
 
       expectLater(
         authBloc.stream,
-        emitsInOrder([
-          const AuthLoading(),
-          const Unauthenticated(),
-        ]),
+        emitsInOrder([const AuthLoading(), const Unauthenticated()]),
       );
 
       authBloc.add(const AuthLogoutEvent());
+    });
+  });
+
+  group('AuthOtpRequired equality', () {
+    test('compares correctly based on destination, purpose, and user', () {
+      const otpState1 = AuthOtpRequired(
+        destination: 'test@roomee.vn',
+        purpose: 'register',
+      );
+      const otpState2 = AuthOtpRequired(
+        destination: 'test@roomee.vn',
+        purpose: 'register',
+      );
+      const otpState3 = AuthOtpRequired(
+        destination: 'other@roomee.vn',
+        purpose: 'register',
+      );
+
+      expect(otpState1, equals(otpState2));
+      expect(otpState1 == otpState3, isFalse);
+    });
+  });
+
+  group('AuthVerifyOtpEvent', () {
+    test('emits [AuthLoading, AuthOtpVerified] on successful verification', () async {
+      expectLater(
+        authBloc.stream,
+        emitsInOrder([const AuthLoading(), const AuthOtpVerified()]),
+      );
+
+      authBloc.add(
+        const AuthVerifyOtpEvent(email: 'test@roomee.vn', otp: '123456'),
+      );
+    });
+
+    test('emits [AuthLoading, AuthFailure] on verification error', () async {
+      fakeRepo.errorToThrow = const ClientException(
+        message: 'Mã xác thực không hợp lệ',
+        statusCode: 400,
+      );
+
+      expectLater(
+        authBloc.stream,
+        emitsInOrder([
+          const AuthLoading(),
+          const AuthFailure(
+            message: 'Mã xác thực không hợp lệ',
+            statusCode: 400,
+          ),
+        ]),
+      );
+
+      authBloc.add(
+        const AuthVerifyOtpEvent(email: 'test@roomee.vn', otp: '000000'),
+      );
+    });
+  });
+
+  group('AuthResendOtpEvent', () {
+    test('emits [AuthLoading, AuthOtpSent] on successful resend', () async {
+      expectLater(
+        authBloc.stream,
+        emitsInOrder([const AuthLoading(), const AuthOtpSent()]),
+      );
+
+      authBloc.add(const AuthResendOtpEvent('test@roomee.vn'));
+    });
+
+    test('emits [AuthLoading, AuthFailure] on resend error', () async {
+      fakeRepo.errorToThrow = const ServerException(
+        message: 'Không thể gửi email OTP',
+      );
+
+      expectLater(
+        authBloc.stream,
+        emitsInOrder([
+          const AuthLoading(),
+          const AuthFailure(
+            message: 'Không thể gửi email OTP',
+            statusCode: 500,
+          ),
+        ]),
+      );
+
+      authBloc.add(const AuthResendOtpEvent('test@roomee.vn'));
     });
   });
 }

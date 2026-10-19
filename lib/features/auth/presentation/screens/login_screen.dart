@@ -5,6 +5,7 @@ import 'package:roomee/core/configs/app_theme.dart';
 import 'package:roomee/core/localization/app_localizations.dart';
 import 'package:roomee/core/router/app_router.dart';
 import 'package:roomee/core/widgets/app_button.dart';
+import 'package:roomee/core/widgets/app_notification.dart';
 import 'package:roomee/core/widgets/app_text_field.dart';
 import 'package:roomee/features/auth/data/auth_dto.dart';
 import 'package:roomee/features/auth/presentation/bloc/auth_bloc.dart';
@@ -45,12 +46,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _onForgotPassword() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(t('forgotPassword')),
-        backgroundColor: DefaultColors.primary,
-      ),
-    );
+    AppNotification.showInfo(context, t('forgotPassword'));
   }
 
   @override
@@ -76,21 +72,12 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       ),
       body: BlocConsumer<AuthBloc, AuthState>(
+        listenWhen: (previous, current) => previous is AuthLoading,
         listener: (context, state) {
           if (state is Authenticated) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(t('loginSuccess')),
-                backgroundColor: DefaultColors.primary,
-              ),
-            );
+            AppNotification.showSuccess(context, t('loginSuccess'));
           } else if (state is AuthFailure) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: DefaultColors.danger,
-              ),
-            );
+            AppNotification.showError(context, state.message);
           }
         },
         builder: (context, state) {

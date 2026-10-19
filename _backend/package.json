@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit",
     "typeorm": "tsx ./node_modules/typeorm/cli.js -d src/config/data-source.ts",
     "migration:create": "tsx ./node_modules/typeorm/cli.js migration:create",
-    "migration:generate": "tsx ./node_modules/typeorm/cli.js migration:generate -d src/config/data-source.ts",
+    "migration:generate": "node scripts/migration-generate.mjs",
     "migration:run": "tsx ./node_modules/typeorm/cli.js migration:run -d src/config/data-source.ts",
     "migration:revert": "tsx ./node_modules/typeorm/cli.js migration:revert -d src/config/data-source.ts",
     "migration:show": "tsx ./node_modules/typeorm/cli.js migration:show -d src/config/data-source.ts",

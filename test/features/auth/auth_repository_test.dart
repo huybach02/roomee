@@ -210,5 +210,65 @@ void main() {
       expect(await repository.isLoggedIn(), isFalse);
       expect(await repository.getCurrentUser(), isNull);
     });
+
+    test('resendOtp sends post request to /auth/resend-otp', () async {
+      String? requestedPath;
+      Map<String, dynamic>? requestedData;
+
+      testDio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            requestedPath = options.path;
+            requestedData = options.data as Map<String, dynamic>?;
+            return handler.resolve(
+              Response(
+                requestOptions: options,
+                statusCode: 200,
+                data: {
+                  'success': true,
+                  'message': 'Thành công',
+                  'data': null,
+                },
+              ),
+            );
+          },
+        ),
+      );
+
+      await repository.resendOtp('test@roomee.vn');
+
+      expect(requestedPath, '/auth/resend-otp');
+      expect(requestedData, {'email': 'test@roomee.vn'});
+    });
+
+    test('verifyOtp sends post request to /auth/verify-otp', () async {
+      String? requestedPath;
+      Map<String, dynamic>? requestedData;
+
+      testDio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            requestedPath = options.path;
+            requestedData = options.data as Map<String, dynamic>?;
+            return handler.resolve(
+              Response(
+                requestOptions: options,
+                statusCode: 200,
+                data: {
+                  'success': true,
+                  'message': 'Thành công',
+                  'data': null,
+                },
+              ),
+            );
+          },
+        ),
+      );
+
+      await repository.verifyOtp(email: 'test@roomee.vn', otp: '123456');
+
+      expect(requestedPath, '/auth/verify-otp');
+      expect(requestedData, {'email': 'test@roomee.vn', 'otp': '123456'});
+    });
   });
 }

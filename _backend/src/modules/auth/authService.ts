@@ -3,7 +3,12 @@ import { User } from "../../entities/user.js";
 import { UserRepository } from "../../repositories/userRepository.js";
 import { RegisterDto } from "./authSchema.js";
 import argon2 from "argon2";
-import { CODE_RESPONSE, Gender, UserRole } from "../../utils/constanst.js";
+import {
+  CODE_RESPONSE,
+  Gender,
+  TTL_OTP_SECONDS,
+  UserRole,
+} from "../../utils/constanst.js";
 import { MailService } from "../mail/mailService.js";
 import { OtpService } from "./otpService.js";
 
@@ -39,6 +44,7 @@ export class AuthService {
       birthday: dtoData.birthday || null,
       gender: dtoData.gender || Gender.MALE,
       role: dtoData.role || UserRole.TENANT,
+      isEmailVerified: false,
       isActive: true,
       provinceId: dtoData.provinceId || null,
       wardId: dtoData.wardId || null,
@@ -50,7 +56,7 @@ export class AuthService {
     const otp = await this.otpService.generateAndSaveOtp(
       savedUser.email,
       "register",
-      600,
+      TTL_OTP_SECONDS,
     );
 
     // Gửi email chứa mã OTP xác thực
@@ -65,6 +71,37 @@ export class AuthService {
       user: savedUser as User,
       code: CODE_RESPONSE.NEED_VERIFY_EMAIL,
     };
+  }
+
+  public async resendOtp(email: string): Promise<void> {
+    // Tạo mã OTP 6 số và lưu vào Redis (hết hạn sau 10 phút)
+    const otp = await this.otpService.generateAndSaveOtp(
+      email,
+      "register",
+      TTL_OTP_SECONDS,
+    );
+
+    // Gửi email chứa mã OTP xác thực
+    await this.mailService.sendOtpEmail({
+      to: email,
+      otp,
+      fullName: null,
+      expiresInMinutes: 10,
+    });
+  }
+
+  public async verifyOtp(email: string, otp: string): Promise<void> {
+    // Xác thực mã OTP
+    const isOtpValid = await this.otpService.verifyOtp(email, otp, "register");
+    if (!isOtpValid) {
+      throw new Error(t("auth.invalidOtp"));
+    }
+
+    const user = await this.userRepository.findOneBy({ email });
+    if (user) {
+      user.isEmailVerified = true;
+      await this.userRepository.save(user);
+    }
   }
 
   public async login(

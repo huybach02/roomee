@@ -18,7 +18,8 @@
     "loginError": "Đã xảy ra lỗi khi đăng nhập.",
     "userNotFound": "Tài khoản không tồn tại.",
     "invalidCredentials": "Email hoặc mật khẩu không chính xác.",
-    "emailAlreadyExists": "Email này đã được sử dụng."
+    "emailAlreadyExists": "Email này đã được sử dụng.",
+    "invalidOtp": "Mã xác thực (OTP) không hợp lệ hoặc đã hết hạn."
   },
   "mail": {
     "verifyOtpSubject": "Mã xác thực tài khoản Roomee",

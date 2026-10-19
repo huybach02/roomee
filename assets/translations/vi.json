@@ -23,14 +23,17 @@
     "ward": "Phường/Xã",
     "wardHint": "Chọn phường/xã",
     "searchHint": "Tìm kiếm...",
-    "noOptions": "Không có dữ liệu"
+    "noOptions": "Không có dữ liệu",
+    "otp": "Mã OTP",
+    "otpHint": "Nhập mã 6 chữ số"
   },
   "validateErrors": {
     "fieldRequired": "Vui lòng nhập trường này",
     "invalidEmail": "Email không hợp lệ",
     "invalidPhone": "Số điện thoại không hợp lệ",
     "passwordTooShort": "Mật khẩu phải có ít nhất 6 ký tự",
-    "passwordsDoNotMatch": "Mật khẩu xác nhận không khớp"
+    "passwordsDoNotMatch": "Mật khẩu xác nhận không khớp",
+    "otpInvalid": "Vui lòng nhập đủ 6 chữ số mã OTP"
   },
   "errors": {
     "noInternet": "Không có kết nối Internet. Vui lòng kiểm tra lại mạng.",
@@ -54,6 +57,7 @@
   "languageEnglish": "English",
   "registerTitle": "Đăng ký tài khoản",
   "registerSubtitle": "Nhập thông tin cá nhân để bắt đầu sử dụng Roomee",
+  "registerSuccessMessage": "Đăng ký thành công! Vui lòng kiểm tra email để xác thực tài khoản.",
   "loginTitle": "Đăng nhập",
   "loginSubtitle": "Đăng nhập để tiếp tục quản lý phòng trọ",
   "genderMale": "Nam",
@@ -66,5 +70,14 @@
   "loginNow": "Đăng nhập ngay",
   "registerNow": "Đăng ký ngay",
   "forgotPassword": "Quên mật khẩu?",
-  "loginSuccess": "Đăng nhập thành công"
+  "loginSuccess": "Đăng nhập thành công",
+  "otpTitle": "Xác thực mã OTP",
+  "otpSubtitle": "Nhập mã xác thực gồm 6 chữ số đã được gửi đến {target}",
+  "otpDefaultSubtitle": "Nhập mã xác thực gồm 6 chữ số đã được gửi đến bạn",
+  "verify": "Xác nhận",
+  "resendCode": "Gửi lại mã",
+  "resendCodeIn": "Gửi lại mã sau {seconds}s",
+  "didNotReceiveCode": "Chưa nhận được mã?",
+  "otpSentSuccess": "Mã xác thực mới đã được gửi thành công",
+  "otpVerifiedSuccess": "Xác thực tài khoản thành công! Vui lòng đăng nhập."
 }

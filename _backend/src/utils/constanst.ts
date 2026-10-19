@@ -1,6 +1,7 @@
 export const DEFAULT_PORT = 5000;
 export const NODE_ENV = process.env.NODE_ENV || "development";
 export const API_PREFIX = process.env.API_PREFIX || "/api/v1";
+export const TTL_OTP_SECONDS = 600; // 10 phút
 
 export enum UserRole {
   LANDLORD = "landlord", // Chủ trọ

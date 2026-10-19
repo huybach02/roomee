@@ -13,6 +13,7 @@ class AppDropdownField<T> extends StatefulWidget {
   final T? value;
   final List<AppDropdownOption<T>> options;
   final ValueChanged<T>? onChanged;
+  final VoidCallback? onTap;
   final String? labelText;
   final String? hintText;
   final String? searchHint;
@@ -20,12 +21,14 @@ class AppDropdownField<T> extends StatefulWidget {
   final FormFieldValidator<String>? validator;
   final Widget? prefixIcon;
   final bool enabled;
+  final bool isLoading;
 
   const AppDropdownField({
     super.key,
     this.value,
     required this.options,
     this.onChanged,
+    this.onTap,
     this.labelText,
     this.hintText,
     this.searchHint,
@@ -33,6 +36,7 @@ class AppDropdownField<T> extends StatefulWidget {
     this.validator,
     this.prefixIcon,
     this.enabled = true,
+    this.isLoading = false,
   });
 
   @override
@@ -81,6 +85,8 @@ class _AppDropdownFieldState<T> extends State<AppDropdownField<T>> {
   Future<void> _openSheet() async {
     if (!widget.enabled) return;
 
+    widget.onTap?.call();
+
     final selected = await showModalBottomSheet<T>(
       context: context,
       isScrollControlled: true,
@@ -92,6 +98,7 @@ class _AppDropdownFieldState<T> extends State<AppDropdownField<T>> {
         options: widget.options,
         searchHint: widget.searchHint ?? '',
         emptyText: widget.emptyText ?? '',
+        isLoading: widget.isLoading,
       ),
     );
 
@@ -112,10 +119,22 @@ class _AppDropdownFieldState<T> extends State<AppDropdownField<T>> {
       labelText: widget.labelText,
       hintText: widget.hintText,
       prefixIcon: widget.prefixIcon,
-      suffixIcon: const Icon(
-        Icons.arrow_drop_down,
-        color: DefaultColors.textSecondary,
-      ),
+      suffixIcon: widget.isLoading
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: Padding(
+                padding: EdgeInsets.all(12),
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: DefaultColors.primary,
+                ),
+              ),
+            )
+          : const Icon(
+              Icons.arrow_drop_down,
+              color: DefaultColors.textSecondary,
+            ),
       validator: widget.validator,
     );
   }
@@ -125,11 +144,13 @@ class _DropdownSheet<T> extends StatefulWidget {
   final List<AppDropdownOption<T>> options;
   final String searchHint;
   final String emptyText;
+  final bool isLoading;
 
   const _DropdownSheet({
     required this.options,
     required this.searchHint,
     required this.emptyText,
+    this.isLoading = false,
   });
 
   @override
@@ -139,6 +160,14 @@ class _DropdownSheet<T> extends StatefulWidget {
 class _DropdownSheetState<T> extends State<_DropdownSheet<T>> {
   final TextEditingController _searchController = TextEditingController();
   late List<AppDropdownOption<T>> _filtered = widget.options;
+
+  @override
+  void didUpdateWidget(covariant _DropdownSheet<T> oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.options != oldWidget.options) {
+      _onSearch(_searchController.text);
+    }
+  }
 
   @override
   void dispose() {
@@ -189,7 +218,13 @@ class _DropdownSheetState<T> extends State<_DropdownSheet<T>> {
               ),
             ),
             Expanded(
-              child: _filtered.isEmpty
+              child: widget.isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        color: DefaultColors.primary,
+                      ),
+                    )
+                  : _filtered.isEmpty
                   ? Center(
                       child: Text(
                         widget.emptyText,

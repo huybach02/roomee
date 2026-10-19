@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:roomee/core/screens/welcome_screen.dart';
 import 'package:roomee/features/auth/presentation/screens/login_screen.dart';
+import 'package:roomee/features/auth/presentation/screens/otp_screen.dart';
 import 'package:roomee/features/auth/presentation/screens/register_screen.dart';
 
 class AppRoutes {
@@ -11,6 +12,7 @@ class AppRoutes {
   static const String welcome = '/';
   static const String login = '/login';
   static const String register = '/register';
+  static const String otp = '/otp';
 }
 
 Page<void> _buildSlidePage(GoRouterState state, Widget child) {
@@ -42,6 +44,28 @@ GoRouter createAppRouter({
         path: AppRoutes.register,
         name: 'register',
         pageBuilder: (context, state) => _buildSlidePage(state, const RegisterScreen()),
+      ),
+      GoRoute(
+        path: AppRoutes.otp,
+        name: 'otp',
+        pageBuilder: (context, state) {
+          final extra = state.extra;
+          String? destination;
+          String? purpose;
+          if (extra is Map<String, dynamic>) {
+            destination = extra['destination'] as String?;
+            purpose = extra['purpose'] as String?;
+          } else if (extra is String) {
+            destination = extra;
+          }
+          return _buildSlidePage(
+            state,
+            OtpScreen(
+              destination: destination,
+              purpose: purpose,
+            ),
+          );
+        },
       ),
     ],
   );

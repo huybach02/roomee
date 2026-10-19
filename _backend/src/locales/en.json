@@ -18,7 +18,8 @@
     "loginError": "An error occurred while logging in.",
     "userNotFound": "User not found.",
     "invalidCredentials": "Incorrect email or password.",
-    "emailAlreadyExists": "This email is already in use."
+    "emailAlreadyExists": "This email is already in use.",
+    "invalidOtp": "The verification code (OTP) is invalid or has expired."
   },
   "mail": {
     "verifyOtpSubject": "Your Roomee Verification Code",

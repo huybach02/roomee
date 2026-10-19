@@ -75,6 +75,10 @@ export const changePasswordSchema = z.object({
   newPassword: ruleValidates.passwordRule({ min: 6, label: "New password" }),
 });
 
+export const resendOtpSchema = z.object({
+  email: ruleValidates.emailRule,
+});
+
 export const verifyOtpSchema = z.object({
   email: ruleValidates.emailRule.optional(),
   phoneNumber: ruleValidates.phoneRule("Phone number").optional().nullable(),
@@ -87,4 +91,5 @@ export type LoginDto = z.infer<typeof loginSchema>;
 export type ForgotPasswordDto = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordDto = z.infer<typeof resetPasswordSchema>;
 export type ChangePasswordDto = z.infer<typeof changePasswordSchema>;
+export type ResendOtpDto = z.infer<typeof resendOtpSchema>;
 export type VerifyOtpDto = z.infer<typeof verifyOtpSchema>;
