@@ -6,9 +6,19 @@ import 'package:roomee/core/localization/app_localizations.dart';
 import 'package:roomee/core/router/app_router.dart';
 import 'package:roomee/core/widgets/app_button.dart';
 import 'package:roomee/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:roomee/utils/constanst.dart';
 
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+/// Màn hình Dashboard dành cho Người thuê trọ ĐÃ CÓ hợp đồng (hasContract = true).
+/// Sau này sẽ là dashboard quản lý phòng thuê, hóa đơn điện nước, yêu cầu sửa chữa...
+class TenantScreen extends StatefulWidget {
+  const TenantScreen({super.key});
+
+  @override
+  State<TenantScreen> createState() => _TenantScreenState();
+}
+
+class _TenantScreenState extends State<TenantScreen> {
+  int _selectedIndex = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -18,7 +28,7 @@ class HomeScreen extends StatelessWidget {
         backgroundColor: DefaultColors.white,
         elevation: 0,
         title: Text(
-          t('homeTitle'),
+          t('tenantDashboardTitle'),
           style: const TextStyle(
             color: DefaultColors.primary,
             fontSize: FontSizes.medium,
@@ -36,7 +46,7 @@ class HomeScreen extends StatelessWidget {
           final user = state is Authenticated ? state.user : null;
           final displayName = user?.fullName?.isNotEmpty == true
               ? user!.fullName!
-              : (user?.email ?? 'User');
+              : (user?.email ?? 'Tenant');
 
           return SafeArea(
             child: Padding(
@@ -46,7 +56,7 @@ class HomeScreen extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     const Icon(
-                      Icons.home_work_outlined,
+                      Icons.apartment_rounded,
                       size: 64,
                       color: DefaultColors.primary,
                     ),
@@ -60,6 +70,15 @@ class HomeScreen extends StatelessWidget {
                         color: DefaultColors.textPrimary,
                       ),
                     ),
+                    const SizedBox(height: 6),
+                    Text(
+                      t('tenantDashboardSubtitle'),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: FontSizes.standard,
+                        color: DefaultColors.textSecondary,
+                      ),
+                    ),
                     if (user?.email != null) ...[
                       const SizedBox(height: 6),
                       Text(
@@ -68,29 +87,6 @@ class HomeScreen extends StatelessWidget {
                           fontSize: FontSizes.standard,
                           color: DefaultColors.textSecondary,
                         ),
-                      ),
-                    ],
-                    if (user?.role != null) ...[
-                      const SizedBox(height: 6),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            '${t('userRole')}: ',
-                            style: const TextStyle(
-                              fontSize: FontSizes.standard,
-                              color: DefaultColors.textSecondary,
-                            ),
-                          ),
-                          Text(
-                            user!.role.name.toUpperCase(),
-                            style: const TextStyle(
-                              fontSize: FontSizes.standard,
-                              fontWeight: FontWeight.bold,
-                              color: DefaultColors.secondary,
-                            ),
-                          ),
-                        ],
                       ),
                     ],
                     const SizedBox(height: 32),
@@ -107,6 +103,30 @@ class HomeScreen extends StatelessWidget {
             ),
           );
         },
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: (index) {
+          setState(() {
+            _selectedIndex = index;
+          });
+        },
+        type: BottomNavigationBarType.fixed,
+        backgroundColor: DefaultColors.white,
+        selectedItemColor: DefaultColors.primary,
+        unselectedItemColor: DefaultColors.textSecondary,
+        selectedFontSize: FontSizes.small,
+        unselectedFontSize: FontSizes.small,
+        elevation: 8,
+        items: tenantNavItems
+            .map(
+              (item) => BottomNavigationBarItem(
+                icon: Icon(item.icon),
+                activeIcon: Icon(item.activeIcon),
+                label: t(item.labelKey),
+              ),
+            )
+            .toList(),
       ),
     );
   }

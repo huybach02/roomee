@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:roomee/core/bloc/locale/locale_cubit.dart';
 import 'package:roomee/core/localization/app_localizations.dart';
 import 'package:roomee/core/models/models.dart';
 import 'package:roomee/core/router/app_router.dart';
@@ -16,7 +17,7 @@ import 'package:roomee/features/auth/presentation/screens/otp_screen.dart';
 import 'package:roomee/features/auth/presentation/screens/register_screen.dart';
 import 'package:roomee/features/general/data/general_repository.dart';
 import 'package:roomee/features/general/presentation/bloc/general_bloc.dart';
-import 'package:roomee/features/home/presentation/screens/home_screen.dart';
+import 'package:roomee/core/screens/home_screen.dart';
 import 'package:roomee/utils/constanst.dart';
 
 class _FakeGeneralRepo implements IGeneralRepository {
@@ -41,7 +42,16 @@ class _FakeAuthRepo implements IAuthRepository {
   @override
   Future<AuthData> login(LoginRequest request) async {
     await Future.delayed(const Duration(milliseconds: 100));
-    return const AuthData(token: 'fake_tok', code: null);
+    return const AuthData(
+      token: 'fake_tok',
+      user: UserModel(
+        id: '1',
+        email: 'user@roomee.vn',
+        role: UserRole.tenant,
+        hasContract: false,
+      ),
+      code: null,
+    );
   }
 
   @override
@@ -105,8 +115,11 @@ void main() {
       final router = createAppRouter(initialLocation: AppRoutes.login);
 
       await tester.pumpWidget(
-        BlocProvider<AuthBloc>.value(
-          value: bloc,
+        MultiBlocProvider(
+          providers: [
+            BlocProvider<AuthBloc>.value(value: bloc),
+            BlocProvider<LocaleCubit>(create: (_) => LocaleCubit()),
+          ],
           child: MaterialApp.router(
             locale: const Locale('vi'),
             localizationsDelegates: delegates,

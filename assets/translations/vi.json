@@ -95,5 +95,16 @@
   "resetPasswordSubtitle": "Tạo mật khẩu mới cho tài khoản của bạn",
   "savePassword": "Lưu mật khẩu mới",
   "forgotPasswordSentMessage": "Mã xác thực đã được gửi về email của bạn (nếu tài khoản tồn tại).",
-  "resetPasswordSuccessMessage": "Đặt lại mật khẩu thành công! Vui lòng đăng nhập lại."
+  "resetPasswordSuccessMessage": "Đặt lại mật khẩu thành công! Vui lòng đăng nhập lại.",
+  "tenantDashboardTitle": "Quản lý phòng thuê",
+  "tenantDashboardSubtitle": "Dashboard quản lý dành cho người thuê trọ",
+  "landlordDashboardTitle": "Quản lý nhà trọ",
+  "landlordDashboardSubtitle": "Dashboard quản lý dành cho chủ trọ & nhân viên",
+  "homeExploreRooms": "Khám phá phòng trọ & tin đăng cho thuê",
+  "navHome": "Trang chủ",
+  "navWorkspace": "Workspace",
+  "navManageRentals": "Quản lý trọ",
+  "navMyRental": "Trọ của tôi",
+  "navMessages": "Nhắn tin",
+  "navMenu": "Menu"
 }

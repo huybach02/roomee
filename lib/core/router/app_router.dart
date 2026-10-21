@@ -1,13 +1,16 @@
 import 'package:flutter/cupertino.dart' show CupertinoPage;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:roomee/core/screens/home_screen.dart';
+import 'package:roomee/core/screens/landlord_screen.dart';
+import 'package:roomee/core/screens/tenant_screen.dart';
 import 'package:roomee/core/screens/welcome_screen.dart';
+import 'package:roomee/core/screens/wrapper_screen.dart';
 import 'package:roomee/features/auth/presentation/screens/forgot_password_screen.dart';
 import 'package:roomee/features/auth/presentation/screens/login_screen.dart';
 import 'package:roomee/features/auth/presentation/screens/otp_screen.dart';
 import 'package:roomee/features/auth/presentation/screens/register_screen.dart';
 import 'package:roomee/features/auth/presentation/screens/reset_password_screen.dart';
-import 'package:roomee/features/home/presentation/screens/home_screen.dart';
 
 class AppRoutes {
   AppRoutes._();
@@ -18,7 +21,10 @@ class AppRoutes {
   static const String otp = '/otp';
   static const String forgotPassword = '/forgot-password';
   static const String resetPassword = '/reset-password';
+  static const String wrapper = '/wrapper';
   static const String home = '/home';
+  static const String tenant = '/tenant';
+  static const String landlord = '/landlord';
 }
 
 Page<void> _buildSlidePage(GoRouterState state, Widget child) {
@@ -29,7 +35,7 @@ Page<void> _buildSlidePage(GoRouterState state, Widget child) {
 }
 
 GoRouter createAppRouter({
-  String initialLocation = AppRoutes.welcome,
+  String initialLocation = AppRoutes.wrapper,
   GlobalKey<NavigatorState>? navigatorKey,
 }) {
   return GoRouter(
@@ -92,10 +98,28 @@ GoRouter createAppRouter({
         },
       ),
       GoRoute(
+        path: AppRoutes.wrapper,
+        name: 'wrapper',
+        pageBuilder: (context, state) =>
+            _buildSlidePage(state, const WrapperScreen()),
+      ),
+      GoRoute(
         path: AppRoutes.home,
         name: 'home',
         pageBuilder: (context, state) =>
             _buildSlidePage(state, const HomeScreen()),
+      ),
+      GoRoute(
+        path: AppRoutes.tenant,
+        name: 'tenant',
+        pageBuilder: (context, state) =>
+            _buildSlidePage(state, const TenantScreen()),
+      ),
+      GoRoute(
+        path: AppRoutes.landlord,
+        name: 'landlord',
+        pageBuilder: (context, state) =>
+            _buildSlidePage(state, const LandlordScreen()),
       ),
     ],
   );

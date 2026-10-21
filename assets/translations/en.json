@@ -95,5 +95,16 @@
   "resetPasswordSubtitle": "Create a new password for your account",
   "savePassword": "Save new password",
   "forgotPasswordSentMessage": "A verification code has been sent to your email (if account exists).",
-  "resetPasswordSuccessMessage": "Password reset successfully! Please log in again."
+  "resetPasswordSuccessMessage": "Password reset successfully! Please log in again.",
+  "tenantDashboardTitle": "Rental Management",
+  "tenantDashboardSubtitle": "Dashboard for tenants with active contracts",
+  "landlordDashboardTitle": "Property Management",
+  "landlordDashboardSubtitle": "Dashboard for landlords and property staff",
+  "homeExploreRooms": "Explore available rental rooms and listings",
+  "navHome": "Home",
+  "navWorkspace": "Workspace",
+  "navManageRentals": "Rental Management",
+  "navMyRental": "My Rental",
+  "navMessages": "Messages",
+  "navMenu": "Menu"
 }

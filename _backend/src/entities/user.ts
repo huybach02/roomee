@@ -77,4 +77,7 @@ export class User extends Mixin(AuditableTrait) {
 
   @Column({ type: "boolean", default: false })
   isEmailVerified: boolean;
+
+  @Column({ type: "boolean", default: false })
+  hasContract: boolean;
 }

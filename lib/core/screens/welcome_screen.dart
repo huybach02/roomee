@@ -6,6 +6,7 @@ import 'package:roomee/core/configs/app_theme.dart';
 import 'package:roomee/core/localization/app_localizations.dart';
 import 'package:roomee/core/router/app_router.dart';
 import 'package:roomee/core/widgets/app_button.dart';
+import 'package:roomee/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:roomee/utils/constanst.dart';
 
 class WelcomeScreen extends StatelessWidget {
@@ -16,7 +17,12 @@ class WelcomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    AuthBloc? authBloc;
+    try {
+      authBloc = context.read<AuthBloc>();
+    } catch (_) {}
+
+    final scaffold = Scaffold(
       backgroundColor: DefaultColors.white,
       body: SafeArea(
         child: Padding(
@@ -81,6 +87,20 @@ class WelcomeScreen extends StatelessWidget {
         ),
       ),
     );
+
+    if (authBloc != null) {
+      return BlocListener<AuthBloc, AuthState>(
+        bloc: authBloc,
+        listener: (context, state) {
+          if (state is Authenticated) {
+            context.go(AppRoutes.wrapper);
+          }
+        },
+        child: scaffold,
+      );
+    }
+
+    return scaffold;
   }
 
   Widget _buildLanguageToggle(BuildContext context) {

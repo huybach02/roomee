@@ -14,6 +14,7 @@ class UserModel {
   final Gender gender;
   final UserRole role;
   final bool isActive;
+  final bool hasContract;
   final int? provinceId;
   final ProvinceModel? province;
   final int? wardId;
@@ -34,6 +35,7 @@ class UserModel {
     this.gender = Gender.male,
     this.role = UserRole.tenant,
     this.isActive = true,
+    this.hasContract = false,
     this.provinceId,
     this.province,
     this.wardId,
@@ -58,6 +60,7 @@ class UserModel {
       gender: _parseGender(json['gender']),
       role: _parseRole(json['role']),
       isActive: json['isActive'] as bool? ?? true,
+      hasContract: json['hasContract'] as bool? ?? false,
       provinceId: json['provinceId'] as int?,
       province: json['province'] is Map<String, dynamic>
           ? ProvinceModel.fromJson(json['province'] as Map<String, dynamic>)
@@ -89,6 +92,7 @@ class UserModel {
       'gender': gender.name,
       'role': role.name,
       'isActive': isActive,
+      'hasContract': hasContract,
       if (provinceId != null) 'provinceId': provinceId,
       if (province != null) 'province': province!.toJson(),
       if (wardId != null) 'wardId': wardId,
@@ -111,6 +115,7 @@ class UserModel {
     Gender? gender,
     UserRole? role,
     bool? isActive,
+    bool? hasContract,
     int? provinceId,
     ProvinceModel? province,
     int? wardId,
@@ -131,6 +136,7 @@ class UserModel {
       gender: gender ?? this.gender,
       role: role ?? this.role,
       isActive: isActive ?? this.isActive,
+      hasContract: hasContract ?? this.hasContract,
       provinceId: provinceId ?? this.provinceId,
       province: province ?? this.province,
       wardId: wardId ?? this.wardId,

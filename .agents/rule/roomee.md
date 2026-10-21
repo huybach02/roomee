@@ -23,17 +23,19 @@
 - **Cache/Redis:** ioredis (`^5.11.1`)
 - **Đa ngôn ngữ (i18n):** Tự xây dựng trên `AsyncLocalStorage` (`node:async_hooks`) + JSON dictionaries (`src/locales/vi.json`, `en.json`)
 - **Tooling:** `tsx`, `typescript`
-- **Các package trong roadmap nhưng CHƯA cài:** Argon2, JWT (`jsonwebtoken`), Socket.io, BullMQ, node-cron, Resend, Cloudinary (chỉ cài khi triển khai tính năng tương ứng).
+- **Các package đã cài đặt:** Argon2 (`argon2`), JWT (`jsonwebtoken` & `@types/jsonwebtoken`).
+- **Các package trong roadmap nhưng CHƯA cài:** Socket.io, BullMQ, node-cron, Resend, Cloudinary (chỉ cài khi triển khai tính năng tương ứng).
 
 **Mobile (`lib/`):**
 - **Framework:** Flutter + Dart (SDK `^3.13.5`)
 - **State management:** `flutter_bloc` (`^9.1.1`)
+- **Mạng / HTTP Client:** `dio` (`^5.9.1`)
 - **Điều hướng:** `go_router` (`^18.1.0`)
 - **Lưu trữ bảo mật:** `flutter_secure_storage` (`^11.2.0`)
 - **Định dạng / Đa ngôn ngữ:** `intl` (`^0.20.3`) + `flutter_localizations` (SDK) + JSON dictionaries (`assets/translations/vi.json`, `en.json`)
 - **Lint:** `flutter_lints` (`^6.0.0`)
 - **Icons:** `cupertino_icons` (`^1.0.8`)
-- **Các package trong roadmap nhưng CHƯA cài:** `dio`, `freezed`, `json_serializable`, `get_it`, `socket_io_client`, `firebase_messaging`, `cached_network_image`, `image_picker`, `file_picker` (chỉ cài khi triển khai tính năng tương ứng).
+- **Các package trong roadmap nhưng CHƯA cài:** `freezed`, `json_serializable`, `get_it`, `socket_io_client`, `firebase_messaging`, `cached_network_image`, `image_picker`, `file_picker` (chỉ cài khi triển khai tính năng tương ứng).
 
 ## 2. Nguyên tắc chung (bắt buộc)
 
@@ -127,6 +129,19 @@ _backend/
 - `npm run start` (`node dist/index.js`)
 - Migration: `npm run migration:generate|run|revert|show`
 
+### 3.10 Authentication & Security
+- **Mật khẩu & Băm:** Bắt buộc băm mật khẩu bằng Argon2 (`argon2.hash`). Khi query kiểm tra mật khẩu trong `AuthService`, dùng `userRepository.findByEmailWithPassword()` do trường `password` có cấu hình `{ select: false }`.
+- **JWT Token:** Cấp Access Token qua `jsonwebtoken` (payload: `{ sub: user.id, email: user.email, role: user.role }`, hạn 7 ngày).
+- **Cơ chế Tạm khóa tài khoản (Account Lockout qua Redis):**
+  - Giới hạn: `MAX_LOGIN_ATTEMPTS = 5`.
+  - Khi người dùng đăng nhập sai quá 5 lần, tài khoản bị tạm khóa 15 phút (`LOGIN_LOCKOUT_SECONDS = 900`).
+  - Sử dụng Redis `login:lockout:{email}` (TTL 15p) để chặn trực tiếp từ đầu hàm `login()` mà không tốn CPU chạy Argon2.
+  - Bộ đếm `login:attempts:{email}` được xóa sạch ngay khi đăng nhập đúng.
+- **Quên mật khẩu (Forgot Password qua OTP + Reset Token):**
+  - Bước 1: `POST /auth/forgot-password` -> Gửi mã OTP 6 số qua email (Redis TTL 10p, cooldown 60s, chống user enumeration).
+  - Bước 2: `POST /auth/verify-reset-otp` -> Xác thực OTP -> Cấp `resetToken` (UUID, Redis TTL 15p).
+  - Bước 3: `POST /auth/reset-password` -> Đặt mật khẩu mới với `resetToken` (dùng 1 lần duy nhất, cập nhật Argon2, xóa token và giải phóng lockout).
+
 ## 4. Flutter (root `lib/`)
 
 ### 4.1 Cấu trúc thư mục thực tế
@@ -140,11 +155,27 @@ lib/
       app_theme.dart             # DefaultColors, FontSizes, AppTheme
     localization/
       app_localizations.dart     # Engine dịch, preload cache JSON, hàm toàn cục t() và context.tr()
+    models/                      # Models chuyển đổi dữ liệu (user_model.dart kèm hasContract, province, ward)
+      models.dart
+      user_model.dart
+      province_model.dart
+      ward_model.dart
+    network/                     # Cấu hình mạng Dio, interceptors (auth, logging), exceptions, ApiResponse
+      api_client.dart
+      api_exceptions.dart
+      api_response.dart
     router/
-      app_router.dart            # Định nghĩa AppRoutes, hàm createAppRouter(), instance appRouter
-    screens/
+      app_router.dart            # Định nghĩa AppRoutes, hàm createAppRouter() (initialLocation: AppRoutes.wrapper)
+    screens/                     # Màn hình gốc & điều phối luồng người dùng
       welcome_screen.dart        # Màn hình chào mừng / chọn luồng ban đầu
       loading_screen.dart        # LoadingScreen (.show/.hide) & LoadingOverlay (wrapper)
+      wrapper_screen.dart        # Router Dispatcher tự động điều phối theo role & hasContract
+      home_screen.dart           # Màn hình tìm trọ (Tenant chưa có hợp đồng)
+      tenant_screen.dart         # Dashboard quản lý trọ (Tenant đã có hợp đồng)
+      landlord_screen.dart       # Dashboard quản lý nhà trọ (Chủ trọ & Nhân viên)
+    types/                       # Các model/types tiện ích dùng chung
+      app_nav_item.dart          # AppNavItem (labelKey, icon, activeIcon)
+      types.dart
     validation/                  # Chuẩn hóa validation 2 tầng (ValidationConfig, Validators, FieldRules)
       app_validators.dart
     widgets/                     # UI components chuẩn hóa của Design System
@@ -159,7 +190,7 @@ lib/
     data/                        # datasource, model, repository implementation
     presentation/
       bloc/                      # BLoC / Cubit cho feature
-      screens/                   # Các màn hình (login_screen.dart, register_screen.dart)
+      screens/                   # login_screen, register_screen, otp_screen, forgot_password_screen, reset_password_screen
   utils/
     constanst.dart               # Hằng số frontend (apiBaseUrl, logoAssetPath, UserRole, Gender)
     function_helper.dart         # Helper chung
@@ -195,12 +226,27 @@ test/
   - Lựa chọn phân đoạn/segmented: `AppSegmentedSelect`
   - Thông báo nổi: `AppNotification` (`.showSuccess`, `.showError`, `.showWarning`, `.showInfo`)
   - Loading Overlay: `LoadingScreen` (imperative qua `.show(context)` / `context.showLoading()`, `.hide(context)`) và `LoadingOverlay(isLoading: ..., child: ...)` (declarative wrapper).
+- **Bottom Navigation Bar:**
+  - Định nghĩa model item: `AppNavItem` (`lib/core/types/app_nav_item.dart`).
+  - Danh sách hằng số dùng chung trong `lib/utils/constanst.dart`:
+    - `landlordNavItems` (5 items: Trang chủ, Workspace, Quản lý trọ, Nhắn tin, Menu).
+    - `tenantNavItems` (4 items: Trang chủ, Trọ của tôi, Nhắn tin, Menu).
+  - Tái sử dụng `BottomNavigationBar(type: BottomNavigationBarType.fixed)` map trực tiếp từ danh sách trên kèm `label: t(item.labelKey)`.
 - **Xử lý Loading toàn màn hình:** Đối với các tác vụ async / submit form (như Đăng nhập, Đăng ký, Xác thực OTP,...), **bắt buộc dùng `LoadingOverlay`** bọc màn hình (hoặc `LoadingScreen.show(context)`). Lớp phủ này hiển thị indicator chuẩn Design System, khóa toàn bộ tương tác chạm và vô hiệu hóa nút back (`PopScope(canPop: false)`), chống hiện tượng submit đúp. Không lồng thêm spinner con trên `AppButton(isLoading: true)` khi đã dùng `LoadingOverlay` để tránh lặp 2 vòng xoay cùng lúc.
 - Không viết đè style hoặc dựng widget nhập liệu/button riêng lẻ gây phân mảnh giao diện.
 
 ### 4.4 State Management & Điều hướng
 - Quản lý state theo `flutter_bloc` (`Bloc` cho luồng nghiệp vụ phức tạp, `Cubit` cho state đơn giản).
 - Điều hướng khai báo tập trung tại `lib/core/router/app_router.dart` qua `GoRouter`. Đặt route path trong `AppRoutes`.
+- **Cơ chế điều phối tự động (Wrapper Router Dispatcher):**
+  - Điểm khởi đầu mặc định của ứng dụng (`initialLocation`): **`AppRoutes.wrapper`** (`WrapperScreen`).
+  - Khi mở app hoặc Hot Restart, `WrapperScreen` tự động kiểm tra phiên đăng nhập từ `AuthBloc`:
+    - Nếu `Unauthenticated`: chuyển về `AppRoutes.welcome`.
+    - Nếu `Authenticated`:
+      - `landlord` / `staff` / `admin` -> `AppRoutes.landlord` (`LandlordScreen`).
+      - `tenant` + `hasContract == true` (đã thuê trọ) -> `AppRoutes.tenant` (`TenantScreen`).
+      - `tenant` + `hasContract == false` (chưa thuê trọ) -> `AppRoutes.home` (`HomeScreen`).
+  - `WelcomeScreen` cũng tích hợp `BlocListener` kép để chuyển sang `AppRoutes.wrapper` nếu nhận thấy state `Authenticated`.
 
 ### 4.5 Chuẩn hoá Validation (Mobile)
 - Toàn bộ validation phía client đặt tập trung tại `lib/core/validation/app_validators.dart`.

@@ -11,7 +11,7 @@ import 'package:roomee/core/widgets/app_button.dart';
 import 'package:roomee/features/auth/data/auth_dto.dart';
 import 'package:roomee/features/auth/data/auth_repository.dart';
 import 'package:roomee/features/auth/presentation/bloc/auth_bloc.dart';
-import 'package:roomee/features/home/presentation/screens/home_screen.dart';
+import 'package:roomee/core/screens/home_screen.dart';
 import 'package:roomee/utils/constanst.dart';
 
 class _FakeAuthRepo implements IAuthRepository {

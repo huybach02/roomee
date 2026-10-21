@@ -78,7 +78,7 @@ class _LoginScreenState extends State<LoginScreen> {
         listener: (context, state) {
           if (state is Authenticated) {
             AppNotification.showSuccess(context, t('loginSuccess'));
-            context.go(AppRoutes.home);
+            context.go(AppRoutes.wrapper);
           } else if (state is AuthOtpRequired) {
             context.push(
               AppRoutes.otp,
