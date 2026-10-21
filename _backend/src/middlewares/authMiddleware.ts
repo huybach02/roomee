@@ -38,9 +38,21 @@ export const authMiddleware = async (
       sub: number;
       email: string;
       role: string;
+      sid?: string;
       exp?: number;
       [key: string]: any;
     };
+
+    // 3. Kiểm tra xem session của token này có bị thu hồi tức thời trong Redis không
+    if (decoded.sid) {
+      const isSessionBlacklisted = await redis.get(
+        `blacklist:session:${decoded.sid}`,
+      );
+      if (isSessionBlacklisted) {
+        CustomResponse.error(res, t("common.unauthorized"), null, 401);
+        return;
+      }
+    }
 
     req.user = decoded;
     req.token = token;

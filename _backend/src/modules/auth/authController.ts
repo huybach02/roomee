@@ -4,6 +4,7 @@ import { AuthService } from "./authService.js";
 import {
   ForgotPasswordDto,
   LoginDto,
+  RefreshTokenDto,
   RegisterDto,
   ResetPasswordDto,
   VerifyOtpDto,
@@ -31,9 +32,19 @@ export class AuthController {
 
   public loginUser = async (req: Request, res: Response): Promise<void> => {
     const { email, password } = req.body as LoginDto;
+    const deviceInfo = req.headers["user-agent"] || null;
+    const ipAddress =
+      (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
+      req.ip ||
+      null;
 
     try {
-      const result = await this.authService.login(email, password);
+      const result = await this.authService.login(
+        email,
+        password,
+        deviceInfo ?? undefined,
+        ipAddress ?? undefined,
+      );
       return CustomResponse.success(res, result, t("common.success"), 200);
     } catch (error) {
       const message =
@@ -144,6 +155,35 @@ export class AuthController {
           ? error.message
           : t("common.internalServerError");
       return CustomResponse.error(res, message, null, 500);
+    }
+  };
+
+  public refreshToken = async (req: Request, res: Response): Promise<void> => {
+    const { refreshToken } = req.body as RefreshTokenDto;
+    const deviceInfo = req.headers["user-agent"] || null;
+    const ipAddress =
+      (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
+      req.ip ||
+      null;
+
+    try {
+      const result = await this.authService.refreshToken(
+        refreshToken,
+        deviceInfo ?? undefined,
+        ipAddress ?? undefined,
+      );
+      return CustomResponse.success(
+        res,
+        result,
+        t("auth.refreshTokenSuccess"),
+        200,
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : t("auth.invalidRefreshToken");
+      return CustomResponse.error(res, message, null, 401);
     }
   };
 }

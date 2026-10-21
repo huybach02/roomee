@@ -29,7 +29,9 @@
     "invalidCredentialsWithAttempts": "Incorrect email or password. You have {remaining} attempt(s) left before account lockout.",
     "forgotPasswordSent": "A verification code has been sent to your email (if account exists).",
     "resetPasswordSuccess": "Password has been reset successfully. Please log in again.",
-    "invalidResetToken": "Password reset session is invalid or has expired. Please try again."
+    "invalidResetToken": "Password reset session is invalid or has expired. Please try again.",
+    "invalidRefreshToken": "Session is invalid or has expired. Please log in again.",
+    "refreshTokenSuccess": "Session refreshed successfully."
   },
   "mail": {
     "sendFailed": "Failed to send verification email. Please try again later.",

@@ -34,7 +34,14 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       if (isLoggedIn) {
         final user = await _authRepository.getCurrentUser();
         final token = await _authRepository.getToken() ?? '';
-        emit(Authenticated(user: user, token: token));
+        final refreshToken = await _authRepository.getRefreshToken();
+        emit(
+          Authenticated(
+            user: user,
+            token: token,
+            refreshToken: refreshToken,
+          ),
+        );
       } else {
         emit(const Unauthenticated());
       }
@@ -59,7 +66,13 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           ),
         );
       } else {
-        emit(Authenticated(user: authData.user, token: authData.token));
+        emit(
+          Authenticated(
+            user: authData.user,
+            token: authData.token,
+            refreshToken: authData.refreshToken,
+          ),
+        );
       }
     } on ApiException catch (e) {
       emit(

@@ -1,5 +1,6 @@
 import { DataSource } from "typeorm";
 import { DataUnitsSeeder } from "./dataUnitsSeeder.js";
+import { UserSeeder } from "./userSeeder.js";
 
 export interface ISeeder {
   readonly name: string;
@@ -8,4 +9,7 @@ export interface ISeeder {
 
 export const seeders: ISeeder[] = [
   new DataUnitsSeeder(),
+  new UserSeeder(),
 ];
+
+export { DataUnitsSeeder, UserSeeder };

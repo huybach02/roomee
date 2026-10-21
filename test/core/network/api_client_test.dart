@@ -69,6 +69,234 @@ void main() {
 
       expect(unauthorizedCalled, isTrue);
     });
+
+    test('refreshes token on 401 and replays request successfully', () async {
+      FlutterSecureStorage.setMockInitialValues({
+        'access_token': 'expired_token',
+        'refresh_token': 'valid_refresh_token',
+      });
+
+      final refreshDio = Dio();
+      int refreshCallCount = 0;
+      refreshDio.httpClientAdapter = _MockAdapter((options) async {
+        if (options.path.contains('/auth/refresh-token')) {
+          refreshCallCount++;
+          return ResponseBody.fromString(
+            '{"success": true, "data": {"accessToken": "fresh_access_token", "refreshToken": "fresh_refresh_token"}}',
+            200,
+            headers: {
+              Headers.contentTypeHeader: [Headers.jsonContentType],
+            },
+          );
+        }
+        return ResponseBody.fromString('Not Found', 404);
+      });
+
+      final clientDio = Dio();
+      final interceptor = AuthInterceptor(
+        clientDio: clientDio,
+        refreshDio: refreshDio,
+      );
+      clientDio.interceptors.add(interceptor);
+
+      int requestCallCount = 0;
+      clientDio.httpClientAdapter = _MockAdapter((options) async {
+        requestCallCount++;
+        if (requestCallCount == 1) {
+          return ResponseBody.fromString(
+            '{"message": "Unauthorized"}',
+            401,
+            headers: {
+              Headers.contentTypeHeader: [Headers.jsonContentType],
+            },
+          );
+        }
+        expect(
+          options.headers['Authorization'],
+          'Bearer fresh_access_token',
+        );
+        return ResponseBody.fromString(
+          '{"success": true, "data": "secret_data"}',
+          200,
+          headers: {
+            Headers.contentTypeHeader: [Headers.jsonContentType],
+          },
+        );
+      });
+
+      final res = await clientDio.get('https://example.com/api/v1/profile');
+
+      expect(res.statusCode, 200);
+      expect(res.data['data'], 'secret_data');
+      expect(refreshCallCount, 1);
+      expect(requestCallCount, 2);
+
+      const storage = FlutterSecureStorage();
+      expect(await storage.read(key: 'access_token'), 'fresh_access_token');
+      expect(await storage.read(key: 'refresh_token'), 'fresh_refresh_token');
+    });
+
+    test(
+      'queues concurrent requests on 401, triggers single refresh, and replays all in FIFO order',
+      () async {
+        FlutterSecureStorage.setMockInitialValues({
+          'access_token': 'expired_token',
+          'refresh_token': 'valid_refresh_token',
+        });
+
+        final refreshDio = Dio();
+        int refreshCallCount = 0;
+        refreshDio.httpClientAdapter = _MockAdapter((options) async {
+          if (options.path.contains('/auth/refresh-token')) {
+            refreshCallCount++;
+            // Delay mô phỏng mạng để các request khác rơi vào 401
+            await Future.delayed(const Duration(milliseconds: 50));
+            return ResponseBody.fromString(
+              '{"success": true, "data": {"accessToken": "fresh_access_token", "refreshToken": "fresh_refresh_token"}}',
+              200,
+              headers: {
+                Headers.contentTypeHeader: [Headers.jsonContentType],
+              },
+            );
+          }
+          return ResponseBody.fromString('Not Found', 404);
+        });
+
+        final clientDio = Dio();
+        final interceptor = AuthInterceptor(
+          clientDio: clientDio,
+          refreshDio: refreshDio,
+        );
+        clientDio.interceptors.add(interceptor);
+
+        final replayedPaths = <String>[];
+        final failedPaths = <String>{};
+
+        clientDio.httpClientAdapter = _MockAdapter((options) async {
+          final path = options.path;
+          if (!failedPaths.contains(path)) {
+            failedPaths.add(path);
+            return ResponseBody.fromString(
+              '{"message": "Expired"}',
+              401,
+              headers: {
+                Headers.contentTypeHeader: [Headers.jsonContentType],
+              },
+            );
+          }
+          replayedPaths.add(path);
+          return ResponseBody.fromString(
+            '{"path": "$path", "auth": "${options.headers['Authorization']}"}',
+            200,
+            headers: {
+              Headers.contentTypeHeader: [Headers.jsonContentType],
+            },
+          );
+        });
+
+        // Gửi 3 request đồng thời
+        final results = await Future.wait([
+          clientDio.get('/req_1'),
+          clientDio.get('/req_2'),
+          clientDio.get('/req_3'),
+        ]);
+
+        expect(refreshCallCount, 1);
+        expect(results.length, 3);
+        expect(results[0].data['path'], '/req_1');
+        expect(results[1].data['path'], '/req_2');
+        expect(results[2].data['path'], '/req_3');
+        expect(results[0].data['auth'], 'Bearer fresh_access_token');
+        expect(results[1].data['auth'], 'Bearer fresh_access_token');
+        expect(results[2].data['auth'], 'Bearer fresh_access_token');
+        expect(replayedPaths, ['/req_1', '/req_2', '/req_3']);
+      },
+    );
+
+    test(
+      'triggers onUnauthorized and rejects queue when refresh token fails',
+      () async {
+        FlutterSecureStorage.setMockInitialValues({
+          'access_token': 'expired_token',
+          'refresh_token': 'invalid_refresh_token',
+        });
+
+        final refreshDio = Dio();
+        refreshDio.httpClientAdapter = _MockAdapter((options) async {
+          return ResponseBody.fromString(
+            '{"message": "Invalid refresh token"}',
+            401,
+            headers: {
+              Headers.contentTypeHeader: [Headers.jsonContentType],
+            },
+          );
+        });
+
+        bool unauthorizedCalled = false;
+        final clientDio = Dio();
+        final interceptor = AuthInterceptor(
+          clientDio: clientDio,
+          refreshDio: refreshDio,
+          onUnauthorized: () {
+            unauthorizedCalled = true;
+          },
+        );
+        clientDio.interceptors.add(interceptor);
+        clientDio.httpClientAdapter = _MockAdapter((options) async {
+          return ResponseBody.fromString(
+            '{"message": "Expired"}',
+            401,
+            headers: {
+              Headers.contentTypeHeader: [Headers.jsonContentType],
+            },
+          );
+        });
+
+        try {
+          await clientDio.get('/any_endpoint');
+        } catch (_) {}
+
+        expect(unauthorizedCalled, isTrue);
+      },
+    );
+
+    test('does not attempt refresh if request has no Authorization header', () async {
+      FlutterSecureStorage.setMockInitialValues({});
+
+      final refreshDio = Dio();
+      bool refreshCalled = false;
+      refreshDio.httpClientAdapter = _MockAdapter((options) async {
+        refreshCalled = true;
+        return ResponseBody.fromString('OK', 200);
+      });
+
+      bool unauthorizedCalled = false;
+      final clientDio = Dio();
+      final interceptor = AuthInterceptor(
+        clientDio: clientDio,
+        refreshDio: refreshDio,
+        onUnauthorized: () {
+          unauthorizedCalled = true;
+        },
+      );
+      clientDio.interceptors.add(interceptor);
+      clientDio.httpClientAdapter = _MockAdapter((options) async {
+        return ResponseBody.fromString(
+          '{"message": "Unauthorized"}',
+          401,
+          headers: {
+            Headers.contentTypeHeader: [Headers.jsonContentType],
+          },
+        );
+      });
+
+      try {
+        await clientDio.post('/auth/login');
+      } catch (_) {}
+
+      expect(refreshCalled, isFalse);
+      expect(unauthorizedCalled, isFalse);
+    });
   });
 
   group('BaseService', () {
@@ -494,6 +722,24 @@ class _FakeAdapter implements HttpClientAdapter {
         Headers.contentTypeHeader: [Headers.jsonContentType],
       },
     );
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
+
+class _MockAdapter implements HttpClientAdapter {
+  final Future<ResponseBody> Function(RequestOptions options) onFetch;
+
+  _MockAdapter(this.onFetch);
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) {
+    return onFetch(options);
   }
 
   @override

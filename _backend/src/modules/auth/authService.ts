@@ -6,18 +6,22 @@ import { RegisterDto } from "./authSchema.js";
 import argon2 from "argon2";
 import jwt from "jsonwebtoken";
 import {
+  ACCESS_TOKEN_EXPIRES_IN,
   CODE_RESPONSE,
   Gender,
   LOGIN_LOCKOUT_MINUTES,
   LOGIN_LOCKOUT_SECONDS,
   MAX_LOGIN_ATTEMPTS,
   OTP_EXPIRES_IN_MINUTES,
+  REFRESH_TOKEN_EXPIRES_IN_DAYS,
+  TTL_ACCESS_TOKEN_SECONDS,
   TTL_OTP_SECONDS,
   UserRole,
 } from "../../utils/constanst.js";
 import { MailService } from "../mail/mailService.js";
 import { OtpService } from "./otpService.js";
 import { redis } from "../../config/redis.js";
+import { RefreshTokenRepository } from "../../repositories/refreshTokenRepository.js";
 
 @injectable()
 export class AuthService {
@@ -27,6 +31,7 @@ export class AuthService {
     private userRepository: UserRepository,
     private mailService: MailService,
     private otpService: OtpService,
+    private refreshTokenRepository: RefreshTokenRepository,
   ) {
     if (!process.env.JWT_SECRET) {
       throw new Error("JWT_SECRET environment variable is missing.");
@@ -152,7 +157,15 @@ export class AuthService {
   public async login(
     email: string,
     password: string,
-  ): Promise<{ user: User; token: string; code?: string }> {
+    deviceInfo?: string,
+    ipAddress?: string,
+  ): Promise<{
+    user: User;
+    token: string;
+    accessToken: string;
+    refreshToken: string;
+    code?: string;
+  }> {
     const normalizedEmail = email.trim().toLowerCase();
     const lockoutKey = `login:lockout:${normalizedEmail}`;
     const attemptsKey = `login:attempts:${normalizedEmail}`;
@@ -232,25 +245,51 @@ export class AuthService {
       return {
         user: userWithoutPassword as User,
         token: "",
+        accessToken: "",
+        refreshToken: "",
         code: CODE_RESPONSE.NEED_VERIFY_EMAIL,
       };
     }
 
-    const token = jwt.sign(
+    // Sinh Refresh Token (64 ký tự hex ngẫu nhiên) và lưu bản ghi phiên
+    const rawRefreshToken = crypto.randomBytes(32).toString("hex");
+    const tokenHash = crypto
+      .createHash("sha256")
+      .update(rawRefreshToken)
+      .digest("hex");
+    const expiresAt = new Date(
+      Date.now() + REFRESH_TOKEN_EXPIRES_IN_DAYS * 24 * 60 * 60 * 1000,
+    );
+
+    const session = this.refreshTokenRepository.create({
+      userId: user.id,
+      tokenHash,
+      deviceInfo: deviceInfo || null,
+      ipAddress: ipAddress || null,
+      expiresAt,
+      isRevoked: false,
+    });
+    const savedSession = await this.refreshTokenRepository.save(session);
+
+    // Sinh Access Token ngắn hạn mang sid (Session ID)
+    const accessToken = jwt.sign(
       {
         sub: user.id,
         email: user.email,
         role: user.role,
+        sid: savedSession.id,
       },
       this.jwtSecret,
       {
-        expiresIn: "7d",
+        expiresIn: ACCESS_TOKEN_EXPIRES_IN,
       },
     );
 
     return {
       user: userWithoutPassword as User,
-      token,
+      token: accessToken,
+      accessToken,
+      refreshToken: rawRefreshToken,
     };
   }
 
@@ -361,22 +400,126 @@ export class AuthService {
     if (!token) return;
 
     try {
-      // Giải mã token để tính thời gian sống còn lại (TTL)
-      const decoded = jwt.decode(token) as { exp?: number } | null;
+      // Giải mã token để lấy thông tin session và TTL còn lại
+      const decoded = jwt.decode(token) as {
+        exp?: number;
+        sid?: string;
+      } | null;
+
+      let remainingTtl = TTL_ACCESS_TOKEN_SECONDS;
       if (decoded && decoded.exp) {
         const nowInSeconds = Math.floor(Date.now() / 1000);
-        const remainingTtl = decoded.exp - nowInSeconds;
-
-        if (remainingTtl > 0) {
-          // Lưu token vào Redis blacklist cho đến khi token tự hết hạn
-          await redis.set(`blacklist:token:${token}`, "1", "EX", remainingTtl);
-          return;
+        const calculated = decoded.exp - nowInSeconds;
+        if (calculated > 0) {
+          remainingTtl = calculated;
         }
       }
-      // Fallback mặc định 7 ngày nếu không đọc được exp
-      await redis.set(`blacklist:token:${token}`, "1", "EX", 7 * 24 * 3600);
+
+      // 1. Blacklist access token trong Redis
+      await redis.set(`blacklist:token:${token}`, "1", "EX", remainingTtl);
+
+      // 2. Thu hồi session trong DB và Redis nếu có sid
+      if (decoded && decoded.sid) {
+        await this.refreshTokenRepository.revokeBySessionId(decoded.sid);
+        await redis.set(
+          `blacklist:session:${decoded.sid}`,
+          "1",
+          "EX",
+          remainingTtl,
+        );
+      }
     } catch {
-      await redis.set(`blacklist:token:${token}`, "1", "EX", 7 * 24 * 3600);
+      await redis.set(
+        `blacklist:token:${token}`,
+        "1",
+        "EX",
+        TTL_ACCESS_TOKEN_SECONDS,
+      );
     }
+  }
+
+  public async refreshToken(
+    refreshTokenString: string,
+    deviceInfo?: string,
+    ipAddress?: string,
+  ): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    token: string;
+  }> {
+    if (!refreshTokenString) {
+      throw new Error(t("auth.invalidRefreshToken"));
+    }
+
+    const tokenHash = crypto
+      .createHash("sha256")
+      .update(refreshTokenString)
+      .digest("hex");
+
+    const session =
+      await this.refreshTokenRepository.findByTokenHash(tokenHash);
+
+    if (
+      !session ||
+      session.isRevoked ||
+      new Date(session.expiresAt).getTime() <= Date.now()
+    ) {
+      throw new Error(t("auth.invalidRefreshToken"));
+    }
+
+    if (!session.user || !session.user.isActive) {
+      throw new Error(t("auth.accountInactive"));
+    }
+
+    // Token Rotation: Thu hồi session cũ
+    session.isRevoked = true;
+    await this.refreshTokenRepository.save(session);
+
+    // Blacklist session cũ trong Redis để chặn tức thì các token của phiên cũ
+    await redis.set(
+      `blacklist:session:${session.id}`,
+      "1",
+      "EX",
+      TTL_ACCESS_TOKEN_SECONDS,
+    );
+
+    // Sinh refresh token mới và session mới
+    const newRawRefreshToken = crypto.randomBytes(32).toString("hex");
+    const newTokenHash = crypto
+      .createHash("sha256")
+      .update(newRawRefreshToken)
+      .digest("hex");
+    const newExpiresAt = new Date(
+      Date.now() + REFRESH_TOKEN_EXPIRES_IN_DAYS * 24 * 60 * 60 * 1000,
+    );
+
+    const newSession = this.refreshTokenRepository.create({
+      userId: session.userId,
+      tokenHash: newTokenHash,
+      deviceInfo: deviceInfo || session.deviceInfo,
+      ipAddress: ipAddress || session.ipAddress,
+      expiresAt: newExpiresAt,
+      isRevoked: false,
+    });
+    const savedNewSession = await this.refreshTokenRepository.save(newSession);
+
+    const newAccessToken = jwt.sign(
+      {
+        sub: session.user.id,
+        email: session.user.email,
+        role: session.user.role,
+        sid: savedNewSession.id,
+      },
+      this.jwtSecret,
+      {
+        expiresIn: ACCESS_TOKEN_EXPIRES_IN,
+      },
+    );
+
+    return {
+      accessToken: newAccessToken,
+      refreshToken: newRawRefreshToken,
+      token: newAccessToken,
+    };
   }
 }

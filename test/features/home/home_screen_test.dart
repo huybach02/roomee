@@ -35,6 +35,16 @@ class _FakeAuthRepo implements IAuthRepository {
   Future<String?> getToken() async => null;
 
   @override
+  Future<String?> getRefreshToken() async => null;
+
+  @override
+  Future<RefreshTokenResponse> refreshToken() async =>
+      const RefreshTokenResponse(
+        accessToken: 'new_token',
+        refreshToken: 'new_refresh',
+      );
+
+  @override
   Future<void> logout() async {
     loggedOut = true;
   }

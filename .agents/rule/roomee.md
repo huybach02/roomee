@@ -59,9 +59,10 @@ _backend/
     config/                      # data-source.ts (TypeORM), redis.ts (ioredis lazyConnect)
     entities/                    # Entity TypeORM (PascalCase), kế thừa Mixin(AuditableTrait)
       user.ts
+      refreshToken.ts            # Quản lý phiên đăng nhập theo thiết bị & Refresh Token
     locales/                     # vi.json, en.json (từ điển đa ngôn ngữ cho API)
-    middlewares/                 # i18nMiddleware.ts, validateMiddleware.ts
-    migrations/                  # TypeORM migrations (1792...-CreateUsersTable.ts)
+    middlewares/                 # i18nMiddleware.ts, validateMiddleware.ts, authMiddleware.ts
+    migrations/                  # TypeORM migrations
     mixins/                      # auditableTrait.ts (createdAt, updatedAt, createdBy, updatedBy)
     modules/<module>/            # Mỗi tính năng 1 module thư mục
       <module>Controller.ts      # Controller xử lý req/res
@@ -70,7 +71,8 @@ _backend/
       <module>Schema.ts          # Zod schema & DTO types (z.infer)
     repositories/                # Repository tùy biến kế thừa Repository<Entity>
       userRepository.ts
-    seeders/                     # Seed dữ liệu khởi tạo
+      refreshTokenRepository.ts  # Truy vấn phiên, thu hồi session theo id hoặc tokenHash
+    seeders/                     # Seed dữ liệu khởi tạo (DataUnitsSeeder, UserSeeder)
     types/                       # express.d.ts (mở rộng Express.Request: locale, t)
     utils/
       constanst.ts               # Hằng số, Enum UserRole, Gender (chú ý chính tả file)
@@ -131,7 +133,13 @@ _backend/
 
 ### 3.10 Authentication & Security
 - **Mật khẩu & Băm:** Bắt buộc băm mật khẩu bằng Argon2 (`argon2.hash`). Khi query kiểm tra mật khẩu trong `AuthService`, dùng `userRepository.findByEmailWithPassword()` do trường `password` có cấu hình `{ select: false }`.
-- **JWT Token:** Cấp Access Token qua `jsonwebtoken` (payload: `{ sub: user.id, email: user.email, role: user.role }`, hạn 7 ngày).
+- **Cặp Token (Access Token & Refresh Token) & Quản lý Phiên (Session Management):**
+  - **Access Token:** Hạn ngắn **15 phút** (`ACCESS_TOKEN_EXPIRES_IN = "15m"`). Payload chứa: `{ sub: user.id, email: user.email, role: user.role, sid: session.id }`.
+  - **Refresh Token:** Hạn **7 ngày** (`REFRESH_TOKEN_EXPIRES_IN_DAYS = 7`, sliding session). Được sinh ngẫu nhiên 64 ký tự hex an toàn, băm mã hóa SHA-256 (`tokenHash`) và lưu trữ trong bảng `refresh_tokens` (đại diện cho phiên đăng nhập theo thiết bị, lưu `deviceInfo`, `ipAddress`, `isRevoked`, `lastActiveAt`).
+  - **Xoay vòng Token (Refresh Token Rotation - RTR):** Mỗi khi gọi `POST /api/v1/auth/refresh-token`, phiên cũ bị đánh dấu `isRevoked = true`, đưa `blacklist:session:{oldSession.id}` vào Redis (TTL 900s), đồng thời tạo phiên mới mang `sid` mới và cấp cặp token mới (Single-Use Token).
+- **Thu hồi phiên tức thời (Instant Revocation qua Redis):**
+  - Trong `authMiddleware`, ngoài việc kiểm tra `blacklist:token:${token}`, còn kiểm tra nhanh trong Redis `blacklist:session:${decoded.sid}`.
+  - Khi một thiết bị bị đăng xuất từ xa, server chỉ cần đưa session ID đó vào Redis blacklist là thiết bị đó bị chặn đứng ngay lập tức (< 1ms) ở request tiếp theo.
 - **Cơ chế Tạm khóa tài khoản (Account Lockout qua Redis):**
   - Giới hạn: `MAX_LOGIN_ATTEMPTS = 5`.
   - Khi người dùng đăng nhập sai quá 5 lần, tài khoản bị tạm khóa 15 phút (`LOGIN_LOCKOUT_SECONDS = 900`).
@@ -141,10 +149,16 @@ _backend/
   - Bước 1: `POST /auth/forgot-password` -> Gửi mã OTP 6 số qua email (Redis TTL 10p, cooldown 60s, chống user enumeration).
   - Bước 2: `POST /auth/verify-reset-otp` -> Xác thực OTP -> Cấp `resetToken` (UUID, Redis TTL 15p).
   - Bước 3: `POST /auth/reset-password` -> Đặt mật khẩu mới với `resetToken` (dùng 1 lần duy nhất, cập nhật Argon2, xóa token và giải phóng lockout).
-- **Đăng xuất (Logout & Thu hồi Token qua Redis Blacklist):**
+- **Đăng xuất (Logout & Thu hồi Phiên):**
   - Endpoint `POST /auth/logout` bảo vệ bằng `authMiddleware`.
-  - Server giải mã JWT, lấy thời gian sống còn lại (`exp - now`) và đưa token vào Redis `blacklist:token:{token}` với TTL tương ứng.
-  - `authMiddleware` tự động từ chối mọi request mang token nằm trong blacklist với mã `401 Unauthorized`.
+  - Server giải mã JWT, lấy `sid` và thời gian sống còn lại (`exp - now`).
+  - Đánh dấu phiên `isRevoked = true` trong database.
+  - Đưa cả `blacklist:token:{token}` và `blacklist:session:{sid}` vào Redis với TTL tương ứng.
+- **Tài khoản Seed dữ liệu mẫu (Seeder Accounts):**
+  - `UserSeeder` cung cấp sẵn 3 tài khoản kiểm thử (mật khẩu chung: `"password"`):
+    1. `minhtuan@roomee.vn` — `tenant` (Người thuê), `hasContract: true` (Tự động vào `TenantScreen`).
+    2. `vantoan@roomee.vn` — `tenant` (Người thuê), `hasContract: false` (Tự động vào `HomeScreen`).
+    3. `huybach2002ct@gmail.com` — `landlord` (Chủ trọ), `hasContract: false` (Tự động vào `LandlordScreen`).
 
 ## 4. Flutter (root `lib/`)
 
@@ -251,9 +265,18 @@ test/
       - `tenant` + `hasContract == true` (đã thuê trọ) -> `AppRoutes.tenant` (`TenantScreen`).
       - `tenant` + `hasContract == false` (chưa thuê trọ) -> `AppRoutes.home` (`HomeScreen`).
   - `WelcomeScreen` cũng tích hợp `BlocListener` kép để chuyển sang `AppRoutes.wrapper` nếu nhận thấy state `Authenticated`.
+- **Cơ chế Refresh Token ngầm & Hàng đợi Retry (Lock & FIFO Retry Queue qua `AuthInterceptor`):**
+  - **Lưu trữ bảo mật:** Lưu cả `access_token`, `refresh_token`, `cached_user` và `app_locale` trong `FlutterSecureStorage`.
+  - **Tránh đệ quy vô hạn:** `AuthInterceptor` sử dụng một instance `_refreshDio` độc lập (không gắn `AuthInterceptor`) để gọi `POST /api/v1/auth/refresh-token`.
+  - **Khóa & Xếp hàng đợi:** Khi nhiều request đồng thời gặp mã `401 Unauthorized` do Access Token hết hạn:
+    - Request đầu tiên khóa cờ `_isRefreshing = true`, đưa chính nó vào `_retryQueue` và gọi refresh ngầm.
+    - Các request tiếp theo khi thấy `_isRefreshing == true` sẽ được đưa vào cuối hàng đợi `_retryQueue` và tạm dừng chờ.
+    - Bỏ qua các request 401 không có `Authorization: Bearer` (như đăng nhập sai mật khẩu) hoặc 401 trên chính endpoint `/auth/refresh-token`.
+  - **Replay FIFO:** Khi refresh thành công, lưu cặp token mới vào `FlutterSecureStorage`, giải phóng cờ `_isRefreshing = false`, và lần lượt replay từng request trong `_retryQueue` theo đúng thứ tự FIFO với token mới (`clientDio.fetch(options)`), resolve trực tiếp về đúng caller ban đầu (trong suốt với UI/BLoC).
+  - **Fail-safe:** Nếu refresh thất bại (hết hạn refresh token hoặc bị thu hồi), toàn bộ hàng đợi bị reject và kích hoạt `onUnauthorized?.call()`.
 - **Quy trình Đăng xuất & Tự động Đăng xuất (Logout & Auto-Logout):**
-  - Khi người dùng đăng xuất thủ công: gửi yêu cầu `POST /auth/logout` lên server (thu hồi token vào Redis blacklist), đồng thời luôn xóa sạch `access_token` và `cached_user` trong `FlutterSecureStorage` (kể cả khi offline) rồi chuyển về `AppRoutes.welcome`.
-  - **Tự động Đăng xuất khi 401 Unauthorized:** `AuthInterceptor` liên kết với `AuthBloc` thông qua callback `onUnauthorized` tại `main.dart`. Khi có bất kỳ request API nào trả về `401` (token hết hạn, bị thu hồi hoặc tài khoản bị khóa), ứng dụng tự động phát sinh `AuthLogoutEvent()` để dọn dẹp phiên và chuyển người dùng về màn hình chào mừng.
+  - Khi người dùng đăng xuất thủ công: gửi yêu cầu `POST /auth/logout` lên server (thu hồi session trong DB và đưa vào Redis blacklist), đồng thời luôn xóa sạch cả `access_token`, `refresh_token` và `cached_user` trong `FlutterSecureStorage` (kể cả khi offline) rồi chuyển về `AppRoutes.welcome`.
+  - **Tự động Đăng xuất khi 401 Unauthorized:** `AuthInterceptor` liên kết với `AuthBloc` thông qua callback `onUnauthorized` tại `main.dart`. Khi Refresh Token bị từ chối hoặc hết hạn, ứng dụng tự động phát sinh `AuthLogoutEvent()` để dọn dẹp phiên và chuyển người dùng về màn hình chào mừng.
 
 ### 4.5 Chuẩn hoá Validation (Mobile)
 - Toàn bộ validation phía client đặt tập trung tại `lib/core/validation/app_validators.dart`.

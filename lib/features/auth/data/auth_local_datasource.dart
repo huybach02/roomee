@@ -6,6 +6,7 @@ class AuthLocalDataSource {
   final FlutterSecureStorage _storage;
 
   static const String tokenKey = 'access_token';
+  static const String refreshTokenKey = 'refresh_token';
   static const String userKey = 'cached_user';
 
   AuthLocalDataSource({FlutterSecureStorage? storage})
@@ -24,6 +25,21 @@ class AuthLocalDataSource {
   /// Xóa access token
   Future<void> deleteToken() async {
     await _storage.delete(key: tokenKey);
+  }
+
+  /// Lưu refresh token
+  Future<void> saveRefreshToken(String token) async {
+    await _storage.write(key: refreshTokenKey, value: token);
+  }
+
+  /// Lấy refresh token hiện tại
+  Future<String?> getRefreshToken() async {
+    return _storage.read(key: refreshTokenKey);
+  }
+
+  /// Xóa refresh token
+  Future<void> deleteRefreshToken() async {
+    await _storage.delete(key: refreshTokenKey);
   }
 
   /// Lưu thông tin người dùng cục bộ (phục vụ hiển thị nhanh & offline mode)
@@ -58,6 +74,7 @@ class AuthLocalDataSource {
   /// Xóa sạch phiên đăng nhập khi đăng xuất
   Future<void> clearSession() async {
     await deleteToken();
+    await deleteRefreshToken();
     await deleteUser();
   }
 }

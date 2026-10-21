@@ -9,6 +9,7 @@ class _FakeAuthRepository implements IAuthRepository {
   bool loggedIn = false;
   UserModel? currentUser;
   String? token;
+  String? refreshTokenValue;
   ApiException? errorToThrow;
   String? codeToReturnOnLogin;
 
@@ -58,10 +59,26 @@ class _FakeAuthRepository implements IAuthRepository {
   }
 
   @override
+  Future<String?> getRefreshToken() async {
+    return refreshTokenValue;
+  }
+
+  @override
+  Future<RefreshTokenResponse> refreshToken() async {
+    token = 'refreshed_token_456';
+    refreshTokenValue = 'new_refresh_token_789';
+    return const RefreshTokenResponse(
+      accessToken: 'refreshed_token_456',
+      refreshToken: 'new_refresh_token_789',
+    );
+  }
+
+  @override
   Future<void> logout() async {
     loggedIn = false;
     currentUser = null;
     token = null;
+    refreshTokenValue = null;
   }
 
   String? lastResentEmail;

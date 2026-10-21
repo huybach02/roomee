@@ -42,8 +42,13 @@ final class AuthOtpRequired extends AuthState {
 final class Authenticated extends AuthState {
   final UserModel? user;
   final String token;
+  final String? refreshToken;
 
-  const Authenticated({this.user, required this.token});
+  const Authenticated({
+    this.user,
+    required this.token,
+    this.refreshToken,
+  });
 
   @override
   bool operator ==(Object other) =>
@@ -51,10 +56,11 @@ final class Authenticated extends AuthState {
       other is Authenticated &&
           runtimeType == other.runtimeType &&
           user == other.user &&
-          token == other.token;
+          token == other.token &&
+          refreshToken == other.refreshToken;
 
   @override
-  int get hashCode => Object.hash(user, token);
+  int get hashCode => Object.hash(user, token, refreshToken);
 }
 
 final class Unauthenticated extends AuthState {

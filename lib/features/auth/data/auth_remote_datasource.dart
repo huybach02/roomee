@@ -69,4 +69,13 @@ class AuthRemoteDataSource extends BaseService {
   Future<ApiResponse<dynamic>> logout() {
     return postData<dynamic>('/auth/logout');
   }
+
+  Future<ApiResponse<RefreshTokenResponse>> refreshToken(String refreshToken) {
+    return postData<RefreshTokenResponse>(
+      '/auth/refresh-token',
+      data: {'refreshToken': refreshToken},
+      fromJsonT: (json) =>
+          RefreshTokenResponse.fromJson(json as Map<String, dynamic>),
+    );
+  }
 }

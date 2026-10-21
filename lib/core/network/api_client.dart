@@ -33,6 +33,8 @@ class ApiClient {
         AuthInterceptor(
           secureStorage: secureStorage,
           onUnauthorized: onUnauthorized,
+          clientDio: _dio,
+          baseUrl: baseUrl ?? apiBaseUrl,
         ),
         LoggingInterceptor(),
       ]);

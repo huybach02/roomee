@@ -80,6 +80,10 @@ export const verifyOtpSchema = z.object({
     .regex(/^\d{6}$/, "OTP must be 6 digits"),
 });
 
+export const refreshTokenSchema = z.object({
+  refreshToken: ruleValidates.requiredString("Refresh token"),
+});
+
 export type RegisterDto = z.infer<typeof registerSchema>;
 export type UpdateProfileDto = z.infer<typeof updateProfileSchema>;
 export type LoginDto = z.infer<typeof loginSchema>;
@@ -88,3 +92,4 @@ export type ResetPasswordDto = z.infer<typeof resetPasswordSchema>;
 export type ChangePasswordDto = z.infer<typeof changePasswordSchema>;
 export type ResendOtpDto = z.infer<typeof resendOtpSchema>;
 export type VerifyOtpDto = z.infer<typeof verifyOtpSchema>;
+export type RefreshTokenDto = z.infer<typeof refreshTokenSchema>;

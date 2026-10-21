@@ -4,6 +4,7 @@ import { AuthController } from "./authController.js";
 import {
   forgotPasswordSchema,
   loginSchema,
+  refreshTokenSchema,
   registerSchema,
   resendOtpSchema,
   resetPasswordSchema,
@@ -69,6 +70,12 @@ export class AuthRoutes {
       loginRateLimiter,
       validate(resetPasswordSchema),
       this.authController.resetPassword,
+    );
+    this.router.post(
+      "/refresh-token",
+      loginRateLimiter,
+      validate(refreshTokenSchema),
+      this.authController.refreshToken,
     );
     this.router.post(
       "/logout",

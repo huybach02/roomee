@@ -22,6 +22,8 @@ abstract class IAuthRepository {
   Future<UserModel?> getCurrentUser();
   Future<bool> isLoggedIn();
   Future<String?> getToken();
+  Future<String?> getRefreshToken();
+  Future<RefreshTokenResponse> refreshToken();
   Future<void> logout();
 }
 
@@ -47,6 +49,9 @@ class AuthRepository implements IAuthRepository {
     if (authData.token.isNotEmpty) {
       await _localDataSource.saveToken(authData.token);
     }
+    if (authData.refreshToken != null && authData.refreshToken!.isNotEmpty) {
+      await _localDataSource.saveRefreshToken(authData.refreshToken!);
+    }
     if (authData.user != null) {
       await _localDataSource.saveUser(authData.user!);
     }
@@ -65,6 +70,9 @@ class AuthRepository implements IAuthRepository {
 
     if (authData.token.isNotEmpty) {
       await _localDataSource.saveToken(authData.token);
+    }
+    if (authData.refreshToken != null && authData.refreshToken!.isNotEmpty) {
+      await _localDataSource.saveRefreshToken(authData.refreshToken!);
     }
     if (authData.user != null) {
       await _localDataSource.saveUser(authData.user!);
@@ -129,6 +137,30 @@ class AuthRepository implements IAuthRepository {
   @override
   Future<String?> getToken() async {
     return _localDataSource.getToken();
+  }
+
+  @override
+  Future<String?> getRefreshToken() async {
+    return _localDataSource.getRefreshToken();
+  }
+
+  @override
+  Future<RefreshTokenResponse> refreshToken() async {
+    final currentRefreshToken = await _localDataSource.getRefreshToken();
+    if (currentRefreshToken == null || currentRefreshToken.isEmpty) {
+      throw const UnauthorizedException(message: 'Phiên đăng nhập đã hết hạn.');
+    }
+
+    final response = await _remoteDataSource.refreshToken(currentRefreshToken);
+    final data = response.data;
+    if (data == null) {
+      throw const ServerException(message: 'Phản hồi không hợp lệ từ máy chủ.');
+    }
+
+    await _localDataSource.saveToken(data.accessToken);
+    await _localDataSource.saveRefreshToken(data.refreshToken);
+
+    return data;
   }
 
   @override

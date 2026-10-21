@@ -80,6 +80,16 @@ void main() {
       expect(await localDataSource.isLoggedIn(), isFalse);
     });
 
+    test('saves, reads, and deletes refresh token', () async {
+      expect(await localDataSource.getRefreshToken(), isNull);
+
+      await localDataSource.saveRefreshToken('refresh_abc');
+      expect(await localDataSource.getRefreshToken(), 'refresh_abc');
+
+      await localDataSource.deleteRefreshToken();
+      expect(await localDataSource.getRefreshToken(), isNull);
+    });
+
     test('saves, reads, and clears user profile', () async {
       const user = UserModel(
         id: 'usr_1',
@@ -269,6 +279,45 @@ void main() {
 
       expect(requestedPath, '/auth/verify-otp');
       expect(requestedData, {'email': 'test@roomee.vn', 'otp': '123456'});
+    });
+
+    test('refreshToken calls /auth/refresh-token and updates tokens', () async {
+      await localDataSource.saveRefreshToken('old_refresh_123');
+
+      String? requestedPath;
+      Map<String, dynamic>? requestedData;
+
+      testDio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            requestedPath = options.path;
+            requestedData = options.data as Map<String, dynamic>?;
+            return handler.resolve(
+              Response(
+                requestOptions: options,
+                statusCode: 200,
+                data: {
+                  'success': true,
+                  'message': 'Thành công',
+                  'data': {
+                    'accessToken': 'new_access_token',
+                    'refreshToken': 'new_refresh_token',
+                  },
+                },
+              ),
+            );
+          },
+        ),
+      );
+
+      final result = await repository.refreshToken();
+
+      expect(requestedPath, '/auth/refresh-token');
+      expect(requestedData, {'refreshToken': 'old_refresh_123'});
+      expect(result.accessToken, 'new_access_token');
+      expect(result.refreshToken, 'new_refresh_token');
+      expect(await repository.getToken(), 'new_access_token');
+      expect(await repository.getRefreshToken(), 'new_refresh_token');
     });
   });
 }
