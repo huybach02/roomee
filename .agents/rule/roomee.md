@@ -23,8 +23,8 @@
 - **Cache/Redis:** ioredis (`^5.11.1`)
 - **Đa ngôn ngữ (i18n):** Tự xây dựng trên `AsyncLocalStorage` (`node:async_hooks`) + JSON dictionaries (`src/locales/vi.json`, `en.json`)
 - **Tooling:** `tsx`, `typescript`
-- **Các package đã cài đặt:** Argon2 (`argon2`), JWT (`jsonwebtoken` & `@types/jsonwebtoken`).
-- **Các package trong roadmap nhưng CHƯA cài:** Socket.io, BullMQ, node-cron, Resend, Cloudinary (chỉ cài khi triển khai tính năng tương ứng).
+- **Các package đã cài đặt:** Argon2 (`argon2`), JWT (`jsonwebtoken`), Cron scheduler (`node-cron`).
+- **Các package trong roadmap nhưng CHƯA cài:** Socket.io, BullMQ, Resend, Cloudinary (chỉ cài khi triển khai tính năng tương ứng).
 
 **Mobile (`lib/`):**
 - **Framework:** Flutter + Dart (SDK `^3.13.5`)
@@ -56,10 +56,17 @@ _backend/
   scripts/
     dev.mjs                      # Dev runner đa nền tảng (tsc --watch + node --watch)
   src/
+    commands/                    # CLI commands độc lập (seeder.ts, cleanExpiredRedis.ts)
+      seeder.ts
+      cleanExpiredRedis.ts       # Script dọn dẹp các record cache hết hạn trong persist_redis
     config/                      # data-source.ts (TypeORM), redis.ts (ioredis lazyConnect)
+    cron/                        # Quản lý Cronjob định kỳ nền bằng node-cron
+      cleanExpiredRedisCron.ts   # Cronjob quét xóa cache hết hạn mỗi ngày (hoặc theo cấu hình)
+      index.ts                   # Export startCronJobs() & stopCronJobs()
     entities/                    # Entity TypeORM (PascalCase), kế thừa Mixin(AuditableTrait)
       user.ts
       refreshToken.ts            # Quản lý phiên đăng nhập theo thiết bị & Refresh Token
+      persistRedis.ts            # Lưu trữ dữ liệu dự phòng từ Redis (key, value jsonb, ttl, expiredAt)
     locales/                     # vi.json, en.json (từ điển đa ngôn ngữ cho API)
     middlewares/                 # i18nMiddleware.ts, validateMiddleware.ts, authMiddleware.ts
     migrations/                  # TypeORM migrations
@@ -72,7 +79,10 @@ _backend/
     repositories/                # Repository tùy biến kế thừa Repository<Entity>
       userRepository.ts
       refreshTokenRepository.ts  # Truy vấn phiên, thu hồi session theo id hoặc tokenHash
+      persistRedisRepository.ts  # Thao tác bảng persist_redis (set, get còn hạn, lazy delete, clean)
     seeders/                     # Seed dữ liệu khởi tạo (DataUnitsSeeder, UserSeeder)
+    services/                    # Các service hạ tầng dùng chung (Cross-cutting infrastructure)
+      cacheService.ts            # Cache Layer: ghi song song Redis+DB, fallback DB & auto-rehydrate
     types/                       # express.d.ts (mở rộng Express.Request: locale, t)
     utils/
       constanst.ts               # Hằng số, Enum UserRole, Gender (chú ý chính tả file)
@@ -82,7 +92,7 @@ _backend/
       ruleValidate.ts            # Reusable rules Zod (requiredString, emailRule,...)
     routes.ts                    # Class Routes @injectable() gom toàn bộ route vào API_PREFIX
     app.ts                       # Class App cấu hình Express middleware, health check, 404, error handler
-    index.ts                     # Bootstrap server: kết nối DB, Redis rồi lắng nghe port
+    index.ts                     # Bootstrap server: kết nối DB, Redis, khởi động Cron rồi lắng nghe port
 ```
 
 ### 3.3 DI (tsyringe)
@@ -120,15 +130,33 @@ _backend/
 - Entity dùng `Mixin(AuditableTrait)` (`src/mixins/auditableTrait.ts`) để tự động có các cột: `createdAt`, `updatedAt`, `createdBy`, `updatedBy`.
 - Bảng đặt tên snake_case số nhiều (`users`); cột dùng camelCase (`fullName`, `phoneNumber`, `isActive`).
 
-### 3.8 Redis
+### 3.8 Cache, Redis & Cơ chế Persist/Fallback
 - Cấu hình qua `REDIS_URL` trong `.env`, khởi tạo trong `src/config/redis.ts` với `lazyConnect: true`.
 - Kết nối tường minh khi start server (`connectRedis()`) và đóng gracefully khi tắt (`closeRedis()`).
+- **Quy tắc bắt buộc khi thao tác Cache:** Mọi controller, service, middleware **bắt buộc sử dụng `CacheService`** (`src/services/cacheService.ts`), không gọi trực tiếp `redis` (trừ health check hoặc ngoại lệ đặc thù).
+- **Cơ chế Persist xuống Database (`persist_redis`):**
+  - Mọi thao tác ghi (`cacheService.set`, `setNx`, `incr`) đều được ghi đồng thời vào bảng `persist_redis` (PostgreSQL) với `key` (PK), `value` (`jsonb`), `ttl` (giây) và `expiredAt` (timestamp).
+- **Cơ chế Fallback & Auto-Rehydration:**
+  - Khi gọi `cacheService.get<T>(key)`: Ưu tiên đọc từ Redis.
+  - Nếu Redis miss (cache miss, hoặc Redis sập/restart mất dữ liệu RAM), tự động fallback xuống truy vấn bảng `persist_redis` (`expiredAt IS NULL OR expiredAt > NOW()`).
+  - Nếu tìm thấy dữ liệu còn hạn trong DB: tự động tính TTL còn lại và nạp ngược lại (**rehydrate**) lên Redis khi Redis online.
+- **Tự động nhận diện kiểu dữ liệu (JSON vs String):**
+  - `cacheService.get<T>(key)` tự động parse thành Object/Array nếu dữ liệu bắt đầu bằng `{` hoặc `[`.
+  - Giữ nguyên kiểu chuỗi (`string`) nếu là chuỗi thông thường (OTP, email, token, cờ boolean) để tránh lỗi ép kiểu ngoài ý muốn.
+- **Xóa đồng bộ (`cacheService.del`):**
+  - Luôn xóa key ở cả Redis và Database cùng lúc, chống tái sử dụng token hoặc OTP cũ khi có sự cố.
+- **Dọn dẹp cache hết hạn (Expiration Cleanup):**
+  - **In-app Cron (`node-cron`):** Tự động kích hoạt khi server start (`src/cron/`), cấu hình qua `CLEAN_PERSIST_REDIS_CRON` (mặc định chạy 00:00 hàng ngày: `"0 0 * * *"`), có cờ `noOverlap: true`.
+  - **CLI Command:** Chạy độc lập qua `src/commands/cleanExpiredRedis.ts` (`npm run clean:redis` / `npm run clean:redis:prod`).
+  - **Lazy Delete:** Khi `getValidKey` phát hiện record đã hết hạn nhưng cronjob chưa kịp chạy, hệ thống tự động xóa record đó trong background và trả về `null`.
 
 ### 3.9 Lệnh thường dùng
 - `npm run dev` (chạy song song tsc và node qua `scripts/dev.mjs`, tự copy locales)
 - `npm run typecheck` (`tsc --noEmit`)
 - `npm run build` (`tsc && cp -r src/locales dist/locales`)
 - `npm run start` (`node dist/index.js`)
+- `npm run clean:redis` (chạy command quét và dọn dẹp các record cache hết hạn trong `persist_redis`)
+- `npm run clean:redis:prod` (chạy command dọn dẹp cache hết hạn trên môi trường production)
 - Migration: `npm run migration:generate|run|revert|show`
 
 ### 3.10 Authentication & Security
@@ -315,6 +343,7 @@ test/
 - [ ] Mọi chuỗi hiển thị đều qua i18n (`t(...)` / `context.tr(...)`), bổ sung đủ cả 2 file `vi.json` và `en.json` tuân thủ đúng cấu trúc phân nhóm (`fields`, `validateErrors`, `errors`).
 - [ ] Form input phía mobile validate qua `FieldRules` / `Validators` (`lib/core/validation/app_validators.dart`), đồng bộ với BE schema.
 - [ ] Backend input validate qua Zod & `ruleValidates`.
+- [ ] Thao tác Cache/Redis phía backend phải qua `CacheService` để đồng bộ persist và fallback DB.
 - [ ] Backend response chuẩn theo `CustomResponse.success(res, data, message)` / `CustomResponse.error(res, message, errors)`.
 - [ ] Typecheck (`npm run typecheck`) / analyze (`flutter analyze`) / test (`flutter test`) đều pass.
 - [ ] Có migration nếu đổi schema.

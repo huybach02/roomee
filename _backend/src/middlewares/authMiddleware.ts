@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
-import { redis } from "../config/redis.js";
+import { container } from "tsyringe";
+import { CacheService } from "../services/cacheService.js";
 import { CustomResponse } from "../utils/customResponse.js";
 
 export const authMiddleware = async (
@@ -21,8 +22,10 @@ export const authMiddleware = async (
   }
 
   try {
-    // 1. Kiểm tra xem token có nằm trong blacklist của Redis không
-    const isBlacklisted = await redis.get(`blacklist:token:${token}`);
+    const cacheService = container.resolve(CacheService);
+
+    // 1. Kiểm tra xem token có nằm trong blacklist không (ưu tiên Redis, fallback DB)
+    const isBlacklisted = await cacheService.get(`blacklist:token:${token}`);
     if (isBlacklisted) {
       CustomResponse.error(res, t("common.unauthorized"), null, 401);
       return;
@@ -43,9 +46,9 @@ export const authMiddleware = async (
       [key: string]: any;
     };
 
-    // 3. Kiểm tra xem session của token này có bị thu hồi tức thời trong Redis không
+    // 3. Kiểm tra xem session của token này có bị thu hồi tức thời không (ưu tiên Redis, fallback DB)
     if (decoded.sid) {
-      const isSessionBlacklisted = await redis.get(
+      const isSessionBlacklisted = await cacheService.get(
         `blacklist:session:${decoded.sid}`,
       );
       if (isSessionBlacklisted) {

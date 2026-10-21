@@ -14,3 +14,9 @@ npm run seed
 # Truyền tên trực tiếp
 npm run seed DataUnitsSeeder
 npm run seed UserSeeder
+
+# Chạy môi trường dev
+npm run clean:redis
+
+# Chạy môi trường production
+npm run clean:redis:prod

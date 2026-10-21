@@ -3,6 +3,7 @@ import cors from "cors";
 import { container } from "tsyringe";
 import { AppDataSource } from "./config/data-source.js";
 import { closeRedis, redis } from "./config/redis.js";
+import { stopCronJobs } from "./cron/index.js";
 import { Routes } from "./routes.js";
 import { CustomResponse } from "./utils/customResponse.js";
 import { i18nMiddleware } from "./middlewares/i18nMiddleware.js";
@@ -100,6 +101,7 @@ export class App {
     // Graceful shutdown
     const shutdown = async (signal: string) => {
       console.log(`\nReceived ${signal}. Shutting down gracefully...`);
+      stopCronJobs();
       if (AppDataSource.isInitialized) {
         await AppDataSource.destroy();
         console.log("Database connection closed.");

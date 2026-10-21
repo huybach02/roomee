@@ -20,7 +20,7 @@ import {
 } from "../../utils/constanst.js";
 import { MailService } from "../mail/mailService.js";
 import { OtpService } from "./otpService.js";
-import { redis } from "../../config/redis.js";
+import { CacheService } from "../../services/cacheService.js";
 import { RefreshTokenRepository } from "../../repositories/refreshTokenRepository.js";
 
 @injectable()
@@ -31,6 +31,7 @@ export class AuthService {
     private userRepository: UserRepository,
     private mailService: MailService,
     private otpService: OtpService,
+    private cacheService: CacheService,
     private refreshTokenRepository: RefreshTokenRepository,
   ) {
     if (!process.env.JWT_SECRET) {
@@ -88,10 +89,9 @@ export class AuthService {
     }
 
     // Đặt cooldown 60s cho resend OTP
-    await redis.set(
+    await this.cacheService.set(
       `otp:cooldown:${savedUser.email.trim().toLowerCase()}`,
       "1",
-      "EX",
       60,
     );
 
@@ -108,7 +108,7 @@ export class AuthService {
     const cooldownKey = `otp:cooldown:${normalizedEmail}`;
 
     // Kiểm tra cooldown server-side (60 giây)
-    const canSend = await redis.set(cooldownKey, "1", "EX", 60, "NX");
+    const canSend = await this.cacheService.setNx(cooldownKey, "1", 60);
     if (!canSend) {
       throw new Error(t("auth.otpCooldown"));
     }
@@ -134,7 +134,7 @@ export class AuthService {
     });
 
     if (!isSent) {
-      await redis.del(cooldownKey);
+      await this.cacheService.del(cooldownKey);
       throw new Error(t("mail.sendFailed"));
     }
   }
@@ -171,9 +171,9 @@ export class AuthService {
     const attemptsKey = `login:attempts:${normalizedEmail}`;
 
     // Kiểm tra tài khoản có đang bị tạm khóa hay không
-    const isLocked = await redis.get(lockoutKey);
+    const isLocked = await this.cacheService.get(lockoutKey);
     if (isLocked) {
-      const ttl = await redis.ttl(lockoutKey);
+      const ttl = await this.cacheService.ttl(lockoutKey);
       const remainingMinutes = Math.max(1, Math.ceil(ttl / 60));
       throw new Error(
         t("auth.accountLocked", { minutes: remainingMinutes.toString() }),
@@ -182,14 +182,14 @@ export class AuthService {
 
     // Helper xử lý tăng số lần thử sai và kích hoạt tạm khóa nếu chạm ngưỡng
     const handleFailedAttempt = async (): Promise<never> => {
-      const attempts = await redis.incr(attemptsKey);
-      if (attempts === 1) {
-        await redis.expire(attemptsKey, LOGIN_LOCKOUT_SECONDS);
-      }
+      const attempts = await this.cacheService.incr(
+        attemptsKey,
+        LOGIN_LOCKOUT_SECONDS,
+      );
 
       if (attempts >= MAX_LOGIN_ATTEMPTS) {
-        await redis.set(lockoutKey, "1", "EX", LOGIN_LOCKOUT_SECONDS);
-        await redis.del(attemptsKey);
+        await this.cacheService.set(lockoutKey, "1", LOGIN_LOCKOUT_SECONDS);
+        await this.cacheService.del(attemptsKey);
         throw new Error(
           t("auth.accountLocked", {
             minutes: LOGIN_LOCKOUT_MINUTES.toString(),
@@ -221,13 +221,13 @@ export class AuthService {
       return await handleFailedAttempt();
     }
 
-    await redis.del(attemptsKey);
+    await this.cacheService.del(attemptsKey);
 
     const { password: _, ...userWithoutPassword } = user;
 
     if (!user.isEmailVerified) {
       const cooldownKey = `otp:cooldown:${normalizedEmail}`;
-      const canSend = await redis.set(cooldownKey, "1", "EX", 60, "NX");
+      const canSend = await this.cacheService.setNx(cooldownKey, "1", 60);
       if (canSend) {
         const otp = await this.otpService.generateAndSaveOtp(
           normalizedEmail,
@@ -298,7 +298,7 @@ export class AuthService {
     const cooldownKey = `otp:cooldown:forgot_password:${normalizedEmail}`;
 
     // 1. Kiểm tra cooldown (60 giây)
-    const canSend = await redis.set(cooldownKey, "1", "EX", 60, "NX");
+    const canSend = await this.cacheService.setNx(cooldownKey, "1", 60);
     if (!canSend) {
       throw new Error(t("auth.otpCooldown"));
     }
@@ -328,7 +328,7 @@ export class AuthService {
     });
 
     if (!isSent) {
-      await redis.del(cooldownKey);
+      await this.cacheService.del(cooldownKey);
       throw new Error(t("mail.sendFailed"));
     }
   }
@@ -357,10 +357,9 @@ export class AuthService {
 
     // 3. Tạo reset token ngẫu nhiên an toàn (TTL 15 phút)
     const resetToken = crypto.randomUUID();
-    await redis.set(
+    await this.cacheService.set(
       `password_reset_token:${resetToken}`,
       normalizedEmail,
-      "EX",
       900,
     );
 
@@ -371,9 +370,9 @@ export class AuthService {
     resetToken: string,
     newPassword: string,
   ): Promise<void> {
-    // 1. Lấy email từ token trong Redis
+    // 1. Lấy email từ token trong Redis (fallback DB)
     const tokenKey = `password_reset_token:${resetToken}`;
-    const email = await redis.get(tokenKey);
+    const email = await this.cacheService.get<string>(tokenKey);
     if (!email) {
       throw new Error(t("auth.invalidResetToken"));
     }
@@ -389,11 +388,14 @@ export class AuthService {
     user.isEmailVerified = true;
     await this.userRepository.save(user);
 
-    // 4. Xóa resetToken khỏi Redis (dùng 1 lần duy nhất)
-    await redis.del(tokenKey);
+    // 4. Xóa resetToken khỏi Redis & DB (dùng 1 lần duy nhất)
+    await this.cacheService.del(tokenKey);
 
     // 5. Xóa key lockout / attempts của tài khoản (nếu đang bị khóa)
-    await redis.del(`login:attempts:${email}`, `login:lockout:${email}`);
+    await this.cacheService.del(
+      `login:attempts:${email}`,
+      `login:lockout:${email}`,
+    );
   }
 
   public async logout(token: string): Promise<void> {
@@ -415,24 +417,26 @@ export class AuthService {
         }
       }
 
-      // 1. Blacklist access token trong Redis
-      await redis.set(`blacklist:token:${token}`, "1", "EX", remainingTtl);
+      // 1. Blacklist access token trong Redis + DB
+      await this.cacheService.set(
+        `blacklist:token:${token}`,
+        "1",
+        remainingTtl,
+      );
 
       // 2. Thu hồi session trong DB và Redis nếu có sid
       if (decoded && decoded.sid) {
         await this.refreshTokenRepository.revokeBySessionId(decoded.sid);
-        await redis.set(
+        await this.cacheService.set(
           `blacklist:session:${decoded.sid}`,
           "1",
-          "EX",
           remainingTtl,
         );
       }
     } catch {
-      await redis.set(
+      await this.cacheService.set(
         `blacklist:token:${token}`,
         "1",
-        "EX",
         TTL_ACCESS_TOKEN_SECONDS,
       );
     }
@@ -475,11 +479,10 @@ export class AuthService {
     session.isRevoked = true;
     await this.refreshTokenRepository.save(session);
 
-    // Blacklist session cũ trong Redis để chặn tức thì các token của phiên cũ
-    await redis.set(
+    // Blacklist session cũ trong Redis + DB để chặn tức thì các token của phiên cũ
+    await this.cacheService.set(
       `blacklist:session:${session.id}`,
       "1",
-      "EX",
       TTL_ACCESS_TOKEN_SECONDS,
     );
 

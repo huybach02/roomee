@@ -3,6 +3,7 @@ import "dotenv/config";
 import App from "./app.js";
 import { AppDataSource } from "./config/data-source.js";
 import { connectRedis } from "./config/redis.js";
+import { startCronJobs } from "./cron/index.js";
 import { DEFAULT_PORT } from "./utils/constanst.js";
 
 const PORT = Number(process.env.PORT) || DEFAULT_PORT;
@@ -16,6 +17,8 @@ async function bootstrap() {
     console.log("⏳ Connecting to Redis...");
     await connectRedis();
     console.log("🧠 Connected to Redis successfully");
+
+    startCronJobs();
 
     const server = new App(PORT);
     server.listen();
