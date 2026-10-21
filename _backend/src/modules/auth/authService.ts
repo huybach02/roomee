@@ -3,9 +3,13 @@ import { User } from "../../entities/user.js";
 import { UserRepository } from "../../repositories/userRepository.js";
 import { RegisterDto } from "./authSchema.js";
 import argon2 from "argon2";
+import jwt from "jsonwebtoken";
 import {
   CODE_RESPONSE,
   Gender,
+  LOGIN_LOCKOUT_MINUTES,
+  LOGIN_LOCKOUT_SECONDS,
+  MAX_LOGIN_ATTEMPTS,
   OTP_EXPIRES_IN_MINUTES,
   TTL_OTP_SECONDS,
   UserRole,
@@ -32,7 +36,6 @@ export class AuthService {
   public async register(
     dtoData: RegisterDto,
   ): Promise<{ user: User; code: string }> {
-    // Check if the email already exists
     const existingUser = await this.userRepository.findOneBy({
       email: dtoData.email,
     });
@@ -98,27 +101,25 @@ export class AuthService {
     const normalizedEmail = email.trim().toLowerCase();
     const cooldownKey = `otp:cooldown:${normalizedEmail}`;
 
-    // 1. Kiểm tra cooldown server-side (60 giây)
+    // Kiểm tra cooldown server-side (60 giây)
     const canSend = await redis.set(cooldownKey, "1", "EX", 60, "NX");
     if (!canSend) {
       throw new Error(t("auth.otpCooldown"));
     }
 
-    // 2. Kiểm tra tài khoản tồn tại và chưa xác thực
-    const user = await this.userRepository.findOneBy({ email: normalizedEmail });
+    const user = await this.userRepository.findOneBy({
+      email: normalizedEmail,
+    });
     if (!user || user.isEmailVerified) {
-      // Kết thúc thành công giả định để tránh user enumeration và spam email
       return;
     }
 
-    // 3. Tạo mã OTP 6 số và lưu vào Redis (hết hạn sau 10 phút)
     const otp = await this.otpService.generateAndSaveOtp(
       normalizedEmail,
       "register",
       TTL_OTP_SECONDS,
     );
 
-    // 4. Gửi email chứa mã OTP xác thực
     const isSent = await this.mailService.sendOtpEmail({
       to: normalizedEmail,
       otp,
@@ -127,14 +128,12 @@ export class AuthService {
     });
 
     if (!isSent) {
-      // Xóa cooldown nếu gửi mail thất bại để người dùng có thể gửi lại
       await redis.del(cooldownKey);
       throw new Error(t("mail.sendFailed"));
     }
   }
 
   public async verifyOtp(email: string, otp: string): Promise<void> {
-    // Xác thực mã OTP
     const isOtpValid = await this.otpService.verifyOtp(email, otp, "register");
     if (!isOtpValid) {
       throw new Error(t("auth.invalidOtp"));
@@ -152,19 +151,105 @@ export class AuthService {
   public async login(
     email: string,
     password: string,
-  ): Promise<{ user: User; token: string }> {
-    // const user = await this.userRepository.findOneBy({ email });
-    // if (!user) {
-    //   throw new AppError(404, "User not found");
-    // }
-    // const isPasswordValid = await bcrypt.compare(password, user.password);
-    // if (!isPasswordValid) {
-    //   throw new AppError(401, "Invalid password");
-    // }
-    // const token = jwt.sign({ id: user.id }, this.jwtSecret, {
-    //   expiresIn: "1h",
-    // });
-    // return { user, token };
-    return { user: {} as User, token: "dummy_token" }; // Placeholder implementation
+  ): Promise<{ user: User; token: string; code?: string }> {
+    const normalizedEmail = email.trim().toLowerCase();
+    const lockoutKey = `login:lockout:${normalizedEmail}`;
+    const attemptsKey = `login:attempts:${normalizedEmail}`;
+
+    // Kiểm tra tài khoản có đang bị tạm khóa hay không
+    const isLocked = await redis.get(lockoutKey);
+    if (isLocked) {
+      const ttl = await redis.ttl(lockoutKey);
+      const remainingMinutes = Math.max(1, Math.ceil(ttl / 60));
+      throw new Error(
+        t("auth.accountLocked", { minutes: remainingMinutes.toString() }),
+      );
+    }
+
+    // Helper xử lý tăng số lần thử sai và kích hoạt tạm khóa nếu chạm ngưỡng
+    const handleFailedAttempt = async (): Promise<never> => {
+      const attempts = await redis.incr(attemptsKey);
+      if (attempts === 1) {
+        await redis.expire(attemptsKey, LOGIN_LOCKOUT_SECONDS);
+      }
+
+      if (attempts >= MAX_LOGIN_ATTEMPTS) {
+        await redis.set(lockoutKey, "1", "EX", LOGIN_LOCKOUT_SECONDS);
+        await redis.del(attemptsKey);
+        throw new Error(
+          t("auth.accountLocked", {
+            minutes: LOGIN_LOCKOUT_MINUTES.toString(),
+          }),
+        );
+      }
+
+      const remaining = MAX_LOGIN_ATTEMPTS - attempts;
+      throw new Error(
+        t("auth.invalidCredentialsWithAttempts", {
+          remaining: remaining.toString(),
+        }),
+      );
+    };
+
+    const user =
+      await this.userRepository.findByEmailWithPassword(normalizedEmail);
+    if (!user) {
+      return await handleFailedAttempt();
+    }
+
+    if (!user.isActive) {
+      throw new Error(t("auth.accountInactive"));
+    }
+
+    const isPasswordValid =
+      user.password && (await argon2.verify(user.password, password));
+    if (!isPasswordValid) {
+      return await handleFailedAttempt();
+    }
+
+    await redis.del(attemptsKey);
+
+    const { password: _, ...userWithoutPassword } = user;
+
+    if (!user.isEmailVerified) {
+      const cooldownKey = `otp:cooldown:${normalizedEmail}`;
+      const canSend = await redis.set(cooldownKey, "1", "EX", 60, "NX");
+      if (canSend) {
+        const otp = await this.otpService.generateAndSaveOtp(
+          normalizedEmail,
+          "register",
+          TTL_OTP_SECONDS,
+        );
+        await this.mailService.sendOtpEmail({
+          to: normalizedEmail,
+          otp,
+          fullName: user.fullName,
+          expiresInMinutes: OTP_EXPIRES_IN_MINUTES,
+        });
+      }
+
+      return {
+        user: userWithoutPassword as User,
+        token: "",
+        code: CODE_RESPONSE.NEED_VERIFY_EMAIL,
+      };
+    }
+
+    const token = jwt.sign(
+      {
+        sub: user.id,
+        email: user.email,
+        role: user.role,
+      },
+      this.jwtSecret,
+      {
+        expiresIn: "7d",
+      },
+    );
+
+    return {
+      user: userWithoutPassword as User,
+      token,
+    };
   }
 }

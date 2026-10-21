@@ -82,5 +82,10 @@
   "resendCodeIn": "Gửi lại mã sau {seconds}s",
   "didNotReceiveCode": "Chưa nhận được mã?",
   "otpSentSuccess": "Mã xác thực mới đã được gửi thành công",
-  "otpVerifiedSuccess": "Xác thực tài khoản thành công! Vui lòng đăng nhập."
+  "otpVerifiedSuccess": "Xác thực tài khoản thành công! Vui lòng đăng nhập.",
+  "loading": "Đang xử lý...",
+  "homeTitle": "Trang chủ",
+  "logout": "Đăng xuất",
+  "welcomeUser": "Xin chào, {name}!",
+  "userRole": "Vai trò"
 }

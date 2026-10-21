@@ -10,6 +10,7 @@ class _FakeAuthRepository implements IAuthRepository {
   UserModel? currentUser;
   String? token;
   ApiException? errorToThrow;
+  String? codeToReturnOnLogin;
 
   @override
   Future<AuthData> login(LoginRequest request) async {
@@ -17,7 +18,11 @@ class _FakeAuthRepository implements IAuthRepository {
     loggedIn = true;
     token = 'login_token_123';
     currentUser = UserModel(id: '1', email: request.email);
-    return AuthData(user: currentUser, token: token!, code: null);
+    return AuthData(
+      user: currentUser,
+      token: token!,
+      code: codeToReturnOnLogin,
+    );
   }
 
   @override
@@ -163,6 +168,34 @@ void main() {
         ),
       );
     });
+
+    test(
+      'emits [AuthLoading, AuthOtpRequired] when login returns NEED_VERIFY_EMAIL',
+      () async {
+        fakeRepo.codeToReturnOnLogin = 'NEED_VERIFY_EMAIL';
+
+        expectLater(
+          authBloc.stream,
+          emitsInOrder([
+            const AuthLoading(),
+            const AuthOtpRequired(
+              destination: 'unverified@roomee.vn',
+              purpose: 'register',
+              user: UserModel(id: '1', email: 'unverified@roomee.vn'),
+            ),
+          ]),
+        );
+
+        authBloc.add(
+          const AuthLoginEvent(
+            LoginRequest(
+              email: 'unverified@roomee.vn',
+              password: 'password123',
+            ),
+          ),
+        );
+      },
+    );
   });
 
   group('AuthRegisterEvent', () {

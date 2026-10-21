@@ -47,7 +47,17 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(const AuthLoading());
     try {
       final authData = await _authRepository.login(event.request);
-      emit(Authenticated(user: authData.user, token: authData.token));
+      if (authData.code == AuthOtpRequired.needVerifyEmail) {
+        emit(
+          AuthOtpRequired(
+            destination: event.request.email,
+            purpose: 'register',
+            user: authData.user,
+          ),
+        );
+      } else {
+        emit(Authenticated(user: authData.user, token: authData.token));
+      }
     } on ApiException catch (e) {
       emit(
         AuthFailure(

@@ -82,5 +82,10 @@
   "resendCodeIn": "Resend code in {seconds}s",
   "didNotReceiveCode": "Didn't receive code?",
   "otpSentSuccess": "A new verification code has been sent successfully",
-  "otpVerifiedSuccess": "Account verified successfully! Please log in."
+  "otpVerifiedSuccess": "Account verified successfully! Please log in.",
+  "loading": "Loading...",
+  "homeTitle": "Home",
+  "logout": "Log out",
+  "welcomeUser": "Welcome, {name}!",
+  "userRole": "Role"
 }

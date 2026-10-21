@@ -536,7 +536,7 @@ void main() {
 
     expect(find.byType(LoginScreen), findsOneWidget);
     expect(find.text('Đăng nhập'), findsWidgets);
-    expect(find.text('Email hoặc Số điện thoại'), findsOneWidget);
+    expect(find.text('Email'), findsOneWidget);
     expect(find.text('Mật khẩu'), findsOneWidget);
     expect(find.text('Quên mật khẩu?'), findsOneWidget);
     expect(find.text('Chưa có tài khoản?'), findsOneWidget);

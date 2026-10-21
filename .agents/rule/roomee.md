@@ -144,6 +144,7 @@ lib/
       app_router.dart            # Định nghĩa AppRoutes, hàm createAppRouter(), instance appRouter
     screens/
       welcome_screen.dart        # Màn hình chào mừng / chọn luồng ban đầu
+      loading_screen.dart        # LoadingScreen (.show/.hide) & LoadingOverlay (wrapper)
     validation/                  # Chuẩn hóa validation 2 tầng (ValidationConfig, Validators, FieldRules)
       app_validators.dart
     widgets/                     # UI components chuẩn hóa của Design System
@@ -151,6 +152,8 @@ lib/
       app_text_field.dart        # AppTextField (label, hint, error, prefix/suffix, obscure toggle)
       app_card_select.dart       # AppCardSelect (thẻ chọn vai trò/loại có icon và radio check)
       app_date_picker_field.dart # AppDatePickerField (chọn ngày tháng hiển thị theo định dạng)
+      app_dropdown_field.dart    # AppDropdownField (chọn danh mục bottom sheet có search)
+      app_notification.dart      # AppNotification (thông báo SnackBar chuẩn Design System)
       app_segmented_select.dart  # AppSegmentedSelect (chọn nút gạt đơn hoặc .multiple)
   features/<feature>/            # Feature-first module (ví dụ: auth)
     data/                        # datasource, model, repository implementation
@@ -183,12 +186,16 @@ test/
 ### 4.3 Design System & Reusable Widgets
 - **Bảng màu & kiểu chữ:** Luôn sử dụng `DefaultColors` và `FontSizes` từ `lib/core/configs/app_theme.dart`.
   - Brand colors: `DefaultColors.primary` (`0xFF092E5D` - Navy), `DefaultColors.secondary` (`0xFFED6B25` - Cam).
-- **Quy tắc UI:** Khi phát triển tính năng mới, **bắt buộc ưu tiên tái sử dụng các component chuẩn** trong `lib/core/widgets/`:
+- **Quy tắc UI:** Khi phát triển tính năng mới, **bắt buộc ưu tiên tái sử dụng các component chuẩn** trong `lib/core/widgets/` và `lib/core/screens/`:
   - Nút bấm: `AppButton`
   - Input: `AppTextField`
   - Lựa chọn vai trò/thẻ: `AppCardSelect`
   - Chọn ngày: `AppDatePickerField`
+  - Chọn danh mục/dropdown: `AppDropdownField`
   - Lựa chọn phân đoạn/segmented: `AppSegmentedSelect`
+  - Thông báo nổi: `AppNotification` (`.showSuccess`, `.showError`, `.showWarning`, `.showInfo`)
+  - Loading Overlay: `LoadingScreen` (imperative qua `.show(context)` / `context.showLoading()`, `.hide(context)`) và `LoadingOverlay(isLoading: ..., child: ...)` (declarative wrapper).
+- **Xử lý Loading toàn màn hình:** Đối với các tác vụ async / submit form (như Đăng nhập, Đăng ký, Xác thực OTP,...), **bắt buộc dùng `LoadingOverlay`** bọc màn hình (hoặc `LoadingScreen.show(context)`). Lớp phủ này hiển thị indicator chuẩn Design System, khóa toàn bộ tương tác chạm và vô hiệu hóa nút back (`PopScope(canPop: false)`), chống hiện tượng submit đúp. Không lồng thêm spinner con trên `AppButton(isLoading: true)` khi đã dùng `LoadingOverlay` để tránh lặp 2 vòng xoay cùng lúc.
 - Không viết đè style hoặc dựng widget nhập liệu/button riêng lẻ gây phân mảnh giao diện.
 
 ### 4.4 State Management & Điều hướng
@@ -227,7 +234,8 @@ test/
 ## 7. Checklist cuối task
 
 - [ ] Đúng scope, không thêm gì ngoài yêu cầu.
-- [ ] Tái sử dụng đúng Design System widgets (`lib/core/widgets/`) & `DefaultColors`.
+- [ ] Tái sử dụng đúng Design System widgets (`lib/core/widgets/`), `LoadingOverlay` / `LoadingScreen` (`lib/core/screens/`) & `DefaultColors`.
+- [ ] Các tác vụ submit form async phía mobile sử dụng `LoadingOverlay` / `LoadingScreen` để khóa tương tác.
 - [ ] Mọi chuỗi hiển thị đều qua i18n (`t(...)` / `context.tr(...)`), bổ sung đủ cả 2 file `vi.json` và `en.json` tuân thủ đúng cấu trúc phân nhóm (`fields`, `validateErrors`, `errors`).
 - [ ] Form input phía mobile validate qua `FieldRules` / `Validators` (`lib/core/validation/app_validators.dart`), đồng bộ với BE schema.
 - [ ] Backend input validate qua Zod & `ruleValidates`.

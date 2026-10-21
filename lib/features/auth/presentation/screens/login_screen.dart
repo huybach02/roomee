@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:roomee/core/configs/app_theme.dart';
 import 'package:roomee/core/localization/app_localizations.dart';
 import 'package:roomee/core/router/app_router.dart';
+import 'package:roomee/core/screens/loading_screen.dart';
 import 'package:roomee/core/validation/app_validators.dart';
 import 'package:roomee/core/widgets/app_button.dart';
 import 'package:roomee/core/widgets/app_notification.dart';
@@ -21,14 +22,14 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-  final TextEditingController _emailOrPhoneController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
   bool _obscurePassword = true;
 
   @override
   void dispose() {
-    _emailOrPhoneController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -38,7 +39,7 @@ class _LoginScreenState extends State<LoginScreen> {
       context.read<AuthBloc>().add(
         AuthLoginEvent(
           LoginRequest(
-            email: _emailOrPhoneController.text.trim(),
+            email: _emailController.text.trim(),
             password: _passwordController.text,
           ),
         ),
@@ -77,13 +78,24 @@ class _LoginScreenState extends State<LoginScreen> {
         listener: (context, state) {
           if (state is Authenticated) {
             AppNotification.showSuccess(context, t('loginSuccess'));
+            context.go(AppRoutes.home);
+          } else if (state is AuthOtpRequired) {
+            context.push(
+              AppRoutes.otp,
+              extra: {
+                'destination': state.destination,
+                'purpose': state.purpose,
+              },
+            );
           } else if (state is AuthFailure) {
             AppNotification.showError(context, state.message);
           }
         },
         builder: (context, state) {
           final isLoading = state is AuthLoading;
-          return SafeArea(
+          return LoadingOverlay(
+            isLoading: isLoading,
+            child: SafeArea(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
               child: Form(
@@ -120,18 +132,18 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 32),
 
-                    // Email hoặc Số điện thoại
+                    // Email
                     AppTextField(
-                      controller: _emailOrPhoneController,
+                      controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.next,
-                      labelText: t('fields.emailOrPhone'),
-                      hintText: t('fields.emailOrPhoneHint'),
+                      labelText: t('fields.email'),
+                      hintText: t('fields.emailHint'),
                       prefixIcon: const Icon(
-                        Icons.person_outline,
+                        Icons.email_outlined,
                         color: DefaultColors.textSecondary,
                       ),
-                      validator: Validators.required(),
+                      validator: FieldRules.email(required: true),
                     ),
                     const SizedBox(height: 16),
 
@@ -189,7 +201,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     AppButton(
                       text: t('login'),
                       onPressed: _submitLogin,
-                      isLoading: isLoading,
                       type: AppButtonType.primary,
                     ),
                     const SizedBox(height: 20),
@@ -226,8 +237,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
             ),
-          );
-        },
+          ),
+        );
+      },
       ),
     );
   }

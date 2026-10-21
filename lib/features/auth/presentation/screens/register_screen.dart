@@ -7,6 +7,7 @@ import 'package:roomee/core/configs/app_theme.dart';
 import 'package:roomee/core/localization/app_localizations.dart';
 import 'package:roomee/core/models/models.dart';
 import 'package:roomee/core/router/app_router.dart';
+import 'package:roomee/core/screens/loading_screen.dart';
 import 'package:roomee/core/validation/app_validators.dart';
 import 'package:roomee/core/widgets/app_button.dart';
 import 'package:roomee/core/widgets/app_card_select.dart';
@@ -138,7 +139,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
           },
           builder: (context, state) {
             final isLoading = state is AuthLoading;
-            return SafeArea(
+            return LoadingOverlay(
+              isLoading: isLoading,
+              child: SafeArea(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 24,
@@ -447,7 +450,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       AppButton(
                         text: t('register'),
                         onPressed: _submitForm,
-                        isLoading: isLoading,
                         type: AppButtonType.primary,
                       ),
                       const SizedBox(height: 16),
@@ -484,8 +486,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                 ),
               ),
-            );
-          },
+            ),
+          );
+        },
         ),
       ),
     );

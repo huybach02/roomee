@@ -21,7 +21,11 @@
     "invalidCredentials": "Incorrect email or password.",
     "emailAlreadyExists": "This email is already in use.",
     "invalidOtp": "The verification code (OTP) is invalid or has expired.",
-    "otpCooldown": "Please wait 60 seconds before requesting a new OTP."
+    "otpCooldown": "Please wait 60 seconds before requesting a new OTP.",
+    "accountInactive": "Your account has been deactivated or locked.",
+    "emailNotVerified": "Your email has not been verified yet. Please check your OTP code.",
+    "accountLocked": "Account is temporarily locked due to too many failed attempts. Please try again in {minutes} minutes.",
+    "invalidCredentialsWithAttempts": "Incorrect email or password. You have {remaining} attempt(s) left before account lockout."
   },
   "mail": {
     "sendFailed": "Failed to send verification email. Please try again later.",

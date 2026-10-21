@@ -5,13 +5,37 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:roomee/core/localization/app_localizations.dart';
 import 'package:roomee/core/models/models.dart';
+import 'package:roomee/core/router/app_router.dart';
+import 'package:roomee/core/screens/loading_screen.dart';
 import 'package:roomee/core/widgets/app_button.dart';
 import 'package:roomee/core/widgets/app_text_field.dart';
 import 'package:roomee/features/auth/data/auth_dto.dart';
 import 'package:roomee/features/auth/data/auth_repository.dart';
 import 'package:roomee/features/auth/presentation/bloc/auth_bloc.dart';
-import 'package:roomee/features/auth/presentation/screens/login_screen.dart';
 import 'package:roomee/features/auth/presentation/screens/otp_screen.dart';
+import 'package:roomee/features/auth/presentation/screens/register_screen.dart';
+import 'package:roomee/features/general/data/general_repository.dart';
+import 'package:roomee/features/general/presentation/bloc/general_bloc.dart';
+import 'package:roomee/features/home/presentation/screens/home_screen.dart';
+import 'package:roomee/utils/constanst.dart';
+
+class _FakeGeneralRepo implements IGeneralRepository {
+  @override
+  Future<List<ProvinceModel>> getProvinces() async => const [
+        ProvinceModel(id: 1, code: 79, fullName: 'TP HCM', codeName: 'hcm'),
+      ];
+
+  @override
+  Future<List<WardModel>> getWardsByProvince(int provinceId) async => const [
+        WardModel(
+          id: 10,
+          code: 1,
+          provinceId: 1,
+          fullName: 'Phường 1',
+          codeName: 'p1',
+        ),
+      ];
+}
 
 class _FakeAuthRepo implements IAuthRepository {
   @override
@@ -22,6 +46,7 @@ class _FakeAuthRepo implements IAuthRepository {
 
   @override
   Future<AuthData> register(RegisterRequest request) async {
+    await Future.delayed(const Duration(milliseconds: 100));
     return const AuthData(token: 'fake_tok', code: null);
   }
 
@@ -57,40 +82,49 @@ void main() {
     GlobalCupertinoLocalizations.delegate,
   ];
 
-  testWidgets('LoginScreen shows loading on AppButton when AuthLoading', (
-    WidgetTester tester,
-  ) async {
-    final bloc = AuthBloc(authRepository: _FakeAuthRepo());
+  testWidgets(
+    'LoginScreen shows LoadingOverlay and LoadingScreen when AuthLoading and navigates to HomeScreen',
+    (WidgetTester tester) async {
+      final bloc = AuthBloc(authRepository: _FakeAuthRepo());
+      final router = createAppRouter(initialLocation: AppRoutes.login);
 
-    await tester.pumpWidget(
-      BlocProvider<AuthBloc>.value(
-        value: bloc,
-        child: const MaterialApp(
-          locale: Locale('vi'),
-          localizationsDelegates: delegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: LoginScreen(),
+      await tester.pumpWidget(
+        BlocProvider<AuthBloc>.value(
+          value: bloc,
+          child: MaterialApp.router(
+            locale: const Locale('vi'),
+            localizationsDelegates: delegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            routerConfig: router,
+          ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    // Fill valid credentials
-    final textFields = find.byType(AppTextField);
-    await tester.enterText(textFields.first, 'user@roomee.vn');
-    await tester.enterText(textFields.last, 'password123');
-    await tester.pumpAndSettle();
+      // Fill valid credentials
+      final textFields = find.byType(AppTextField);
+      await tester.enterText(textFields.first, 'user@roomee.vn');
+      await tester.enterText(textFields.last, 'password123');
+      await tester.pumpAndSettle();
 
-    final loginBtn = find.widgetWithText(AppButton, 'Đăng nhập');
-    await tester.tap(loginBtn);
-    await tester.pump();
+      final loginBtn = find.widgetWithText(AppButton, 'Đăng nhập');
+      await tester.tap(loginBtn);
+      await tester.pump();
 
-    // Verify loading indicator is shown
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      // Verify loading overlay and indicator is shown
+      expect(find.byType(LoadingOverlay), findsOneWidget);
+      expect(find.byType(LoadingScreen), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
 
-    await tester.pumpAndSettle();
-    bloc.close();
-  });
+      await tester.pump(const Duration(milliseconds: 150));
+      await tester.pumpAndSettle();
+
+      // Verify navigated to HomeScreen
+      expect(find.byType(HomeScreen), findsOneWidget);
+
+      bloc.close();
+    },
+  );
 
   testWidgets('OtpScreen renders UI elements and handles OTP submission properly', (
     WidgetTester tester,
@@ -178,4 +212,55 @@ void main() {
     expect(resendCalled, isTrue);
     expect(find.text('Mã xác thực mới đã được gửi thành công'), findsOneWidget);
   });
+
+  testWidgets(
+    'RegisterScreen shows LoadingOverlay and LoadingScreen when AuthLoading',
+    (WidgetTester tester) async {
+      final authBloc = AuthBloc(authRepository: _FakeAuthRepo());
+      final generalBloc = GeneralBloc(repository: _FakeGeneralRepo());
+
+      await tester.pumpWidget(
+        MultiBlocProvider(
+          providers: [
+            BlocProvider<AuthBloc>.value(value: authBloc),
+            BlocProvider<GeneralBloc>.value(value: generalBloc),
+          ],
+          child: const MaterialApp(
+            locale: Locale('vi'),
+            localizationsDelegates: delegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: RegisterScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Ban đầu không loading
+      expect(find.byType(LoadingOverlay), findsOneWidget);
+      expect(find.byType(LoadingScreen), findsNothing);
+
+      // Kích hoạt event đăng ký để bloc emit AuthLoading
+      authBloc.add(
+        const AuthRegisterEvent(
+          RegisterRequest(
+            fullName: 'Nguyen Van A',
+            email: 'test@roomee.vn',
+            password: 'password123',
+            phoneNumber: '0901234567',
+            gender: Gender.male,
+            role: UserRole.tenant,
+          ),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 10));
+
+      // Verify LoadingScreen overlay xuất hiện đè lên giao diện
+      expect(find.byType(LoadingScreen), findsOneWidget);
+      expect(find.text('Đang xử lý...'), findsOneWidget);
+
+      await tester.pumpAndSettle();
+      authBloc.close();
+      generalBloc.close();
+    },
+  );
 }

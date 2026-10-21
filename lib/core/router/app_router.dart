@@ -5,6 +5,7 @@ import 'package:roomee/core/screens/welcome_screen.dart';
 import 'package:roomee/features/auth/presentation/screens/login_screen.dart';
 import 'package:roomee/features/auth/presentation/screens/otp_screen.dart';
 import 'package:roomee/features/auth/presentation/screens/register_screen.dart';
+import 'package:roomee/features/home/presentation/screens/home_screen.dart';
 
 class AppRoutes {
   AppRoutes._();
@@ -13,6 +14,7 @@ class AppRoutes {
   static const String login = '/login';
   static const String register = '/register';
   static const String otp = '/otp';
+  static const String home = '/home';
 }
 
 Page<void> _buildSlidePage(GoRouterState state, Widget child) {
@@ -66,6 +68,12 @@ GoRouter createAppRouter({
             ),
           );
         },
+      ),
+      GoRoute(
+        path: AppRoutes.home,
+        name: 'home',
+        pageBuilder: (context, state) =>
+            _buildSlidePage(state, const HomeScreen()),
       ),
     ],
   );
