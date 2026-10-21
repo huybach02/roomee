@@ -40,9 +40,9 @@ const requiredString = (
 const optionalString = (label: string, options: StringRuleOptions = {}) =>
   requiredString(label, options).nullish();
 
-const emailRule = requiredString("Email", { max: 255 }).pipe(
-  z.email("Invalid email address"),
-);
+const emailRule = requiredString("Email", { max: 255 })
+  .toLowerCase()
+  .pipe(z.email("Invalid email address"));
 
 const passwordRule = ({
   label = "Password",

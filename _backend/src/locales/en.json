@@ -4,7 +4,8 @@
     "internalServerError": "An internal server error occurred.",
     "notFound": "Resource not found: {path}",
     "unauthorized": "You are not authorized to perform this action.",
-    "badRequest": "Bad request."
+    "badRequest": "Bad request.",
+    "tooManyRequests": "Too many requests. Please try again later."
   },
   "validation": {
     "failed": "Validation failed.",
@@ -19,9 +20,11 @@
     "userNotFound": "User not found.",
     "invalidCredentials": "Incorrect email or password.",
     "emailAlreadyExists": "This email is already in use.",
-    "invalidOtp": "The verification code (OTP) is invalid or has expired."
+    "invalidOtp": "The verification code (OTP) is invalid or has expired.",
+    "otpCooldown": "Please wait 60 seconds before requesting a new OTP."
   },
   "mail": {
+    "sendFailed": "Failed to send verification email. Please try again later.",
     "verifyOtpSubject": "Your Roomee Verification Code",
     "tagline": "Smart rental management system",
     "greeting": "Hello {name},",
@@ -31,6 +34,5 @@
     "footerNote": "If you did not request this, please ignore this email.",
     "otpEmailText": "Your verification OTP is: {otp}. This code is valid for {minutes} minutes.",
     "copyright": "All rights reserved."
-  },
-  "emailAlreadyExists": "Email already exists."
+  }
 }

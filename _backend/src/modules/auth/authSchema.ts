@@ -4,7 +4,7 @@ import { Gender, UserRole } from "../../utils/constanst.js";
 
 export const registerSchema = z.object({
   email: ruleValidates.emailRule,
-  password: ruleValidates.passwordRule({ min: 6 }),
+  password: ruleValidates.passwordRule({ min: 8 }),
   fullName: ruleValidates.optionalString("Full name", { max: 100, min: 0 }),
   phoneNumber: ruleValidates.phoneRule("Phone number").optional().nullable(),
   avatarUrl: ruleValidates.optionalString("Avatar URL", { max: 255, min: 0 }),
@@ -14,14 +14,8 @@ export const registerSchema = z.object({
     .enumRule("Gender", [Gender.MALE, Gender.FEMALE, Gender.OTHER] as const)
     .optional(),
   role: ruleValidates
-    .enumRule("Role", [
-      UserRole.LANDLORD,
-      UserRole.STAFF,
-      UserRole.TENANT,
-      UserRole.ADMIN,
-    ] as const)
+    .enumRule("Role", [UserRole.LANDLORD, UserRole.TENANT] as const)
     .optional(),
-  isActive: z.boolean().optional(),
   provinceId: ruleValidates
     .numberRule("Province ID", { int: true, min: 1 })
     .optional()
@@ -64,7 +58,7 @@ export const forgotPasswordSchema = z.object({
 
 export const resetPasswordSchema = z.object({
   token: ruleValidates.requiredString("Reset token"),
-  newPassword: ruleValidates.passwordRule({ min: 6 }),
+  newPassword: ruleValidates.passwordRule({ min: 8 }),
 });
 
 export const changePasswordSchema = z.object({
@@ -72,7 +66,7 @@ export const changePasswordSchema = z.object({
     min: 1,
     label: "Current password",
   }),
-  newPassword: ruleValidates.passwordRule({ min: 6, label: "New password" }),
+  newPassword: ruleValidates.passwordRule({ min: 8, label: "New password" }),
 });
 
 export const resendOtpSchema = z.object({
@@ -80,9 +74,10 @@ export const resendOtpSchema = z.object({
 });
 
 export const verifyOtpSchema = z.object({
-  email: ruleValidates.emailRule.optional(),
-  phoneNumber: ruleValidates.phoneRule("Phone number").optional().nullable(),
-  otp: ruleValidates.requiredString("OTP", { min: 4, max: 8 }),
+  email: ruleValidates.emailRule,
+  otp: ruleValidates
+    .requiredString("OTP")
+    .regex(/^\d{6}$/, "OTP must be 6 digits"),
 });
 
 export type RegisterDto = z.infer<typeof registerSchema>;

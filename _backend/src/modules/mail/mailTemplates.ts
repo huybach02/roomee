@@ -12,13 +12,25 @@ export interface OtpTemplateData {
   locale?: SupportedLocale;
 }
 
+export function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 export function renderOtpEmailTemplate(data: OtpTemplateData): string {
   const currentLocale =
     data.locale || localeStorage.getStore()?.locale || DEFAULT_LOCALE;
 
+  const safeFullName = escapeHtml(data.fullName || "");
+  const safeOtp = escapeHtml(data.otp || "");
+
   const title = t("mail.verifyOtpSubject", undefined, currentLocale);
   const tagline = t("mail.tagline", undefined, currentLocale);
-  const greeting = t("mail.greeting", { name: data.fullName }, currentLocale);
+  const greeting = t("mail.greeting", { name: safeFullName }, currentLocale);
   const intro = t("mail.otpVerifyIntro", undefined, currentLocale);
   const otpLabel = t("mail.otpLabel", undefined, currentLocale);
   const expireNote = t(
@@ -150,7 +162,7 @@ export function renderOtpEmailTemplate(data: OtpTemplateData): string {
         <div class="text">${intro}</div>
         <div class="otp-box">
           <div class="otp-label">${otpLabel}</div>
-          <div class="otp-code">${data.otp}</div>
+          <div class="otp-code">${safeOtp}</div>
         </div>
         <div class="notice">
           ⏱️ ${expireNote}

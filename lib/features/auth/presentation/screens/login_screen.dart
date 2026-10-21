@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:roomee/core/configs/app_theme.dart';
 import 'package:roomee/core/localization/app_localizations.dart';
 import 'package:roomee/core/router/app_router.dart';
+import 'package:roomee/core/validation/app_validators.dart';
 import 'package:roomee/core/widgets/app_button.dart';
 import 'package:roomee/core/widgets/app_notification.dart';
 import 'package:roomee/core/widgets/app_text_field.dart';
@@ -130,12 +131,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         Icons.person_outline,
                         color: DefaultColors.textSecondary,
                       ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return t('validateErrors.fieldRequired');
-                        }
-                        return null;
-                      },
+                      validator: Validators.required(),
                     ),
                     const SizedBox(height: 16),
 
@@ -163,15 +159,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           });
                         },
                       ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return t('validateErrors.fieldRequired');
-                        }
-                        if (value.length < 6) {
-                          return t('validateErrors.passwordTooShort');
-                        }
-                        return null;
-                      },
+                      validator: FieldRules.loginPassword(),
                     ),
                     const SizedBox(height: 8),
 

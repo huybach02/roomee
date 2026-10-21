@@ -6,21 +6,28 @@ import argon2 from "argon2";
 import {
   CODE_RESPONSE,
   Gender,
+  OTP_EXPIRES_IN_MINUTES,
   TTL_OTP_SECONDS,
   UserRole,
 } from "../../utils/constanst.js";
 import { MailService } from "../mail/mailService.js";
 import { OtpService } from "./otpService.js";
+import { redis } from "../../config/redis.js";
 
 @injectable()
 export class AuthService {
-  private readonly jwtSecret = process.env.JWT_SECRET || "default_secret";
+  private readonly jwtSecret: string;
 
   constructor(
     private userRepository: UserRepository,
     private mailService: MailService,
     private otpService: OtpService,
-  ) {}
+  ) {
+    if (!process.env.JWT_SECRET) {
+      throw new Error("JWT_SECRET environment variable is missing.");
+    }
+    this.jwtSecret = process.env.JWT_SECRET;
+  }
 
   public async register(
     dtoData: RegisterDto,
@@ -30,7 +37,7 @@ export class AuthService {
       email: dtoData.email,
     });
     if (existingUser) {
-      throw new Error(t("emailAlreadyExists"));
+      throw new Error(t("auth.emailAlreadyExists"));
     }
 
     const hashedPassword = await argon2.hash(dtoData.password);
@@ -60,34 +67,70 @@ export class AuthService {
     );
 
     // Gửi email chứa mã OTP xác thực
-    await this.mailService.sendOtpEmail({
+    const isSent = await this.mailService.sendOtpEmail({
       to: savedUser.email,
       otp,
       fullName: savedUser.fullName,
-      expiresInMinutes: 10,
+      expiresInMinutes: OTP_EXPIRES_IN_MINUTES,
     });
 
+    if (!isSent) {
+      throw new Error(t("mail.sendFailed"));
+    }
+
+    // Đặt cooldown 60s cho resend OTP
+    await redis.set(
+      `otp:cooldown:${savedUser.email.trim().toLowerCase()}`,
+      "1",
+      "EX",
+      60,
+    );
+
+    const { password: _, ...userWithoutPassword } = savedUser;
+
     return {
-      user: savedUser as User,
+      user: userWithoutPassword as User,
       code: CODE_RESPONSE.NEED_VERIFY_EMAIL,
     };
   }
 
   public async resendOtp(email: string): Promise<void> {
-    // Tạo mã OTP 6 số và lưu vào Redis (hết hạn sau 10 phút)
+    const normalizedEmail = email.trim().toLowerCase();
+    const cooldownKey = `otp:cooldown:${normalizedEmail}`;
+
+    // 1. Kiểm tra cooldown server-side (60 giây)
+    const canSend = await redis.set(cooldownKey, "1", "EX", 60, "NX");
+    if (!canSend) {
+      throw new Error(t("auth.otpCooldown"));
+    }
+
+    // 2. Kiểm tra tài khoản tồn tại và chưa xác thực
+    const user = await this.userRepository.findOneBy({ email: normalizedEmail });
+    if (!user || user.isEmailVerified) {
+      // Kết thúc thành công giả định để tránh user enumeration và spam email
+      return;
+    }
+
+    // 3. Tạo mã OTP 6 số và lưu vào Redis (hết hạn sau 10 phút)
     const otp = await this.otpService.generateAndSaveOtp(
-      email,
+      normalizedEmail,
       "register",
       TTL_OTP_SECONDS,
     );
 
-    // Gửi email chứa mã OTP xác thực
-    await this.mailService.sendOtpEmail({
-      to: email,
+    // 4. Gửi email chứa mã OTP xác thực
+    const isSent = await this.mailService.sendOtpEmail({
+      to: normalizedEmail,
       otp,
-      fullName: null,
-      expiresInMinutes: 10,
+      fullName: user.fullName,
+      expiresInMinutes: OTP_EXPIRES_IN_MINUTES,
     });
+
+    if (!isSent) {
+      // Xóa cooldown nếu gửi mail thất bại để người dùng có thể gửi lại
+      await redis.del(cooldownKey);
+      throw new Error(t("mail.sendFailed"));
+    }
   }
 
   public async verifyOtp(email: string, otp: string): Promise<void> {
@@ -98,10 +141,12 @@ export class AuthService {
     }
 
     const user = await this.userRepository.findOneBy({ email });
-    if (user) {
-      user.isEmailVerified = true;
-      await this.userRepository.save(user);
+    if (!user) {
+      throw new Error(t("auth.userNotFound"));
     }
+
+    user.isEmailVerified = true;
+    await this.userRepository.save(user);
   }
 
   public async login(

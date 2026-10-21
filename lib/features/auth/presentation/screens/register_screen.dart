@@ -7,6 +7,7 @@ import 'package:roomee/core/configs/app_theme.dart';
 import 'package:roomee/core/localization/app_localizations.dart';
 import 'package:roomee/core/models/models.dart';
 import 'package:roomee/core/router/app_router.dart';
+import 'package:roomee/core/validation/app_validators.dart';
 import 'package:roomee/core/widgets/app_button.dart';
 import 'package:roomee/core/widgets/app_card_select.dart';
 import 'package:roomee/core/widgets/app_date_picker_field.dart';
@@ -210,12 +211,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           Icons.person_outline,
                           color: DefaultColors.textSecondary,
                         ),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return t('validateErrors.fieldRequired');
-                          }
-                          return null;
-                        },
+                        validator: FieldRules.fullName(),
                       ),
                       const SizedBox(height: 16),
 
@@ -230,18 +226,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           Icons.email_outlined,
                           color: DefaultColors.textSecondary,
                         ),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return t('validateErrors.fieldRequired');
-                          }
-                          final emailRegex = RegExp(
-                            r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
-                          );
-                          if (!emailRegex.hasMatch(value.trim())) {
-                            return t('validateErrors.invalidEmail');
-                          }
-                          return null;
-                        },
+                        validator: FieldRules.email(),
                       ),
                       const SizedBox(height: 16),
 
@@ -256,18 +241,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           Icons.phone_outlined,
                           color: DefaultColors.textSecondary,
                         ),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return t('validateErrors.fieldRequired');
-                          }
-                          final phoneRegex = RegExp(
-                            r'^(?:\+84|0)(?:3|5|7|8|9)\d{8}$',
-                          );
-                          if (!phoneRegex.hasMatch(value.trim())) {
-                            return t('validateErrors.invalidPhone');
-                          }
-                          return null;
-                        },
+                        validator: FieldRules.phone(required: true),
                       ),
                       const SizedBox(height: 16),
 
@@ -295,15 +269,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             });
                           },
                         ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return t('validateErrors.fieldRequired');
-                          }
-                          if (value.length < 6) {
-                            return t('validateErrors.passwordTooShort');
-                          }
-                          return null;
-                        },
+                        validator: FieldRules.password(),
                       ),
                       const SizedBox(height: 16),
 
@@ -332,15 +298,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             });
                           },
                         ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return t('validateErrors.fieldRequired');
-                          }
-                          if (value != _passwordController.text) {
-                            return t('validateErrors.passwordsDoNotMatch');
-                          }
-                          return null;
-                        },
+                        validator: FieldRules.confirmPassword(
+                          () => _passwordController.text,
+                        ),
                       ),
                       const SizedBox(height: 16),
 
@@ -389,12 +349,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   Icons.location_city_outlined,
                                   color: DefaultColors.textSecondary,
                                 ),
-                                validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return t('validateErrors.fieldRequired');
-                                  }
-                                  return null;
-                                },
+                                validator: Validators.required(),
                                 onChanged: (id) {
                                   final province = generalLoaded.provinces
                                       .firstWhere((p) => p.id == id);
@@ -431,12 +386,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   Icons.map_outlined,
                                   color: DefaultColors.textSecondary,
                                 ),
-                                validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return t('validateErrors.fieldRequired');
-                                  }
-                                  return null;
-                                },
+                                validator: Validators.required(),
                                 onChanged: (id) {
                                   setState(() {
                                     _selectedWard = generalLoaded.wards
@@ -463,12 +413,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             _selectedDate = date;
                           });
                         },
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return t('validateErrors.fieldRequired');
-                          }
-                          return null;
-                        },
+                        validator: Validators.required(),
                       ),
                       const SizedBox(height: 16),
 

@@ -4,7 +4,8 @@
     "internalServerError": "Đã có lỗi xảy ra từ máy chủ.",
     "notFound": "Không tìm thấy tài nguyên yêu cầu: {path}",
     "unauthorized": "Bạn chưa được cấp quyền truy cập.",
-    "badRequest": "Yêu cầu không hợp lệ."
+    "badRequest": "Yêu cầu không hợp lệ.",
+    "tooManyRequests": "Bạn đã gửi quá nhiều yêu cầu. Vui lòng thử lại sau ít phút."
   },
   "validation": {
     "failed": "Dữ liệu gửi lên không hợp lệ.",
@@ -19,9 +20,11 @@
     "userNotFound": "Tài khoản không tồn tại.",
     "invalidCredentials": "Email hoặc mật khẩu không chính xác.",
     "emailAlreadyExists": "Email này đã được sử dụng.",
-    "invalidOtp": "Mã xác thực (OTP) không hợp lệ hoặc đã hết hạn."
+    "invalidOtp": "Mã xác thực (OTP) không hợp lệ hoặc đã hết hạn.",
+    "otpCooldown": "Vui lòng đợi 60 giây trước khi yêu cầu mã OTP mới."
   },
   "mail": {
+    "sendFailed": "Không thể gửi email xác thực. Vui lòng thử lại sau.",
     "verifyOtpSubject": "Mã xác thực tài khoản Roomee",
     "tagline": "Hệ thống quản lý thuê trọ thông minh",
     "greeting": "Xin chào {name},",
@@ -31,6 +34,5 @@
     "footerNote": "Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email.",
     "otpEmailText": "Mã OTP xác thực của bạn là: {otp}. Mã này có hiệu lực trong {minutes} phút.",
     "copyright": "Tất cả các quyền được bảo lưu."
-  },
-  "emailAlreadyExists": "Email đã tồn tại."
+  }
 }

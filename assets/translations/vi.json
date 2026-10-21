@@ -9,7 +9,7 @@
     "emailOrPhone": "Email hoặc Số điện thoại",
     "emailOrPhoneHint": "Nhập email hoặc số điện thoại",
     "password": "Mật khẩu",
-    "passwordHint": "Tối thiểu 6 ký tự",
+    "passwordHint": "Tối thiểu 8 ký tự",
     "confirmPassword": "Xác nhận mật khẩu",
     "confirmPasswordHint": "Nhập lại mật khẩu",
     "address": "Địa chỉ",
@@ -31,9 +31,12 @@
     "fieldRequired": "Vui lòng nhập trường này",
     "invalidEmail": "Email không hợp lệ",
     "invalidPhone": "Số điện thoại không hợp lệ",
-    "passwordTooShort": "Mật khẩu phải có ít nhất 6 ký tự",
+    "passwordTooShort": "Mật khẩu phải có ít nhất {min} ký tự",
     "passwordsDoNotMatch": "Mật khẩu xác nhận không khớp",
-    "otpInvalid": "Vui lòng nhập đủ 6 chữ số mã OTP"
+    "otpInvalid": "Vui lòng nhập đủ 6 chữ số mã OTP",
+    "minLength": "Tối thiểu {min} ký tự",
+    "maxLength": "Tối đa {max} ký tự",
+    "invalidDigits": "Định dạng chữ số không hợp lệ"
   },
   "errors": {
     "noInternet": "Không có kết nối Internet. Vui lòng kiểm tra lại mạng.",

@@ -3,6 +3,7 @@ import nodemailer, { type Transporter } from "nodemailer";
 import { SendEmailOptions, SendOtpEmailParams } from "./mailTypes.js";
 import { renderOtpEmailTemplate } from "./mailTemplates.js";
 import { t } from "../../utils/i18n.js";
+import { OTP_EXPIRES_IN_MINUTES } from "../../utils/constanst.js";
 
 @injectable()
 export class MailService {
@@ -44,8 +45,12 @@ export class MailService {
       : options.to;
 
     if (!this.transporter) {
-      console.error("SMTP not configured.");
-      return { success: true };
+      if (process.env.NODE_ENV !== "production") {
+        console.warn("[MailService] SMTP not configured. Skipped sending email in development.");
+        return { success: true };
+      }
+      console.error("[MailService] SMTP not configured.");
+      return { success: false };
     }
 
     try {
@@ -68,7 +73,21 @@ export class MailService {
    * Gửi email chứa mã OTP xác thực
    */
   public async sendOtpEmail(params: SendOtpEmailParams): Promise<boolean> {
-    const { to, otp, fullName, expiresInMinutes = 5, locale } = params;
+    const {
+      to,
+      otp,
+      fullName,
+      expiresInMinutes = OTP_EXPIRES_IN_MINUTES,
+      locale,
+    } = params;
+
+    // Trong môi trường dev, luôn in mã OTP ra console để dễ lấy mã và test
+    if (process.env.NODE_ENV !== "production") {
+      console.log(
+        `\n🔑 [DEV OTP] Mã xác thực gửi tới ${to}: ${otp} (Hiệu lực: ${expiresInMinutes} phút)\n`,
+      );
+    }
+
     const subject = t("mail.verifyOtpSubject", undefined, locale);
     const html = renderOtpEmailTemplate({
       otp,

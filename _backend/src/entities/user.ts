@@ -15,7 +15,7 @@ import { Ward } from "./ward.js";
 @Entity({ name: "users" })
 export class User extends Mixin(AuditableTrait) {
   @PrimaryGeneratedColumn()
-  id: string;
+  id: number;
 
   @Column({ type: "varchar", length: 255, unique: true })
   email: string;

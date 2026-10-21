@@ -144,6 +144,8 @@ lib/
       app_router.dart            # Định nghĩa AppRoutes, hàm createAppRouter(), instance appRouter
     screens/
       welcome_screen.dart        # Màn hình chào mừng / chọn luồng ban đầu
+    validation/                  # Chuẩn hóa validation 2 tầng (ValidationConfig, Validators, FieldRules)
+      app_validators.dart
     widgets/                     # UI components chuẩn hóa của Design System
       app_button.dart            # AppButton (primary, secondary, outline, isLoading)
       app_text_field.dart        # AppTextField (label, hint, error, prefix/suffix, obscure toggle)
@@ -193,6 +195,20 @@ test/
 - Quản lý state theo `flutter_bloc` (`Bloc` cho luồng nghiệp vụ phức tạp, `Cubit` cho state đơn giản).
 - Điều hướng khai báo tập trung tại `lib/core/router/app_router.dart` qua `GoRouter`. Đặt route path trong `AppRoutes`.
 
+### 4.5 Chuẩn hoá Validation (Mobile)
+- Toàn bộ validation phía client đặt tập trung tại `lib/core/validation/app_validators.dart`.
+- **Kiến trúc 2 tầng:**
+  - `ValidationConfig`: Chứa các hằng số validate và regex dùng chung (`emailMax: 255`, `passwordMin: 8`, `passwordMax: 255`, `fullNameMax: 100`, `bioMax: 500`, `otpLength: 6`, Regex `email`, `vnPhone`). **Bắt buộc giữ đồng bộ tuyệt đối** với backend (`_backend/src/utils/ruleValidate.ts` và `<module>Schema.ts`).
+  - **Tầng 1 — `Validators` (Rule nguyên tử):** Mỗi hàm chỉ kiểm tra 1 điều kiện (`compose`, `required`, `requiredValue`, `minLength`, `maxLength`, `pattern`, `email`, `vnPhone`, `digits`, `matches`).
+    - Quy ước (giống `.optional()` của Zod): Mọi rule, trừ `required`, đều bỏ qua giá trị rỗng/null. Muốn bắt buộc thì ghép thêm `required()`.
+    - Message lỗi được dịch động lúc validate (`t(messageKey, params)`), hỗ trợ param nội suy (`{min}`, `{max}`).
+    - `compose`: Chạy lần lượt các rule và dừng lại ở lỗi đầu tiên.
+  - **Tầng 2 — `FieldRules` (Rule theo từng loại field):** Tương đương `ruleValidates.*` phía backend. Cung cấp sẵn: `email({required})`, `password()`, `loginPassword()`, `confirmPassword()`, `phone({required})`, `fullName({required})`, `bio()`, `otp()`.
+- **Quy tắc áp dụng:**
+  - Mọi màn hình form/input (Screen/Widget) **bắt buộc ưu tiên dùng `FieldRules`** thay vì tự viết logic validate inline.
+  - Với các trường chọn lựa đơn giản (dropdown, date picker, v.v.): dùng `Validators.required()`.
+  - Mọi message lỗi bắt buộc khai báo trong `validateErrors.*` của cả `assets/translations/vi.json` và `en.json`.
+
 ## 5. Workflow & Definition of Done
 
 - Trước khi code: nêu kế hoạch ngắn dạng `[step] → verify: [check]`.
@@ -213,6 +229,7 @@ test/
 - [ ] Đúng scope, không thêm gì ngoài yêu cầu.
 - [ ] Tái sử dụng đúng Design System widgets (`lib/core/widgets/`) & `DefaultColors`.
 - [ ] Mọi chuỗi hiển thị đều qua i18n (`t(...)` / `context.tr(...)`), bổ sung đủ cả 2 file `vi.json` và `en.json` tuân thủ đúng cấu trúc phân nhóm (`fields`, `validateErrors`, `errors`).
+- [ ] Form input phía mobile validate qua `FieldRules` / `Validators` (`lib/core/validation/app_validators.dart`), đồng bộ với BE schema.
 - [ ] Backend input validate qua Zod & `ruleValidates`.
 - [ ] Backend response chuẩn theo `CustomResponse.success(res, data, message)` / `CustomResponse.error(res, message, errors)`.
 - [ ] Typecheck (`npm run typecheck`) / analyze (`flutter analyze`) / test (`flutter test`) đều pass.

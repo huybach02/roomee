@@ -9,7 +9,7 @@
     "emailOrPhone": "Email or Phone number",
     "emailOrPhoneHint": "Enter your email or phone number",
     "password": "Password",
-    "passwordHint": "At least 6 characters",
+    "passwordHint": "At least 8 characters",
     "confirmPassword": "Confirm Password",
     "confirmPasswordHint": "Re-enter your password",
     "address": "Address",
@@ -31,9 +31,12 @@
     "fieldRequired": "This field is required",
     "invalidEmail": "Invalid email address",
     "invalidPhone": "Invalid phone number",
-    "passwordTooShort": "Password must be at least 6 characters",
+    "passwordTooShort": "Password must be at least {min} characters",
     "passwordsDoNotMatch": "Passwords do not match",
-    "otpInvalid": "Please enter all 6 digits of the OTP"
+    "otpInvalid": "Please enter all 6 digits of the OTP",
+    "minLength": "At least {min} characters",
+    "maxLength": "At most {max} characters",
+    "invalidDigits": "Invalid digit format"
   },
   "errors": {
     "noInternet": "No internet connection. Please check your network.",
