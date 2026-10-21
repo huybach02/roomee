@@ -1,4 +1,4 @@
-package com.example.thue_tro
+package com.example.roomee
 
 import io.flutter.embedding.android.FlutterActivity
 

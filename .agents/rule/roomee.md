@@ -4,7 +4,7 @@
 
 ## 1. Bối cảnh
 
-- **Dự án:** Roomee (`thue_tro`) — ứng dụng quản lý nhà trọ / cho thuê trọ.
+- **Dự án:** Roomee (`roomee`) — ứng dụng quản lý nhà trọ / cho thuê trọ.
 - **Hai phần:**
   - `_backend/` — API server Node.js + TypeScript (Express, TypeORM, PostgreSQL).
   - `lib/` (repo root) — ứng dụng Flutter (mobile).
