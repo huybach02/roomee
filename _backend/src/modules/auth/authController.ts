@@ -128,4 +128,22 @@ export class AuthController {
       return CustomResponse.error(res, message, null, 500);
     }
   };
+
+  public logoutUser = async (req: Request, res: Response): Promise<void> => {
+    const token =
+      req.token || req.headers.authorization?.replace(/^Bearer\s+/i, "");
+
+    try {
+      if (token) {
+        await this.authService.logout(token);
+      }
+      return CustomResponse.success(res, null, t("auth.logoutSuccess"), 200);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : t("common.internalServerError");
+      return CustomResponse.error(res, message, null, 500);
+    }
+  };
 }

@@ -17,6 +17,7 @@
     "registerError": "Đã xảy ra lỗi khi đăng ký tài khoản.",
     "loginSuccess": "Đăng nhập thành công.",
     "loginError": "Đã xảy ra lỗi khi đăng nhập.",
+    "logoutSuccess": "Đăng xuất thành công.",
     "userNotFound": "Tài khoản không tồn tại.",
     "invalidCredentials": "Email hoặc mật khẩu không chính xác.",
     "emailAlreadyExists": "Email này đã được sử dụng.",

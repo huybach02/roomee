@@ -141,6 +141,10 @@ _backend/
   - Bước 1: `POST /auth/forgot-password` -> Gửi mã OTP 6 số qua email (Redis TTL 10p, cooldown 60s, chống user enumeration).
   - Bước 2: `POST /auth/verify-reset-otp` -> Xác thực OTP -> Cấp `resetToken` (UUID, Redis TTL 15p).
   - Bước 3: `POST /auth/reset-password` -> Đặt mật khẩu mới với `resetToken` (dùng 1 lần duy nhất, cập nhật Argon2, xóa token và giải phóng lockout).
+- **Đăng xuất (Logout & Thu hồi Token qua Redis Blacklist):**
+  - Endpoint `POST /auth/logout` bảo vệ bằng `authMiddleware`.
+  - Server giải mã JWT, lấy thời gian sống còn lại (`exp - now`) và đưa token vào Redis `blacklist:token:{token}` với TTL tương ứng.
+  - `authMiddleware` tự động từ chối mọi request mang token nằm trong blacklist với mã `401 Unauthorized`.
 
 ## 4. Flutter (root `lib/`)
 
@@ -247,6 +251,9 @@ test/
       - `tenant` + `hasContract == true` (đã thuê trọ) -> `AppRoutes.tenant` (`TenantScreen`).
       - `tenant` + `hasContract == false` (chưa thuê trọ) -> `AppRoutes.home` (`HomeScreen`).
   - `WelcomeScreen` cũng tích hợp `BlocListener` kép để chuyển sang `AppRoutes.wrapper` nếu nhận thấy state `Authenticated`.
+- **Quy trình Đăng xuất & Tự động Đăng xuất (Logout & Auto-Logout):**
+  - Khi người dùng đăng xuất thủ công: gửi yêu cầu `POST /auth/logout` lên server (thu hồi token vào Redis blacklist), đồng thời luôn xóa sạch `access_token` và `cached_user` trong `FlutterSecureStorage` (kể cả khi offline) rồi chuyển về `AppRoutes.welcome`.
+  - **Tự động Đăng xuất khi 401 Unauthorized:** `AuthInterceptor` liên kết với `AuthBloc` thông qua callback `onUnauthorized` tại `main.dart`. Khi có bất kỳ request API nào trả về `401` (token hết hạn, bị thu hồi hoặc tài khoản bị khóa), ứng dụng tự động phát sinh `AuthLogoutEvent()` để dọn dẹp phiên và chuyển người dùng về màn hình chào mừng.
 
 ### 4.5 Chuẩn hoá Validation (Mobile)
 - Toàn bộ validation phía client đặt tập trung tại `lib/core/validation/app_validators.dart`.

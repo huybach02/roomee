@@ -356,4 +356,27 @@ export class AuthService {
     // 5. Xóa key lockout / attempts của tài khoản (nếu đang bị khóa)
     await redis.del(`login:attempts:${email}`, `login:lockout:${email}`);
   }
+
+  public async logout(token: string): Promise<void> {
+    if (!token) return;
+
+    try {
+      // Giải mã token để tính thời gian sống còn lại (TTL)
+      const decoded = jwt.decode(token) as { exp?: number } | null;
+      if (decoded && decoded.exp) {
+        const nowInSeconds = Math.floor(Date.now() / 1000);
+        const remainingTtl = decoded.exp - nowInSeconds;
+
+        if (remainingTtl > 0) {
+          // Lưu token vào Redis blacklist cho đến khi token tự hết hạn
+          await redis.set(`blacklist:token:${token}`, "1", "EX", remainingTtl);
+          return;
+        }
+      }
+      // Fallback mặc định 7 ngày nếu không đọc được exp
+      await redis.set(`blacklist:token:${token}`, "1", "EX", 7 * 24 * 3600);
+    } catch {
+      await redis.set(`blacklist:token:${token}`, "1", "EX", 7 * 24 * 3600);
+    }
+  }
 }

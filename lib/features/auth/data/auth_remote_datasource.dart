@@ -65,4 +65,8 @@ class AuthRemoteDataSource extends BaseService {
       data: {'token': token, 'newPassword': newPassword},
     );
   }
+
+  Future<ApiResponse<dynamic>> logout() {
+    return postData<dynamic>('/auth/logout');
+  }
 }

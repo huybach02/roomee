@@ -17,6 +17,7 @@
     "registerError": "An error occurred while registering account.",
     "loginSuccess": "Logged in successfully.",
     "loginError": "An error occurred while logging in.",
+    "logoutSuccess": "Logged out successfully.",
     "userNotFound": "User not found.",
     "invalidCredentials": "Incorrect email or password.",
     "emailAlreadyExists": "This email is already in use.",

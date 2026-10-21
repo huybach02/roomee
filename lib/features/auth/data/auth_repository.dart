@@ -133,6 +133,12 @@ class AuthRepository implements IAuthRepository {
 
   @override
   Future<void> logout() async {
-    await _localDataSource.clearSession();
+    try {
+      await _remoteDataSource.logout();
+    } catch (_) {
+      // Bỏ qua lỗi mạng (ví dụ khi thiết bị offline) để luôn đảm bảo xóa session cục bộ
+    } finally {
+      await _localDataSource.clearSession();
+    }
   }
 }

@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:roomee/core/network/interceptors/auth_interceptor.dart';
 import 'package:roomee/core/network/interceptors/logging_interceptor.dart';
@@ -49,15 +50,22 @@ class ApiClient {
         baseUrl != null ||
         secureStorage != null ||
         onUnauthorized != null) {
-      return ApiClient._internal(
+      _instance = ApiClient._internal(
         dio: dio,
         baseUrl: baseUrl,
         secureStorage: secureStorage,
         onUnauthorized: onUnauthorized,
       );
+      return _instance!;
     }
     _instance ??= ApiClient._internal();
     return _instance!;
+  }
+
+  /// Reset singleton instance (hỗ trợ test)
+  @visibleForTesting
+  static void resetForTesting() {
+    _instance = null;
   }
 
   /// Instance getter tiện lợi

@@ -5,6 +5,13 @@ declare global {
     interface Request {
       locale: SupportedLocale;
       t: (key: string, params?: Record<string, string | number>) => string;
+      user?: {
+        sub: number;
+        email: string;
+        role: string;
+        [key: string]: any;
+      };
+      token?: string;
     }
   }
 

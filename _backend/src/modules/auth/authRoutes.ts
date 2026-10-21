@@ -10,6 +10,7 @@ import {
   verifyOtpSchema,
 } from "./authSchema.js";
 import { validate } from "../../middlewares/validateMiddleware.js";
+import { authMiddleware } from "../../middlewares/authMiddleware.js";
 import {
   loginRateLimiter,
   registerRateLimiter,
@@ -68,6 +69,11 @@ export class AuthRoutes {
       loginRateLimiter,
       validate(resetPasswordSchema),
       this.authController.resetPassword,
+    );
+    this.router.post(
+      "/logout",
+      authMiddleware,
+      this.authController.logoutUser,
     );
   }
 }

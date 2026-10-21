@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:roomee/core/bloc/locale/locale_cubit.dart';
 import 'package:roomee/core/configs/app_theme.dart';
 import 'package:roomee/core/localization/app_localizations.dart';
+import 'package:roomee/core/network/api_client.dart';
 import 'package:roomee/core/router/app_router.dart';
 import 'package:roomee/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:roomee/features/general/presentation/bloc/general_bloc.dart';
@@ -21,7 +22,16 @@ void main() async {
     initialLocale = Locale(savedCode!);
   }
 
-  runApp(MyApp(initialLocale: initialLocale));
+  final authBloc = AuthBloc()..add(const AuthCheckEvent());
+
+  // Hook tự động đăng xuất khi gặp lỗi 401 Unauthorized từ bất kỳ API nào
+  ApiClient(
+    onUnauthorized: () {
+      authBloc.add(const AuthLogoutEvent());
+    },
+  );
+
+  runApp(MyApp(initialLocale: initialLocale, authBloc: authBloc));
 }
 
 class MyApp extends StatelessWidget {
