@@ -12,6 +12,13 @@ abstract class IAuthRepository {
   Future<void> resendOtp(String email);
   Future<void> verifyOtp({required String email, required String otp});
 
+  Future<void> forgotPassword(String email);
+  Future<String> verifyResetOtp({required String email, required String otp});
+  Future<void> resetPassword({
+    required String resetToken,
+    required String newPassword,
+  });
+
   Future<UserModel?> getCurrentUser();
   Future<bool> isLoggedIn();
   Future<String?> getToken();
@@ -74,6 +81,38 @@ class AuthRepository implements IAuthRepository {
   @override
   Future<void> verifyOtp({required String email, required String otp}) async {
     await _remoteDataSource.verifyOtp(email: email, otp: otp);
+  }
+
+  @override
+  Future<void> forgotPassword(String email) async {
+    await _remoteDataSource.forgotPassword(email);
+  }
+
+  @override
+  Future<String> verifyResetOtp({
+    required String email,
+    required String otp,
+  }) async {
+    final response = await _remoteDataSource.verifyResetOtp(
+      email: email,
+      otp: otp,
+    );
+    final token = response.data?.resetToken;
+    if (token == null || token.isEmpty) {
+      throw const ServerException(message: 'Mã xác thực không hợp lệ');
+    }
+    return token;
+  }
+
+  @override
+  Future<void> resetPassword({
+    required String resetToken,
+    required String newPassword,
+  }) async {
+    await _remoteDataSource.resetPassword(
+      token: resetToken,
+      newPassword: newPassword,
+    );
   }
 
   @override

@@ -84,3 +84,61 @@ final class AuthResendOtpEvent extends AuthEvent {
   @override
   int get hashCode => email.hashCode;
 }
+
+/// Yêu cầu gửi mã OTP quên mật khẩu
+final class AuthForgotPasswordEvent extends AuthEvent {
+  final String email;
+
+  const AuthForgotPasswordEvent(this.email);
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AuthForgotPasswordEvent &&
+          runtimeType == other.runtimeType &&
+          email == other.email;
+
+  @override
+  int get hashCode => email.hashCode;
+}
+
+/// Xác thực mã OTP đặt lại mật khẩu để lấy resetToken
+final class AuthVerifyResetOtpEvent extends AuthEvent {
+  final String email;
+  final String otp;
+
+  const AuthVerifyResetOtpEvent({required this.email, required this.otp});
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AuthVerifyResetOtpEvent &&
+          runtimeType == other.runtimeType &&
+          email == other.email &&
+          otp == other.otp;
+
+  @override
+  int get hashCode => Object.hash(email, otp);
+}
+
+/// Đặt lại mật khẩu mới với resetToken
+final class AuthResetPasswordEvent extends AuthEvent {
+  final String resetToken;
+  final String newPassword;
+
+  const AuthResetPasswordEvent({
+    required this.resetToken,
+    required this.newPassword,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AuthResetPasswordEvent &&
+          runtimeType == other.runtimeType &&
+          resetToken == other.resetToken &&
+          newPassword == other.newPassword;
+
+  @override
+  int get hashCode => Object.hash(resetToken, newPassword);
+}

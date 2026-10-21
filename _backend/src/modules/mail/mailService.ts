@@ -79,6 +79,8 @@ export class MailService {
       fullName,
       expiresInMinutes = OTP_EXPIRES_IN_MINUTES,
       locale,
+      subject: customSubject,
+      intro: customIntro,
     } = params;
 
     // Trong môi trường dev, luôn in mã OTP ra console để dễ lấy mã và test
@@ -88,12 +90,15 @@ export class MailService {
       );
     }
 
-    const subject = t("mail.verifyOtpSubject", undefined, locale);
+    const subject =
+      customSubject || t("mail.verifyOtpSubject", undefined, locale);
     const html = renderOtpEmailTemplate({
       otp,
       fullName: fullName || to,
       expiresInMinutes,
       locale,
+      title: subject,
+      intro: customIntro,
     });
 
     const result = await this.sendMail({

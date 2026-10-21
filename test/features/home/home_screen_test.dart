@@ -44,6 +44,22 @@ class _FakeAuthRepo implements IAuthRepository {
 
   @override
   Future<void> verifyOtp({required String email, required String otp}) async {}
+
+  @override
+  Future<void> forgotPassword(String email) async {}
+
+  @override
+  Future<String> verifyResetOtp({
+    required String email,
+    required String otp,
+  }) async =>
+      'fake_token';
+
+  @override
+  Future<void> resetPassword({
+    required String resetToken,
+    required String newPassword,
+  }) async {}
 }
 
 void main() {

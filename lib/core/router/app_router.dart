@@ -2,9 +2,11 @@ import 'package:flutter/cupertino.dart' show CupertinoPage;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:roomee/core/screens/welcome_screen.dart';
+import 'package:roomee/features/auth/presentation/screens/forgot_password_screen.dart';
 import 'package:roomee/features/auth/presentation/screens/login_screen.dart';
 import 'package:roomee/features/auth/presentation/screens/otp_screen.dart';
 import 'package:roomee/features/auth/presentation/screens/register_screen.dart';
+import 'package:roomee/features/auth/presentation/screens/reset_password_screen.dart';
 import 'package:roomee/features/home/presentation/screens/home_screen.dart';
 
 class AppRoutes {
@@ -14,6 +16,8 @@ class AppRoutes {
   static const String login = '/login';
   static const String register = '/register';
   static const String otp = '/otp';
+  static const String forgotPassword = '/forgot-password';
+  static const String resetPassword = '/reset-password';
   static const String home = '/home';
 }
 
@@ -66,6 +70,24 @@ GoRouter createAppRouter({
               destination: destination,
               purpose: purpose,
             ),
+          );
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.forgotPassword,
+        name: 'forgotPassword',
+        pageBuilder: (context, state) =>
+            _buildSlidePage(state, const ForgotPasswordScreen()),
+      ),
+      GoRoute(
+        path: AppRoutes.resetPassword,
+        name: 'resetPassword',
+        pageBuilder: (context, state) {
+          final extra = state.extra;
+          final resetToken = extra is String ? extra : '';
+          return _buildSlidePage(
+            state,
+            ResetPasswordScreen(resetToken: resetToken),
           );
         },
       ),

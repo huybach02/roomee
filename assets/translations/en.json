@@ -87,5 +87,13 @@
   "homeTitle": "Home",
   "logout": "Log out",
   "welcomeUser": "Welcome, {name}!",
-  "userRole": "Role"
+  "userRole": "Role",
+  "forgotPasswordTitle": "Forgot Password",
+  "forgotPasswordSubtitle": "Enter your email to receive an OTP code to reset your password",
+  "sendOtp": "Send verification code",
+  "resetPasswordTitle": "Reset Password",
+  "resetPasswordSubtitle": "Create a new password for your account",
+  "savePassword": "Save new password",
+  "forgotPasswordSentMessage": "A verification code has been sent to your email (if account exists).",
+  "resetPasswordSuccessMessage": "Password reset successfully! Please log in again."
 }

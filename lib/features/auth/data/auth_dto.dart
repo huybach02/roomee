@@ -126,3 +126,49 @@ class AuthData {
   @override
   int get hashCode => Object.hash(user, token);
 }
+
+class ForgotPasswordRequest {
+  final String email;
+
+  const ForgotPasswordRequest({required this.email});
+
+  Map<String, dynamic> toJson() => {'email': email};
+}
+
+class VerifyResetOtpRequest {
+  final String email;
+  final String otp;
+
+  const VerifyResetOtpRequest({required this.email, required this.otp});
+
+  Map<String, dynamic> toJson() => {'email': email, 'otp': otp};
+}
+
+class VerifyResetOtpResponse {
+  final String resetToken;
+
+  const VerifyResetOtpResponse({required this.resetToken});
+
+  factory VerifyResetOtpResponse.fromJson(Map<String, dynamic> json) {
+    return VerifyResetOtpResponse(
+      resetToken: json['resetToken'] as String? ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() => {'resetToken': resetToken};
+}
+
+class ResetPasswordRequest {
+  final String token;
+  final String newPassword;
+
+  const ResetPasswordRequest({
+    required this.token,
+    required this.newPassword,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'token': token,
+    'newPassword': newPassword,
+  };
+}

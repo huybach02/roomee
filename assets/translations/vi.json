@@ -87,5 +87,13 @@
   "homeTitle": "Trang chủ",
   "logout": "Đăng xuất",
   "welcomeUser": "Xin chào, {name}!",
-  "userRole": "Vai trò"
+  "userRole": "Vai trò",
+  "forgotPasswordTitle": "Quên mật khẩu",
+  "forgotPasswordSubtitle": "Nhập email của bạn để nhận mã OTP xác thực đặt lại mật khẩu",
+  "sendOtp": "Gửi mã xác thực",
+  "resetPasswordTitle": "Đặt lại mật khẩu",
+  "resetPasswordSubtitle": "Tạo mật khẩu mới cho tài khoản của bạn",
+  "savePassword": "Lưu mật khẩu mới",
+  "forgotPasswordSentMessage": "Mã xác thực đã được gửi về email của bạn (nếu tài khoản tồn tại).",
+  "resetPasswordSuccessMessage": "Đặt lại mật khẩu thành công! Vui lòng đăng nhập lại."
 }

@@ -2,9 +2,11 @@ import { Router } from "express";
 import { injectable } from "tsyringe";
 import { AuthController } from "./authController.js";
 import {
+  forgotPasswordSchema,
   loginSchema,
   registerSchema,
   resendOtpSchema,
+  resetPasswordSchema,
   verifyOtpSchema,
 } from "./authSchema.js";
 import { validate } from "../../middlewares/validateMiddleware.js";
@@ -48,6 +50,24 @@ export class AuthRoutes {
       verifyOtpRateLimiter,
       validate(verifyOtpSchema),
       this.authController.verifyOtp,
+    );
+    this.router.post(
+      "/forgot-password",
+      resendOtpRateLimiter,
+      validate(forgotPasswordSchema),
+      this.authController.forgotPassword,
+    );
+    this.router.post(
+      "/verify-reset-otp",
+      verifyOtpRateLimiter,
+      validate(verifyOtpSchema),
+      this.authController.verifyResetOtp,
+    );
+    this.router.post(
+      "/reset-password",
+      loginRateLimiter,
+      validate(resetPasswordSchema),
+      this.authController.resetPassword,
     );
   }
 }

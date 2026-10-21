@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:roomee/core/configs/app_theme.dart';
 import 'package:roomee/core/localization/app_localizations.dart';
 import 'package:roomee/core/router/app_router.dart';
+import 'package:roomee/core/screens/loading_screen.dart';
 import 'package:roomee/core/widgets/app_button.dart';
 import 'package:roomee/core/widgets/app_notification.dart';
 import 'package:roomee/features/auth/presentation/bloc/auth_bloc.dart';
@@ -187,7 +188,11 @@ class _OtpScreenState extends State<OtpScreen> {
       final email = widget.destination ?? '';
       final authBloc = _getAuthBloc();
       if (authBloc != null) {
-        authBloc.add(AuthVerifyOtpEvent(email: email, otp: otp));
+        if (widget.purpose == 'forgot_password') {
+          authBloc.add(AuthVerifyResetOtpEvent(email: email, otp: otp));
+        } else {
+          authBloc.add(AuthVerifyOtpEvent(email: email, otp: otp));
+        }
       }
     }
   }
@@ -224,7 +229,11 @@ class _OtpScreenState extends State<OtpScreen> {
       final email = widget.destination ?? '';
       final authBloc = _getAuthBloc();
       if (authBloc != null) {
-        authBloc.add(AuthResendOtpEvent(email));
+        if (widget.purpose == 'forgot_password') {
+          authBloc.add(AuthForgotPasswordEvent(email));
+        } else {
+          authBloc.add(AuthResendOtpEvent(email));
+        }
       }
     }
   }
@@ -305,8 +314,10 @@ class _OtpScreenState extends State<OtpScreen> {
           },
         ),
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
+      body: LoadingOverlay(
+        isLoading: isLoading,
+        child: SafeArea(
+          child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -414,8 +425,9 @@ class _OtpScreenState extends State<OtpScreen> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   @override
   Widget build(BuildContext context) {
@@ -427,7 +439,12 @@ class _OtpScreenState extends State<OtpScreen> {
           if (state is AuthOtpVerified) {
             AppNotification.showSuccess(context, t('otpVerifiedSuccess'));
             context.go(AppRoutes.login);
-          } else if (state is AuthOtpSent) {
+          } else if (state is AuthResetOtpVerified) {
+            context.pushReplacement(
+              AppRoutes.resetPassword,
+              extra: state.resetToken,
+            );
+          } else if (state is AuthOtpSent || state is AuthForgotPasswordSent) {
             AppNotification.showSuccess(context, t('otpSentSuccess'));
             _startCountdown();
           } else if (state is AuthFailure) {

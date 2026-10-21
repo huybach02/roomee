@@ -1,4 +1,5 @@
 import { injectable } from "tsyringe";
+import crypto from "node:crypto";
 import { User } from "../../entities/user.js";
 import { UserRepository } from "../../repositories/userRepository.js";
 import { RegisterDto } from "./authSchema.js";
@@ -251,5 +252,108 @@ export class AuthService {
       user: userWithoutPassword as User,
       token,
     };
+  }
+
+  public async forgotPassword(email: string): Promise<void> {
+    const normalizedEmail = email.trim().toLowerCase();
+    const cooldownKey = `otp:cooldown:forgot_password:${normalizedEmail}`;
+
+    // 1. Kiểm tra cooldown (60 giây)
+    const canSend = await redis.set(cooldownKey, "1", "EX", 60, "NX");
+    if (!canSend) {
+      throw new Error(t("auth.otpCooldown"));
+    }
+
+    // 2. Kiểm tra tài khoản tồn tại và đang hoạt động
+    const user = await this.userRepository.findOneBy({ email: normalizedEmail });
+    if (!user || !user.isActive) {
+      // Kết thúc thành công giả định để tránh user enumeration
+      return;
+    }
+
+    // 3. Tạo mã OTP 6 số lưu vào Redis với purpose 'forgot_password'
+    const otp = await this.otpService.generateAndSaveOtp(
+      normalizedEmail,
+      "forgot_password",
+      TTL_OTP_SECONDS,
+    );
+
+    // 4. Gửi email
+    const isSent = await this.mailService.sendOtpEmail({
+      to: normalizedEmail,
+      otp,
+      fullName: user.fullName,
+      expiresInMinutes: OTP_EXPIRES_IN_MINUTES,
+      subject: t("mail.forgotPasswordSubject"),
+      intro: t("mail.forgotPasswordIntro"),
+    });
+
+    if (!isSent) {
+      await redis.del(cooldownKey);
+      throw new Error(t("mail.sendFailed"));
+    }
+  }
+
+  public async verifyResetOtp(
+    email: string,
+    otp: string,
+  ): Promise<{ resetToken: string }> {
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // 1. Xác thực OTP với purpose 'forgot_password'
+    const isValid = await this.otpService.verifyOtp(
+      normalizedEmail,
+      otp,
+      "forgot_password",
+    );
+    if (!isValid) {
+      throw new Error(t("auth.invalidOtp"));
+    }
+
+    // 2. Kiểm tra user có tồn tại
+    const user = await this.userRepository.findOneBy({ email: normalizedEmail });
+    if (!user) {
+      throw new Error(t("auth.userNotFound"));
+    }
+
+    // 3. Tạo reset token ngẫu nhiên an toàn (TTL 15 phút)
+    const resetToken = crypto.randomUUID();
+    await redis.set(
+      `password_reset_token:${resetToken}`,
+      normalizedEmail,
+      "EX",
+      900,
+    );
+
+    return { resetToken };
+  }
+
+  public async resetPassword(
+    resetToken: string,
+    newPassword: string,
+  ): Promise<void> {
+    // 1. Lấy email từ token trong Redis
+    const tokenKey = `password_reset_token:${resetToken}`;
+    const email = await redis.get(tokenKey);
+    if (!email) {
+      throw new Error(t("auth.invalidResetToken"));
+    }
+
+    // 2. Tìm user
+    const user = await this.userRepository.findOneBy({ email });
+    if (!user) {
+      throw new Error(t("auth.userNotFound"));
+    }
+
+    // 3. Băm mật khẩu mới bằng Argon2 & lưu DB
+    user.password = await argon2.hash(newPassword);
+    user.isEmailVerified = true;
+    await this.userRepository.save(user);
+
+    // 4. Xóa resetToken khỏi Redis (dùng 1 lần duy nhất)
+    await redis.del(tokenKey);
+
+    // 5. Xóa key lockout / attempts của tài khoản (nếu đang bị khóa)
+    await redis.del(`login:attempts:${email}`, `login:lockout:${email}`);
   }
 }

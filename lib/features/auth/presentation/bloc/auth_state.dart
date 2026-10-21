@@ -87,3 +87,41 @@ final class AuthOtpVerified extends AuthState {
 final class AuthOtpSent extends AuthState {
   const AuthOtpSent();
 }
+
+final class AuthForgotPasswordSent extends AuthState {
+  final String email;
+
+  const AuthForgotPasswordSent({required this.email});
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AuthForgotPasswordSent &&
+          runtimeType == other.runtimeType &&
+          email == other.email;
+
+  @override
+  int get hashCode => email.hashCode;
+}
+
+final class AuthResetOtpVerified extends AuthState {
+  final String email;
+  final String resetToken;
+
+  const AuthResetOtpVerified({required this.email, required this.resetToken});
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AuthResetOtpVerified &&
+          runtimeType == other.runtimeType &&
+          email == other.email &&
+          resetToken == other.resetToken;
+
+  @override
+  int get hashCode => Object.hash(email, resetToken);
+}
+
+final class AuthResetPasswordSuccess extends AuthState {
+  const AuthResetPasswordSuccess();
+}

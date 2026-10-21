@@ -80,6 +80,35 @@ class _FakeAuthRepository implements IAuthRepository {
     lastVerifiedEmail = email;
     lastVerifiedOtp = otp;
   }
+
+  String? lastForgotPasswordEmail;
+  String? lastResetToken;
+  String? lastNewPassword;
+
+  @override
+  Future<void> forgotPassword(String email) async {
+    if (errorToThrow != null) throw errorToThrow!;
+    lastForgotPasswordEmail = email;
+  }
+
+  @override
+  Future<String> verifyResetOtp({
+    required String email,
+    required String otp,
+  }) async {
+    if (errorToThrow != null) throw errorToThrow!;
+    return 'fake_reset_token_xyz';
+  }
+
+  @override
+  Future<void> resetPassword({
+    required String resetToken,
+    required String newPassword,
+  }) async {
+    if (errorToThrow != null) throw errorToThrow!;
+    lastResetToken = resetToken;
+    lastNewPassword = newPassword;
+  }
 }
 
 void main() {
@@ -355,6 +384,61 @@ void main() {
       );
 
       authBloc.add(const AuthResendOtpEvent('test@roomee.vn'));
+    });
+  });
+
+  group('AuthForgotPasswordEvent', () {
+    test('emits [AuthLoading, AuthForgotPasswordSent] on success', () async {
+      expectLater(
+        authBloc.stream,
+        emitsInOrder([
+          const AuthLoading(),
+          const AuthForgotPasswordSent(email: 'forgot@roomee.vn'),
+        ]),
+      );
+
+      authBloc.add(const AuthForgotPasswordEvent('forgot@roomee.vn'));
+    });
+  });
+
+  group('AuthVerifyResetOtpEvent', () {
+    test('emits [AuthLoading, AuthResetOtpVerified] on success', () async {
+      expectLater(
+        authBloc.stream,
+        emitsInOrder([
+          const AuthLoading(),
+          const AuthResetOtpVerified(
+            email: 'reset@roomee.vn',
+            resetToken: 'fake_reset_token_xyz',
+          ),
+        ]),
+      );
+
+      authBloc.add(
+        const AuthVerifyResetOtpEvent(
+          email: 'reset@roomee.vn',
+          otp: '123456',
+        ),
+      );
+    });
+  });
+
+  group('AuthResetPasswordEvent', () {
+    test('emits [AuthLoading, AuthResetPasswordSuccess] on success', () async {
+      expectLater(
+        authBloc.stream,
+        emitsInOrder([
+          const AuthLoading(),
+          const AuthResetPasswordSuccess(),
+        ]),
+      );
+
+      authBloc.add(
+        const AuthResetPasswordEvent(
+          resetToken: 'valid_token',
+          newPassword: 'new_password123',
+        ),
+      );
     });
   });
 }

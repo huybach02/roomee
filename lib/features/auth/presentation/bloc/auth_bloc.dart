@@ -20,6 +20,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<AuthLogoutEvent>(_onAuthLogout);
     on<AuthVerifyOtpEvent>(_onAuthVerifyOtp);
     on<AuthResendOtpEvent>(_onAuthResendOtp);
+    on<AuthForgotPasswordEvent>(_onAuthForgotPassword);
+    on<AuthVerifyResetOtpEvent>(_onAuthVerifyResetOtp);
+    on<AuthResetPasswordEvent>(_onAuthResetPassword);
   }
 
   Future<void> _onAuthCheck(
@@ -143,6 +146,75 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     try {
       await _authRepository.resendOtp(event.email);
       emit(const AuthOtpSent());
+    } on ApiException catch (e) {
+      emit(
+        AuthFailure(
+          message: e.message,
+          statusCode: e.statusCode,
+          errors: e.errors,
+        ),
+      );
+    } catch (e) {
+      emit(AuthFailure(message: e.toString()));
+    }
+  }
+
+  Future<void> _onAuthForgotPassword(
+    AuthForgotPasswordEvent event,
+    Emitter<AuthState> emit,
+  ) async {
+    emit(const AuthLoading());
+    try {
+      await _authRepository.forgotPassword(event.email);
+      emit(AuthForgotPasswordSent(email: event.email));
+    } on ApiException catch (e) {
+      emit(
+        AuthFailure(
+          message: e.message,
+          statusCode: e.statusCode,
+          errors: e.errors,
+        ),
+      );
+    } catch (e) {
+      emit(AuthFailure(message: e.toString()));
+    }
+  }
+
+  Future<void> _onAuthVerifyResetOtp(
+    AuthVerifyResetOtpEvent event,
+    Emitter<AuthState> emit,
+  ) async {
+    emit(const AuthLoading());
+    try {
+      final resetToken = await _authRepository.verifyResetOtp(
+        email: event.email,
+        otp: event.otp,
+      );
+      emit(AuthResetOtpVerified(email: event.email, resetToken: resetToken));
+    } on ApiException catch (e) {
+      emit(
+        AuthFailure(
+          message: e.message,
+          statusCode: e.statusCode,
+          errors: e.errors,
+        ),
+      );
+    } catch (e) {
+      emit(AuthFailure(message: e.toString()));
+    }
+  }
+
+  Future<void> _onAuthResetPassword(
+    AuthResetPasswordEvent event,
+    Emitter<AuthState> emit,
+  ) async {
+    emit(const AuthLoading());
+    try {
+      await _authRepository.resetPassword(
+        resetToken: event.resetToken,
+        newPassword: event.newPassword,
+      );
+      emit(const AuthResetPasswordSuccess());
     } on ApiException catch (e) {
       emit(
         AuthFailure(

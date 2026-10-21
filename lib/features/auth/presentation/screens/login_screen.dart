@@ -48,7 +48,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _onForgotPassword() {
-    AppNotification.showInfo(context, t('forgotPassword'));
+    context.push(AppRoutes.forgotPassword);
   }
 
   @override

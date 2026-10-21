@@ -13,4 +13,6 @@ export interface SendOtpEmailParams {
   fullName?: string | null;
   expiresInMinutes?: number;
   locale?: SupportedLocale;
+  subject?: string;
+  intro?: string;
 }

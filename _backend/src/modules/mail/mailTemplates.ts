@@ -10,6 +10,8 @@ export interface OtpTemplateData {
   fullName: string;
   expiresInMinutes: number;
   locale?: SupportedLocale;
+  title?: string;
+  intro?: string;
 }
 
 export function escapeHtml(str: string): string {
@@ -28,10 +30,10 @@ export function renderOtpEmailTemplate(data: OtpTemplateData): string {
   const safeFullName = escapeHtml(data.fullName || "");
   const safeOtp = escapeHtml(data.otp || "");
 
-  const title = t("mail.verifyOtpSubject", undefined, currentLocale);
+  const title = data.title || t("mail.verifyOtpSubject", undefined, currentLocale);
   const tagline = t("mail.tagline", undefined, currentLocale);
   const greeting = t("mail.greeting", { name: safeFullName }, currentLocale);
-  const intro = t("mail.otpVerifyIntro", undefined, currentLocale);
+  const intro = data.intro || t("mail.otpVerifyIntro", undefined, currentLocale);
   const otpLabel = t("mail.otpLabel", undefined, currentLocale);
   const expireNote = t(
     "mail.otpExpireNote",

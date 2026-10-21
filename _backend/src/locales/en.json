@@ -25,14 +25,19 @@
     "accountInactive": "Your account has been deactivated or locked.",
     "emailNotVerified": "Your email has not been verified yet. Please check your OTP code.",
     "accountLocked": "Account is temporarily locked due to too many failed attempts. Please try again in {minutes} minutes.",
-    "invalidCredentialsWithAttempts": "Incorrect email or password. You have {remaining} attempt(s) left before account lockout."
+    "invalidCredentialsWithAttempts": "Incorrect email or password. You have {remaining} attempt(s) left before account lockout.",
+    "forgotPasswordSent": "A verification code has been sent to your email (if account exists).",
+    "resetPasswordSuccess": "Password has been reset successfully. Please log in again.",
+    "invalidResetToken": "Password reset session is invalid or has expired. Please try again."
   },
   "mail": {
     "sendFailed": "Failed to send verification email. Please try again later.",
     "verifyOtpSubject": "Your Roomee Verification Code",
+    "forgotPasswordSubject": "Your Roomee Password Reset Code",
     "tagline": "Smart rental management system",
     "greeting": "Hello {name},",
     "otpVerifyIntro": "Thank you for registering an account on Roomee. Please use the verification code (OTP) below to complete your registration:",
+    "forgotPasswordIntro": "We received a request to reset your Roomee account password. Please use the verification code (OTP) below to proceed:",
     "otpLabel": "Verification Code (OTP)",
     "otpExpireNote": "This verification code will expire in {minutes} minutes. For security reasons, do not share this code with anyone.",
     "footerNote": "If you did not request this, please ignore this email.",

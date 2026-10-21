@@ -1,7 +1,13 @@
 import { Request, Response } from "express";
 import { injectable } from "tsyringe";
 import { AuthService } from "./authService.js";
-import { LoginDto, RegisterDto } from "./authSchema.js";
+import {
+  ForgotPasswordDto,
+  LoginDto,
+  RegisterDto,
+  ResetPasswordDto,
+  VerifyOtpDto,
+} from "./authSchema.js";
 import { CustomResponse } from "../../utils/customResponse.js";
 
 @injectable()
@@ -59,6 +65,61 @@ export class AuthController {
     try {
       const result = await this.authService.verifyOtp(email, otp);
       return CustomResponse.success(res, result, t("common.success"), 200);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : t("common.internalServerError");
+      return CustomResponse.error(res, message, null, 500);
+    }
+  };
+
+  public forgotPassword = async (req: Request, res: Response): Promise<void> => {
+    const { email } = req.body as ForgotPasswordDto;
+
+    try {
+      await this.authService.forgotPassword(email);
+      return CustomResponse.success(
+        res,
+        null,
+        t("auth.forgotPasswordSent"),
+        200,
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : t("common.internalServerError");
+      return CustomResponse.error(res, message, null, 500);
+    }
+  };
+
+  public verifyResetOtp = async (req: Request, res: Response): Promise<void> => {
+    const { email, otp } = req.body as VerifyOtpDto;
+
+    try {
+      const result = await this.authService.verifyResetOtp(email, otp);
+      return CustomResponse.success(res, result, t("common.success"), 200);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : t("common.internalServerError");
+      return CustomResponse.error(res, message, null, 500);
+    }
+  };
+
+  public resetPassword = async (req: Request, res: Response): Promise<void> => {
+    const { token, newPassword } = req.body as ResetPasswordDto;
+
+    try {
+      await this.authService.resetPassword(token, newPassword);
+      return CustomResponse.success(
+        res,
+        null,
+        t("auth.resetPasswordSuccess"),
+        200,
+      );
     } catch (error) {
       const message =
         error instanceof Error
