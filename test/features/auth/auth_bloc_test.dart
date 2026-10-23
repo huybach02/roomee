@@ -4,6 +4,7 @@ import 'package:roomee/core/network/api_exceptions.dart';
 import 'package:roomee/features/auth/data/auth_dto.dart';
 import 'package:roomee/features/auth/data/auth_repository.dart';
 import 'package:roomee/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:roomee/utils/constanst.dart';
 
 class _FakeAuthRepository implements IAuthRepository {
   bool loggedIn = false;
@@ -12,6 +13,8 @@ class _FakeAuthRepository implements IAuthRepository {
   String? refreshTokenValue;
   ApiException? errorToThrow;
   String? codeToReturnOnLogin;
+  UserModel? userToReturnOnSync;
+  ApiException? syncErrorToThrow;
 
   @override
   Future<AuthData> login(LoginRequest request) async {
@@ -46,6 +49,12 @@ class _FakeAuthRepository implements IAuthRepository {
   @override
   Future<UserModel?> getCurrentUser() async {
     return currentUser;
+  }
+
+  @override
+  Future<UserModel?> syncUserProfile() async {
+    if (syncErrorToThrow != null) throw syncErrorToThrow!;
+    return userToReturnOnSync ?? currentUser;
   }
 
   @override
@@ -168,6 +177,71 @@ void main() {
       );
 
       authBloc.add(const AuthCheckEvent());
+    });
+
+    test('revalidates user profile and emits updated Authenticated state when server data changes (e.g. hasContract updated)', () async {
+      fakeRepo.loggedIn = true;
+      fakeRepo.currentUser = const UserModel(
+        id: '10',
+        email: 'tenant@roomee.vn',
+        role: UserRole.tenant,
+        hasContract: false,
+      );
+      fakeRepo.userToReturnOnSync = const UserModel(
+        id: '10',
+        email: 'tenant@roomee.vn',
+        role: UserRole.tenant,
+        hasContract: true,
+      );
+      fakeRepo.token = 'valid_token';
+
+      final expectation = expectLater(
+        authBloc.stream,
+        emitsInOrder([
+          const Authenticated(
+            user: UserModel(
+              id: '10',
+              email: 'tenant@roomee.vn',
+              role: UserRole.tenant,
+              hasContract: false,
+            ),
+            token: 'valid_token',
+          ),
+          const Authenticated(
+            user: UserModel(
+              id: '10',
+              email: 'tenant@roomee.vn',
+              role: UserRole.tenant,
+              hasContract: true,
+            ),
+            token: 'valid_token',
+          ),
+        ]),
+      );
+
+      authBloc.add(const AuthCheckEvent());
+      await expectation;
+    });
+
+    test('emits [Authenticated, Unauthenticated] when syncUserProfile throws UnauthorizedException', () async {
+      fakeRepo.loggedIn = true;
+      fakeRepo.currentUser = const UserModel(id: '10', email: 'revoked@roomee.vn');
+      fakeRepo.token = 'revoked_token';
+      fakeRepo.syncErrorToThrow = const UnauthorizedException();
+
+      final expectation = expectLater(
+        authBloc.stream,
+        emitsInOrder([
+          const Authenticated(
+            user: UserModel(id: '10', email: 'revoked@roomee.vn'),
+            token: 'revoked_token',
+          ),
+          const Unauthenticated(),
+        ]),
+      );
+
+      authBloc.add(const AuthCheckEvent());
+      await expectation;
     });
   });
 

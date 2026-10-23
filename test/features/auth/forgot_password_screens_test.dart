@@ -32,6 +32,9 @@ class _FakeAuthRepo implements IAuthRepository {
   Future<UserModel?> getCurrentUser() async => null;
 
   @override
+  Future<UserModel?> syncUserProfile() async => null;
+
+  @override
   Future<bool> isLoggedIn() async => false;
 
   @override

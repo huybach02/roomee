@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import { container } from "tsyringe";
 import { CacheService } from "../services/cacheService.js";
 import { CustomResponse } from "../utils/customResponse.js";
+import { JWT_ALLOWED_ALGORITHMS } from "../utils/constanst.js";
 
 export const authMiddleware = async (
   req: Request,
@@ -24,20 +25,15 @@ export const authMiddleware = async (
   try {
     const cacheService = container.resolve(CacheService);
 
-    // 1. Kiểm tra xem token có nằm trong blacklist không (ưu tiên Redis, fallback DB)
-    const isBlacklisted = await cacheService.get(`blacklist:token:${token}`);
-    if (isBlacklisted) {
-      CustomResponse.error(res, t("common.unauthorized"), null, 401);
-      return;
-    }
-
-    // 2. Xác thực tính hợp lệ của token
+    // 1. Xác thực tính hợp lệ của token
     const jwtSecret = process.env.JWT_SECRET;
     if (!jwtSecret) {
       throw new Error("JWT_SECRET environment variable is missing.");
     }
 
-    const decoded = jwt.verify(token, jwtSecret) as unknown as {
+    const decoded = jwt.verify(token, jwtSecret, {
+      algorithms: JWT_ALLOWED_ALGORITHMS,
+    }) as unknown as {
       sub: number;
       email: string;
       role: string;
@@ -46,7 +42,7 @@ export const authMiddleware = async (
       [key: string]: any;
     };
 
-    // 3. Kiểm tra xem session của token này có bị thu hồi tức thời không (ưu tiên Redis, fallback DB)
+    // 2. Kiểm tra xem session của token này có bị thu hồi tức thời không (ưu tiên Redis, fallback DB)
     if (decoded.sid) {
       const isSessionBlacklisted = await cacheService.get(
         `blacklist:session:${decoded.sid}`,

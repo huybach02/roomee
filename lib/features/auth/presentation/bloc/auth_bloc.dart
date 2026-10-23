@@ -32,16 +32,37 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     try {
       final isLoggedIn = await _authRepository.isLoggedIn();
       if (isLoggedIn) {
-        final user = await _authRepository.getCurrentUser();
+        // 1. Stale-While-Revalidate: Đọc ngay cache cũ từ storage để UI hiển thị tức thì (0ms latency)
+        final cachedUser = await _authRepository.getCurrentUser();
         final token = await _authRepository.getToken() ?? '';
         final refreshToken = await _authRepository.getRefreshToken();
         emit(
           Authenticated(
-            user: user,
+            user: cachedUser,
             token: token,
             refreshToken: refreshToken,
           ),
         );
+
+        // 2. Làm tươi dữ liệu từ server (Revalidation qua GET /auth/me)
+        try {
+          final freshUser = await _authRepository.syncUserProfile();
+          if (freshUser != null) {
+            emit(
+              Authenticated(
+                user: freshUser,
+                token: token,
+                refreshToken: refreshToken,
+              ),
+            );
+          }
+        } on UnauthorizedException {
+          emit(const Unauthenticated());
+        } on ForbiddenException {
+          emit(const Unauthenticated());
+        } catch (_) {
+          // Lỗi mạng hoặc server tạm thời: Giữ nguyên cachedUser để người dùng sử dụng tiếp (hỗ trợ offline)
+        }
       } else {
         emit(const Unauthenticated());
       }

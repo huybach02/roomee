@@ -20,6 +20,7 @@ abstract class IAuthRepository {
   });
 
   Future<UserModel?> getCurrentUser();
+  Future<UserModel?> syncUserProfile();
   Future<bool> isLoggedIn();
   Future<String?> getToken();
   Future<String?> getRefreshToken();
@@ -127,6 +128,16 @@ class AuthRepository implements IAuthRepository {
   Future<UserModel?> getCurrentUser() async {
     // Đọc thông tin user đã được cache từ local storage (hỗ trợ offline mode)
     return _localDataSource.getUser();
+  }
+
+  @override
+  Future<UserModel?> syncUserProfile() async {
+    final response = await _remoteDataSource.getMe();
+    final freshUser = response.data;
+    if (freshUser != null) {
+      await _localDataSource.saveUser(freshUser);
+    }
+    return freshUser;
   }
 
   @override

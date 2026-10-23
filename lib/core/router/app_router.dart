@@ -125,4 +125,6 @@ GoRouter createAppRouter({
   );
 }
 
-final GoRouter appRouter = createAppRouter();
+final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
+
+final GoRouter appRouter = createAppRouter(navigatorKey: rootNavigatorKey);

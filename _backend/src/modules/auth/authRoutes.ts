@@ -82,6 +82,11 @@ export class AuthRoutes {
       authMiddleware,
       this.authController.logoutUser,
     );
+    this.router.get(
+      "/me",
+      authMiddleware,
+      this.authController.getMe,
+    );
   }
 }
 

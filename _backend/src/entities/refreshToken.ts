@@ -24,9 +24,16 @@ export class RefreshToken extends Mixin(AuditableTrait) {
   @JoinColumn({ name: "userId" })
   user: Relation<User>;
 
-  @Index()
-  @Column({ type: "varchar", length: 64 })
+  @Index({ unique: true })
+  @Column({ type: "varchar", length: 64, unique: true })
   tokenHash: string;
+
+  @Index()
+  @Column({ type: "varchar", length: 64, nullable: true })
+  previousTokenHash: string | null;
+
+  @Column({ type: "timestamp with time zone", nullable: true })
+  rotatedAt: Date | null;
 
   @Column({ type: "varchar", length: 255, nullable: true })
   deviceInfo: string | null;

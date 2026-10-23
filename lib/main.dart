@@ -8,6 +8,7 @@ import 'package:roomee/core/configs/app_theme.dart';
 import 'package:roomee/core/localization/app_localizations.dart';
 import 'package:roomee/core/network/api_client.dart';
 import 'package:roomee/core/router/app_router.dart';
+import 'package:roomee/core/screens/no_internet_screen.dart';
 import 'package:roomee/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:roomee/features/general/presentation/bloc/general_bloc.dart';
 
@@ -24,17 +25,24 @@ void main() async {
 
   final authBloc = AuthBloc()..add(const AuthCheckEvent());
 
-  // Hook tự động đăng xuất khi gặp lỗi 401 Unauthorized từ bất kỳ API nào
+  // Hook tự động đăng xuất khi gặp lỗi 401 Unauthorized từ bất kỳ API nào,
+  // và hiển thị màn hình NoInternetScreen khi mất mạng mà không bị đăng xuất
   ApiClient(
     onUnauthorized: () {
       authBloc.add(const AuthLogoutEvent());
+    },
+    onNetworkError: () {
+      final context = rootNavigatorKey.currentContext;
+      if (context != null) {
+        NoInternetScreen.show(context);
+      }
     },
   );
 
   runApp(MyApp(initialLocale: initialLocale, authBloc: authBloc));
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   final Locale initialLocale;
   final GoRouter? router;
   final AuthBloc? authBloc;
@@ -49,19 +57,43 @@ class MyApp extends StatelessWidget {
   });
 
   @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
+  late final AuthBloc _authBloc;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _authBloc = widget.authBloc ?? (AuthBloc()..add(const AuthCheckEvent()));
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Khi ứng dụng chuyển từ Background lên Foreground:
+      // Tự động kích hoạt AuthCheckEvent() để làm mới thông tin mới nhất từ server
+      _authBloc.add(const AuthCheckEvent());
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return MultiBlocProvider(
       providers: [
         BlocProvider(
-          create: (_) => LocaleCubit(initialLocale: initialLocale),
+          create: (_) => LocaleCubit(initialLocale: widget.initialLocale),
         ),
-        BlocProvider(
-          create: (_) => generalBloc ?? GeneralBloc(),
-        ),
-        BlocProvider(
-          lazy: false,
-          create: (_) => authBloc ?? (AuthBloc()..add(const AuthCheckEvent())),
-        ),
+        BlocProvider(create: (_) => widget.generalBloc ?? GeneralBloc()),
+        BlocProvider.value(value: _authBloc),
       ],
       child: BlocBuilder<LocaleCubit, Locale>(
         builder: (context, locale) {
@@ -76,7 +108,7 @@ class MyApp extends StatelessWidget {
               GlobalCupertinoLocalizations.delegate,
             ],
             supportedLocales: AppLocalizations.supportedLocales,
-            routerConfig: router ?? appRouter,
+            routerConfig: widget.router ?? appRouter,
           );
         },
       ),

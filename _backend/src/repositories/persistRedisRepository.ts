@@ -10,26 +10,36 @@ export class PersistRedisRepository extends Repository<PersistRedis> {
   }
 
   /**
-   * Lưu hoặc cập nhật key-value cùng với TTL vào database
+   * Lưu hoặc cập nhật key-value cùng với TTL vào database.
+   * Hỗ trợ options.preserveTtl (tương đương KEEPTTL trong Redis):
+   * - Nếu preserveTtl = true: Chỉ cập nhật value, giữ nguyên expiredAt và ttl cũ nếu key đã tồn tại.
+   * - Nếu preserveTtl = false / undefined: Cập nhật cả value, ttl và tính lại expiredAt mới.
    */
   public async setKey(
     key: string,
     value: any,
     ttlSeconds?: number,
+    options?: { preserveTtl?: boolean },
   ): Promise<void> {
     const expiredAt = ttlSeconds
       ? new Date(Date.now() + ttlSeconds * 1000)
       : null;
 
-    await this.upsert(
-      {
+    const updateColumns = options?.preserveTtl
+      ? ["value"]
+      : ["value", "ttl", "expiredAt"];
+
+    await this.createQueryBuilder()
+      .insert()
+      .into(PersistRedis)
+      .values({
         key,
-        value,
+        value: value as any,
         ttl: ttlSeconds ?? null,
         expiredAt,
-      },
-      ["key"],
-    );
+      } as any)
+      .orUpdate(updateColumns, ["key"])
+      .execute();
   }
 
   /**

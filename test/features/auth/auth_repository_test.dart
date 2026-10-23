@@ -319,5 +319,45 @@ void main() {
       expect(await repository.getToken(), 'new_access_token');
       expect(await repository.getRefreshToken(), 'new_refresh_token');
     });
+
+    test('syncUserProfile calls /auth/me, updates local storage, and returns fresh user', () async {
+      String? requestedPath;
+      String? requestedMethod;
+
+      testDio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            requestedPath = options.path;
+            requestedMethod = options.method;
+            return handler.resolve(
+              Response(
+                requestOptions: options,
+                statusCode: 200,
+                data: {
+                  'success': true,
+                  'message': 'Thành công',
+                  'data': {
+                    'id': '1',
+                    'email': 'tenant@roomee.vn',
+                    'role': 'tenant',
+                    'hasContract': true,
+                  },
+                },
+              ),
+            );
+          },
+        ),
+      );
+
+      final freshUser = await repository.syncUserProfile();
+
+      expect(requestedPath, '/auth/me');
+      expect(requestedMethod, 'GET');
+      expect(freshUser, isNotNull);
+      expect(freshUser?.hasContract, isTrue);
+
+      final cached = await localDataSource.getUser();
+      expect(cached?.hasContract, isTrue);
+    });
   });
 }

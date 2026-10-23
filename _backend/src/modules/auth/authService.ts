@@ -1,6 +1,7 @@
 import { injectable } from "tsyringe";
 import crypto from "node:crypto";
 import { User } from "../../entities/user.js";
+import { RefreshToken } from "../../entities/refreshToken.js";
 import { UserRepository } from "../../repositories/userRepository.js";
 import { RegisterDto } from "./authSchema.js";
 import argon2 from "argon2";
@@ -9,19 +10,23 @@ import {
   ACCESS_TOKEN_EXPIRES_IN,
   CODE_RESPONSE,
   Gender,
+  JWT_ALGORITHM,
   LOGIN_LOCKOUT_MINUTES,
   LOGIN_LOCKOUT_SECONDS,
   MAX_LOGIN_ATTEMPTS,
   OTP_EXPIRES_IN_MINUTES,
   REFRESH_TOKEN_EXPIRES_IN_DAYS,
+  REFRESH_TOKEN_GRACE_PERIOD_MS,
   TTL_ACCESS_TOKEN_SECONDS,
   TTL_OTP_SECONDS,
   UserRole,
 } from "../../utils/constanst.js";
-import { MailService } from "../mail/mailService.js";
+import { MailQueue } from "../../queues/mail/mailQueue.js";
 import { OtpService } from "./otpService.js";
 import { CacheService } from "../../services/cacheService.js";
 import { RefreshTokenRepository } from "../../repositories/refreshTokenRepository.js";
+import { AppError } from "../../utils/appError.js";
+import { redis } from "../../config/redis.js";
 
 @injectable()
 export class AuthService {
@@ -29,7 +34,7 @@ export class AuthService {
 
   constructor(
     private userRepository: UserRepository,
-    private mailService: MailService,
+    private mailQueue: MailQueue,
     private otpService: OtpService,
     private cacheService: CacheService,
     private refreshTokenRepository: RefreshTokenRepository,
@@ -47,7 +52,7 @@ export class AuthService {
       email: dtoData.email,
     });
     if (existingUser) {
-      throw new Error(t("auth.emailAlreadyExists"));
+      throw AppError.conflict(t("auth.emailAlreadyExists"));
     }
 
     const hashedPassword = await argon2.hash(dtoData.password);
@@ -76,17 +81,13 @@ export class AuthService {
       TTL_OTP_SECONDS,
     );
 
-    // Gửi email chứa mã OTP xác thực
-    const isSent = await this.mailService.sendOtpEmail({
+    // Đẩy việc gửi email chứa mã OTP vào hàng đợi BullMQ (xử lý nền bất đồng bộ, retry 3 lần)
+    await this.mailQueue.addSendOtpJob({
       to: savedUser.email,
       otp,
       fullName: savedUser.fullName,
       expiresInMinutes: OTP_EXPIRES_IN_MINUTES,
     });
-
-    if (!isSent) {
-      throw new Error(t("mail.sendFailed"));
-    }
 
     // Đặt cooldown 60s cho resend OTP
     await this.cacheService.set(
@@ -110,7 +111,7 @@ export class AuthService {
     // Kiểm tra cooldown server-side (60 giây)
     const canSend = await this.cacheService.setNx(cooldownKey, "1", 60);
     if (!canSend) {
-      throw new Error(t("auth.otpCooldown"));
+      throw AppError.tooManyRequests(t("auth.otpCooldown"));
     }
 
     const user = await this.userRepository.findOneBy({
@@ -126,28 +127,24 @@ export class AuthService {
       TTL_OTP_SECONDS,
     );
 
-    const isSent = await this.mailService.sendOtpEmail({
+    // Đẩy việc gửi email vào hàng đợi BullMQ xử lý nền
+    await this.mailQueue.addSendOtpJob({
       to: normalizedEmail,
       otp,
       fullName: user.fullName,
       expiresInMinutes: OTP_EXPIRES_IN_MINUTES,
     });
-
-    if (!isSent) {
-      await this.cacheService.del(cooldownKey);
-      throw new Error(t("mail.sendFailed"));
-    }
   }
 
   public async verifyOtp(email: string, otp: string): Promise<void> {
     const isOtpValid = await this.otpService.verifyOtp(email, otp, "register");
     if (!isOtpValid) {
-      throw new Error(t("auth.invalidOtp"));
+      throw AppError.badRequest(t("auth.invalidOtp"));
     }
 
     const user = await this.userRepository.findOneBy({ email });
     if (!user) {
-      throw new Error(t("auth.userNotFound"));
+      throw AppError.notFound(t("auth.userNotFound"));
     }
 
     user.isEmailVerified = true;
@@ -161,21 +158,21 @@ export class AuthService {
     ipAddress?: string,
   ): Promise<{
     user: User;
-    token: string;
     accessToken: string;
     refreshToken: string;
     code?: string;
   }> {
     const normalizedEmail = email.trim().toLowerCase();
-    const lockoutKey = `login:lockout:${normalizedEmail}`;
-    const attemptsKey = `login:attempts:${normalizedEmail}`;
+    const clientIp = ipAddress ? ipAddress.trim() : "unknown";
+    const lockoutKey = `login:lockout:${normalizedEmail}:${clientIp}`;
+    const attemptsKey = `login:attempts:${normalizedEmail}:${clientIp}`;
 
-    // Kiểm tra tài khoản có đang bị tạm khóa hay không
+    // Kiểm tra tài khoản có đang bị tạm khóa theo IP này hay không
     const isLocked = await this.cacheService.get(lockoutKey);
     if (isLocked) {
       const ttl = await this.cacheService.ttl(lockoutKey);
       const remainingMinutes = Math.max(1, Math.ceil(ttl / 60));
-      throw new Error(
+      throw AppError.locked(
         t("auth.accountLocked", { minutes: remainingMinutes.toString() }),
       );
     }
@@ -190,7 +187,7 @@ export class AuthService {
       if (attempts >= MAX_LOGIN_ATTEMPTS) {
         await this.cacheService.set(lockoutKey, "1", LOGIN_LOCKOUT_SECONDS);
         await this.cacheService.del(attemptsKey);
-        throw new Error(
+        throw AppError.locked(
           t("auth.accountLocked", {
             minutes: LOGIN_LOCKOUT_MINUTES.toString(),
           }),
@@ -198,7 +195,7 @@ export class AuthService {
       }
 
       const remaining = MAX_LOGIN_ATTEMPTS - attempts;
-      throw new Error(
+      throw AppError.unauthorized(
         t("auth.invalidCredentialsWithAttempts", {
           remaining: remaining.toString(),
         }),
@@ -211,14 +208,15 @@ export class AuthService {
       return await handleFailedAttempt();
     }
 
-    if (!user.isActive) {
-      throw new Error(t("auth.accountInactive"));
-    }
-
     const isPasswordValid =
       user.password && (await argon2.verify(user.password, password));
     if (!isPasswordValid) {
       return await handleFailedAttempt();
+    }
+
+    // Kiểm tra trạng thái tài khoản CHỈ KHI đã xác thực đúng mật khẩu (chống User Enumeration)
+    if (!user.isActive) {
+      throw AppError.forbidden(t("auth.accountInactive"));
     }
 
     await this.cacheService.del(attemptsKey);
@@ -234,7 +232,8 @@ export class AuthService {
           "register",
           TTL_OTP_SECONDS,
         );
-        await this.mailService.sendOtpEmail({
+        // Đẩy việc gửi email vào hàng đợi BullMQ xử lý nền
+        await this.mailQueue.addSendOtpJob({
           to: normalizedEmail,
           otp,
           fullName: user.fullName,
@@ -244,7 +243,6 @@ export class AuthService {
 
       return {
         user: userWithoutPassword as User,
-        token: "",
         accessToken: "",
         refreshToken: "",
         code: CODE_RESPONSE.NEED_VERIFY_EMAIL,
@@ -264,8 +262,8 @@ export class AuthService {
     const session = this.refreshTokenRepository.create({
       userId: user.id,
       tokenHash,
-      deviceInfo: deviceInfo || null,
-      ipAddress: ipAddress || null,
+      deviceInfo: deviceInfo ? deviceInfo.slice(0, 255) : null,
+      ipAddress: ipAddress ? ipAddress.slice(0, 45) : null,
       expiresAt,
       isRevoked: false,
     });
@@ -282,12 +280,12 @@ export class AuthService {
       this.jwtSecret,
       {
         expiresIn: ACCESS_TOKEN_EXPIRES_IN,
+        algorithm: JWT_ALGORITHM,
       },
     );
 
     return {
       user: userWithoutPassword as User,
-      token: accessToken,
       accessToken,
       refreshToken: rawRefreshToken,
     };
@@ -300,11 +298,13 @@ export class AuthService {
     // 1. Kiểm tra cooldown (60 giây)
     const canSend = await this.cacheService.setNx(cooldownKey, "1", 60);
     if (!canSend) {
-      throw new Error(t("auth.otpCooldown"));
+      throw AppError.tooManyRequests(t("auth.otpCooldown"));
     }
 
     // 2. Kiểm tra tài khoản tồn tại và đang hoạt động
-    const user = await this.userRepository.findOneBy({ email: normalizedEmail });
+    const user = await this.userRepository.findOneBy({
+      email: normalizedEmail,
+    });
     if (!user || !user.isActive) {
       // Kết thúc thành công giả định để tránh user enumeration
       return;
@@ -317,8 +317,8 @@ export class AuthService {
       TTL_OTP_SECONDS,
     );
 
-    // 4. Gửi email
-    const isSent = await this.mailService.sendOtpEmail({
+    // 4. Đẩy việc gửi email vào hàng đợi BullMQ (xử lý nền, triệt tiêu hoàn toàn timing attack)
+    await this.mailQueue.addSendOtpJob({
       to: normalizedEmail,
       otp,
       fullName: user.fullName,
@@ -326,11 +326,6 @@ export class AuthService {
       subject: t("mail.forgotPasswordSubject"),
       intro: t("mail.forgotPasswordIntro"),
     });
-
-    if (!isSent) {
-      await this.cacheService.del(cooldownKey);
-      throw new Error(t("mail.sendFailed"));
-    }
   }
 
   public async verifyResetOtp(
@@ -346,13 +341,15 @@ export class AuthService {
       "forgot_password",
     );
     if (!isValid) {
-      throw new Error(t("auth.invalidOtp"));
+      throw AppError.badRequest(t("auth.invalidOtp"));
     }
 
     // 2. Kiểm tra user có tồn tại
-    const user = await this.userRepository.findOneBy({ email: normalizedEmail });
+    const user = await this.userRepository.findOneBy({
+      email: normalizedEmail,
+    });
     if (!user) {
-      throw new Error(t("auth.userNotFound"));
+      throw AppError.notFound(t("auth.userNotFound"));
     }
 
     // 3. Tạo reset token ngẫu nhiên an toàn (TTL 15 phút)
@@ -374,13 +371,13 @@ export class AuthService {
     const tokenKey = `password_reset_token:${resetToken}`;
     const email = await this.cacheService.get<string>(tokenKey);
     if (!email) {
-      throw new Error(t("auth.invalidResetToken"));
+      throw AppError.badRequest(t("auth.invalidResetToken"));
     }
 
     // 2. Tìm user
     const user = await this.userRepository.findOneBy({ email });
     if (!user) {
-      throw new Error(t("auth.userNotFound"));
+      throw AppError.notFound(t("auth.userNotFound"));
     }
 
     // 3. Băm mật khẩu mới bằng Argon2 & lưu DB
@@ -388,58 +385,78 @@ export class AuthService {
     user.isEmailVerified = true;
     await this.userRepository.save(user);
 
-    // 4. Xóa resetToken khỏi Redis & DB (dùng 1 lần duy nhất)
+    // 4. Thu hồi toàn bộ session đăng nhập cũ của user
+    await this.refreshTokenRepository.revokeAllUserSessions(user.id);
+
+    // 5. Xóa resetToken khỏi Redis & DB (dùng 1 lần duy nhất)
     await this.cacheService.del(tokenKey);
 
-    // 5. Xóa key lockout / attempts của tài khoản (nếu đang bị khóa)
-    await this.cacheService.del(
-      `login:attempts:${email}`,
-      `login:lockout:${email}`,
-    );
+    // 6. Xóa key lockout / attempts của tài khoản trên mọi IP (nếu đang bị khóa)
+    try {
+      if (redis.status === "ready") {
+        const lockoutKeys = await redis.keys(`login:*:${email}:*`);
+        if (lockoutKeys.length > 0) {
+          await this.cacheService.del(...lockoutKeys);
+        }
+      }
+    } catch (error) {
+      console.warn(
+        `[AuthService] Clear lockout keys failed for ${email}:`,
+        error,
+      );
+    }
+  }
+
+  public async getProfile(userId: number): Promise<User> {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      relations: {
+        province: true,
+        ward: true,
+      },
+    });
+
+    if (!user) {
+      throw AppError.notFound(t("auth.userNotFound"));
+    }
+
+    if (!user.isActive) {
+      throw AppError.forbidden(t("auth.accountInactive"));
+    }
+
+    const { password: _, ...userWithoutPassword } = user;
+    return userWithoutPassword as User;
   }
 
   public async logout(token: string): Promise<void> {
     if (!token) return;
 
-    try {
-      // Giải mã token để lấy thông tin session và TTL còn lại
-      const decoded = jwt.decode(token) as {
-        exp?: number;
-        sid?: string;
-      } | null;
+    // Giải mã token để lấy thông tin session và TTL còn lại
+    const decoded = jwt.decode(token) as {
+      exp?: number;
+      sid?: string;
+    } | null;
 
-      let remainingTtl = TTL_ACCESS_TOKEN_SECONDS;
-      if (decoded && decoded.exp) {
-        const nowInSeconds = Math.floor(Date.now() / 1000);
-        const calculated = decoded.exp - nowInSeconds;
-        if (calculated > 0) {
-          remainingTtl = calculated;
-        }
-      }
-
-      // 1. Blacklist access token trong Redis + DB
-      await this.cacheService.set(
-        `blacklist:token:${token}`,
-        "1",
-        remainingTtl,
-      );
-
-      // 2. Thu hồi session trong DB và Redis nếu có sid
-      if (decoded && decoded.sid) {
-        await this.refreshTokenRepository.revokeBySessionId(decoded.sid);
-        await this.cacheService.set(
-          `blacklist:session:${decoded.sid}`,
-          "1",
-          remainingTtl,
-        );
-      }
-    } catch {
-      await this.cacheService.set(
-        `blacklist:token:${token}`,
-        "1",
-        TTL_ACCESS_TOKEN_SECONDS,
-      );
+    if (!decoded || !decoded.sid) {
+      return;
     }
+
+    let remainingTtl = TTL_ACCESS_TOKEN_SECONDS;
+    if (decoded.exp) {
+      const nowInSeconds = Math.floor(Date.now() / 1000);
+      const calculated = decoded.exp - nowInSeconds;
+      if (calculated > 0) {
+        remainingTtl = calculated;
+      }
+    }
+
+    // Thu hồi session trong DB và Redis
+    await this.refreshTokenRepository.revokeBySessionId(decoded.sid);
+    await this.cacheService.set(
+      `blacklist:session:${decoded.sid}`,
+      "1",
+      remainingTtl,
+    );
   }
 
   public async refreshToken(
@@ -449,44 +466,81 @@ export class AuthService {
   ): Promise<{
     accessToken: string;
     refreshToken: string;
-    token: string;
   }> {
     if (!refreshTokenString) {
-      throw new Error(t("auth.invalidRefreshToken"));
+      throw AppError.unauthorized(t("auth.invalidRefreshToken"));
     }
 
-    const tokenHash = crypto
+    const incomingHash = crypto
       .createHash("sha256")
       .update(refreshTokenString)
       .digest("hex");
 
     const session =
-      await this.refreshTokenRepository.findByTokenHash(tokenHash);
+      await this.refreshTokenRepository.findByCurrentOrPreviousTokenHash(
+        incomingHash,
+      );
 
-    if (
-      !session ||
-      session.isRevoked ||
-      new Date(session.expiresAt).getTime() <= Date.now()
-    ) {
-      throw new Error(t("auth.invalidRefreshToken"));
+    if (!session) {
+      throw AppError.unauthorized(t("auth.invalidRefreshToken"));
+    }
+
+    if (session.isRevoked) {
+      // Session đã bị thu hồi trước đó -> Thu hồi toàn bộ session để bảo vệ tài khoản
+      await this.refreshTokenRepository.revokeAllUserSessions(session.userId);
+      throw AppError.unauthorized(t("auth.invalidRefreshToken"));
+    }
+
+    if (new Date(session.expiresAt).getTime() <= Date.now()) {
+      throw AppError.unauthorized(t("auth.invalidRefreshToken"));
     }
 
     if (!session.user || !session.user.isActive) {
-      throw new Error(t("auth.accountInactive"));
+      throw AppError.forbidden(t("auth.accountInactive"));
     }
 
-    // Token Rotation: Thu hồi session cũ
-    session.isRevoked = true;
-    await this.refreshTokenRepository.save(session);
+    // 1. Kiểm tra kịch bản DÙNG LẠI TOKEN CŨ (Token Reuse Detection):
+    if (session.previousTokenHash === incomingHash) {
+      const nowMs = Date.now();
+      const rotatedAtMs = session.rotatedAt
+        ? new Date(session.rotatedAt).getTime()
+        : 0;
+      const isWithinGracePeriod =
+        nowMs - rotatedAtMs <= REFRESH_TOKEN_GRACE_PERIOD_MS;
 
-    // Blacklist session cũ trong Redis + DB để chặn tức thì các token của phiên cũ
-    await this.cacheService.set(
-      `blacklist:session:${session.id}`,
-      "1",
-      TTL_ACCESS_TOKEN_SECONDS,
-    );
+      if (isWithinGracePeriod) {
+        // Cho phép cấp lại Access Token hợp lệ mà không khóa tài khoản
+        const reissuedAccessToken = jwt.sign(
+          {
+            sub: session.user.id,
+            email: session.user.email,
+            role: session.user.role,
+            sid: session.id,
+          },
+          this.jwtSecret,
+          {
+            expiresIn: ACCESS_TOKEN_EXPIRES_IN,
+          },
+        );
 
-    // Sinh refresh token mới và session mới
+        return {
+          accessToken: reissuedAccessToken,
+          refreshToken: refreshTokenString,
+        };
+      }
+
+      // Vượt quá Grace Period (> 15s): Phát hiện token cũ bị kẻ gian dùng lại!
+      await this.refreshTokenRepository.revokeAllUserSessions(session.userId);
+      await this.cacheService.set(
+        `blacklist:session:${session.id}`,
+        "1",
+        TTL_ACCESS_TOKEN_SECONDS,
+      );
+      throw AppError.unauthorized(t("auth.invalidRefreshToken"));
+    }
+
+    // 2. Kịch bản HỢP LỆ (incomingHash === session.tokenHash):
+    // Giữ nguyên sid (session.id), chỉ cập nhật tokenHash & previousTokenHash
     const newRawRefreshToken = crypto.randomBytes(32).toString("hex");
     const newTokenHash = crypto
       .createHash("sha256")
@@ -495,34 +549,57 @@ export class AuthService {
     const newExpiresAt = new Date(
       Date.now() + REFRESH_TOKEN_EXPIRES_IN_DAYS * 24 * 60 * 60 * 1000,
     );
+    const now = new Date();
 
-    const newSession = this.refreshTokenRepository.create({
-      userId: session.userId,
-      tokenHash: newTokenHash,
-      deviceInfo: deviceInfo || session.deviceInfo,
-      ipAddress: ipAddress || session.ipAddress,
-      expiresAt: newExpiresAt,
-      isRevoked: false,
-    });
-    const savedNewSession = await this.refreshTokenRepository.save(newSession);
+    const effectiveDeviceInfo = deviceInfo
+      ? deviceInfo.slice(0, 255)
+      : session.deviceInfo;
+    const effectiveIpAddress = ipAddress
+      ? ipAddress.slice(0, 45)
+      : session.ipAddress;
 
+    // Cập nhật nguyên tử trên DB (chống race condition)
+    const updateResult = await this.refreshTokenRepository
+      .createQueryBuilder()
+      .update(RefreshToken)
+      .set({
+        previousTokenHash: session.tokenHash,
+        tokenHash: newTokenHash,
+        rotatedAt: now,
+        lastActiveAt: now,
+        expiresAt: newExpiresAt,
+        deviceInfo: effectiveDeviceInfo,
+        ipAddress: effectiveIpAddress,
+      })
+      .where('id = :id AND "tokenHash" = :tokenHash AND "isRevoked" = false', {
+        id: session.id,
+        tokenHash: session.tokenHash,
+      })
+      .execute();
+
+    if (updateResult.affected !== 1) {
+      await this.refreshTokenRepository.revokeAllUserSessions(session.userId);
+      throw AppError.unauthorized(t("auth.invalidRefreshToken"));
+    }
+
+    // Cấp Access Token mới mang CÙNG sid (session.id)
     const newAccessToken = jwt.sign(
       {
         sub: session.user.id,
         email: session.user.email,
         role: session.user.role,
-        sid: savedNewSession.id,
+        sid: session.id,
       },
       this.jwtSecret,
       {
         expiresIn: ACCESS_TOKEN_EXPIRES_IN,
+        algorithm: JWT_ALGORITHM,
       },
     );
 
     return {
       accessToken: newAccessToken,
       refreshToken: newRawRefreshToken,
-      token: newAccessToken,
     };
   }
 }

@@ -167,8 +167,10 @@ class UserModel {
       other is UserModel &&
           runtimeType == other.runtimeType &&
           id == other.id &&
-          email == other.email;
+          email == other.email &&
+          role == other.role &&
+          hasContract == other.hasContract;
 
   @override
-  int get hashCode => Object.hash(id, email);
+  int get hashCode => Object.hash(id, email, role, hasContract);
 }

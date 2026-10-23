@@ -8,12 +8,15 @@ import 'package:roomee/utils/constanst.dart';
 class ApiClient {
   static ApiClient? _instance;
   final Dio _dio;
+  late final AuthInterceptor? _authInterceptor;
 
   ApiClient._internal({
     Dio? dio,
     String? baseUrl,
     FlutterSecureStorage? secureStorage,
     void Function()? onUnauthorized,
+    void Function()? onNetworkError,
+    void Function()? onNetworkRestored,
   }) : _dio =
            dio ??
            Dio(
@@ -29,15 +32,21 @@ class ApiClient {
              ),
            ) {
     if (dio == null) {
+      final authInterceptor = AuthInterceptor(
+        secureStorage: secureStorage,
+        onUnauthorized: onUnauthorized,
+        onNetworkError: onNetworkError,
+        onNetworkRestored: onNetworkRestored,
+        clientDio: _dio,
+        baseUrl: baseUrl ?? apiBaseUrl,
+      );
+      _authInterceptor = authInterceptor;
       _dio.interceptors.addAll([
-        AuthInterceptor(
-          secureStorage: secureStorage,
-          onUnauthorized: onUnauthorized,
-          clientDio: _dio,
-          baseUrl: baseUrl ?? apiBaseUrl,
-        ),
+        authInterceptor,
         LoggingInterceptor(),
       ]);
+    } else {
+      _authInterceptor = null;
     }
   }
 
@@ -47,16 +56,22 @@ class ApiClient {
     String? baseUrl,
     FlutterSecureStorage? secureStorage,
     void Function()? onUnauthorized,
+    void Function()? onNetworkError,
+    void Function()? onNetworkRestored,
   }) {
     if (dio != null ||
         baseUrl != null ||
         secureStorage != null ||
-        onUnauthorized != null) {
+        onUnauthorized != null ||
+        onNetworkError != null ||
+        onNetworkRestored != null) {
       _instance = ApiClient._internal(
         dio: dio,
         baseUrl: baseUrl,
         secureStorage: secureStorage,
         onUnauthorized: onUnauthorized,
+        onNetworkError: onNetworkError,
+        onNetworkRestored: onNetworkRestored,
       );
       return _instance!;
     }
@@ -72,6 +87,9 @@ class ApiClient {
 
   /// Instance getter tiện lợi
   static ApiClient get instance => ApiClient();
+
+  /// Truy cập AuthInterceptor
+  AuthInterceptor? get authInterceptor => _authInterceptor;
 
   /// Truy cập Dio gốc khi cần các tính năng đặc thù (download file, upload progress...)
   Dio get dio => _dio;

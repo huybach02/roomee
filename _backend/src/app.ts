@@ -7,6 +7,13 @@ import { stopCronJobs } from "./cron/index.js";
 import { Routes } from "./routes.js";
 import { CustomResponse } from "./utils/customResponse.js";
 import { i18nMiddleware } from "./middlewares/i18nMiddleware.js";
+import { AppError } from "./utils/appError.js";
+import { t } from "./utils/i18n.js";
+import {
+  startQueueWorkers,
+  stopQueueWorkers,
+  closeAllQueues,
+} from "./queues/index.js";
 
 interface HttpError extends Error {
   status?: number;
@@ -20,9 +27,28 @@ export class App {
     this.app = express();
     this.port = port;
 
+    this.configureTrustProxy();
     this.initializeMiddlewares();
     this.initializeRoutes();
     this.initializeErrorHandling();
+  }
+
+  private configureTrustProxy(): void {
+    const trustProxy = process.env.TRUST_PROXY;
+    if (trustProxy !== undefined) {
+      if (trustProxy === "true") {
+        this.app.set("trust proxy", true);
+      } else if (trustProxy === "false") {
+        this.app.set("trust proxy", false);
+      } else if (/^\d+$/.test(trustProxy)) {
+        this.app.set("trust proxy", parseInt(trustProxy, 10));
+      } else {
+        this.app.set("trust proxy", trustProxy);
+      }
+    } else {
+      // Mặc định tin cậy 1 hop reverse proxy (như Nginx / Docker / Cloudflare)
+      this.app.set("trust proxy", 1);
+    }
   }
 
   private initializeMiddlewares(): void {
@@ -80,19 +106,34 @@ export class App {
   private initializeErrorHandling(): void {
     // Global Error Handler
     this.app.use(
-      (err: HttpError, req: Request, res: Response, next: NextFunction) => {
-        console.error("Unhandled Error:", err);
+      (err: any, req: Request, res: Response, next: NextFunction) => {
+        // 1. Lỗi nghiệp vụ có chủ đích (AppError)
+        if (err instanceof AppError) {
+          CustomResponse.error(
+            res,
+            err.message,
+            err.errors,
+            err.statusCode,
+          );
+          return;
+        }
+
+        // 2. Lỗi hệ thống / DB không mong muốn (che giấu stack trace và chi tiết SQL)
+        console.error("[Unhandled System Error]:", err);
         CustomResponse.error(
           res,
-          err.message || t("common.internalServerError"),
-          (err as any).errors ?? null,
-          err.status || 500
+          t("common.internalServerError"),
+          null,
+          500,
         );
       }
     );
   }
 
   public listen(): void {
+    // Khởi động toàn bộ BullMQ Queue Workers xử lý tác vụ nền
+    startQueueWorkers();
+
     const server = this.app.listen(this.port, () => {
       console.log(`🚀 Server is running on http://localhost:${this.port}`);
       console.log(`👉 Health check: http://localhost:${this.port}/api/health`);
@@ -102,6 +143,8 @@ export class App {
     const shutdown = async (signal: string) => {
       console.log(`\nReceived ${signal}. Shutting down gracefully...`);
       stopCronJobs();
+      await stopQueueWorkers();
+      await closeAllQueues();
       if (AppDataSource.isInitialized) {
         await AppDataSource.destroy();
         console.log("Database connection closed.");

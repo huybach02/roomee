@@ -297,6 +297,100 @@ void main() {
       expect(refreshCalled, isFalse);
       expect(unauthorizedCalled, isFalse);
     });
+
+    test('prevents infinite retry loop when retried request fails with 401 again', () async {
+      FlutterSecureStorage.setMockInitialValues({
+        'access_token': 'test_token',
+        'refresh_token': 'valid_refresh_token',
+      });
+
+      final refreshDio = Dio();
+      int refreshCallCount = 0;
+      refreshDio.httpClientAdapter = _MockAdapter((options) async {
+        refreshCallCount++;
+        return ResponseBody.fromString(
+          '{"success": true, "data": {"accessToken": "new_token", "refreshToken": "new_refresh"}}',
+          200,
+          headers: {
+            Headers.contentTypeHeader: [Headers.jsonContentType],
+          },
+        );
+      });
+
+      final clientDio = Dio();
+      final interceptor = AuthInterceptor(
+        clientDio: clientDio,
+        refreshDio: refreshDio,
+      );
+      clientDio.interceptors.add(interceptor);
+
+      clientDio.httpClientAdapter = _MockAdapter((options) async {
+        return ResponseBody.fromString(
+          '{"message": "Still Unauthorized"}',
+          401,
+          headers: {
+            Headers.contentTypeHeader: [Headers.jsonContentType],
+          },
+        );
+      });
+
+      try {
+        await clientDio.get(
+          '/forbidden_resource',
+          options: Options(extra: {'retried': true}),
+        );
+      } catch (_) {}
+
+      // Do cờ retried: true, không kích hoạt refresh lần 2
+      expect(refreshCallCount, 0);
+    });
+
+    test('retries immediately without refresh when token in storage is already refreshed', () async {
+      FlutterSecureStorage.setMockInitialValues({
+        'access_token': 'newly_refreshed_token',
+        'refresh_token': 'refresh_token_123',
+      });
+
+      final refreshDio = Dio();
+      int refreshCallCount = 0;
+      refreshDio.httpClientAdapter = _MockAdapter((options) async {
+        refreshCallCount++;
+        return ResponseBody.fromString('OK', 200);
+      });
+
+      final clientDio = Dio();
+      final interceptor = AuthInterceptor(
+        clientDio: clientDio,
+        refreshDio: refreshDio,
+      );
+      clientDio.interceptors.add(interceptor);
+
+      int requestCallCount = 0;
+      String? usedAuthHeader;
+      clientDio.httpClientAdapter = _MockAdapter((options) async {
+        requestCallCount++;
+        usedAuthHeader = options.headers['Authorization'];
+        if (requestCallCount == 1) {
+          return ResponseBody.fromString('{"message": "Old token expired"}', 401, headers: {
+            Headers.contentTypeHeader: [Headers.jsonContentType],
+          });
+        }
+        return ResponseBody.fromString('{"success": true, "data": "ok"}', 200, headers: {
+          Headers.contentTypeHeader: [Headers.jsonContentType],
+        });
+      });
+
+      // Request mang token cũ (stale token)
+      final res = await clientDio.get(
+        '/any_resource',
+        options: Options(headers: {'Authorization': 'Bearer old_stale_token'}),
+      );
+
+      // Không gọi API refresh token vì storage đã có newly_refreshed_token
+      expect(refreshCallCount, 0);
+      expect(res.statusCode, 200);
+      expect(usedAuthHeader, 'Bearer newly_refreshed_token');
+    });
   });
 
   group('BaseService', () {

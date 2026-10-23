@@ -20,6 +20,20 @@ export class RefreshTokenRepository extends Repository<RefreshToken> {
     });
   }
 
+  /**
+   * Tìm phiên theo tokenHash hiện tại HOẶC previousTokenHash để kiểm tra hợp lệ / phát hiện dùng lại token
+   */
+  public async findByCurrentOrPreviousTokenHash(
+    tokenHash: string,
+  ): Promise<RefreshToken | null> {
+    return this.findOne({
+      where: [{ tokenHash }, { previousTokenHash: tokenHash }],
+      relations: {
+        user: true,
+      },
+    });
+  }
+
   public async revokeBySessionId(sessionId: string): Promise<void> {
     await this.update({ id: sessionId }, { isRevoked: true });
   }
@@ -31,8 +45,8 @@ export class RefreshTokenRepository extends Repository<RefreshToken> {
     const qb = this.createQueryBuilder()
       .update(RefreshToken)
       .set({ isRevoked: true })
-      .where("userId = :userId", { userId })
-      .andWhere("isRevoked = false");
+      .where('"userId" = :userId', { userId })
+      .andWhere('"isRevoked" = false');
 
     if (exceptSessionId) {
       qb.andWhere("id != :exceptSessionId", { exceptSessionId });

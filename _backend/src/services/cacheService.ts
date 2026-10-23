@@ -8,8 +8,10 @@ export class CacheService {
 
   /**
    * Lấy dữ liệu theo key.
-   * Ưu tiên đọc từ Redis. Nếu Redis không có hoặc gặp sự cố, fallback xuống database.
-   * Nếu tìm thấy trong database còn hạn, tự động nạp ngược (rehydrate) lên Redis.
+   * Ưu tiên đọc từ Redis.
+   * - Nếu Redis sẵn sàng: Trả về dữ liệu (hoặc null nếu cache miss). Tuyệt đối không fallback xuống DB khi cache miss.
+   * - Chỉ fallback xuống PostgreSQL khi Redis gặp sự cố / không sẵn sàng.
+   * - Nếu tìm thấy trong database còn hạn khi Redis phục hồi, tự động nạp ngược (rehydrate) lên Redis.
    */
   public async get<T = any>(key: string): Promise<T | null> {
     if (!key) return null;
@@ -27,23 +29,16 @@ export class CacheService {
       console.warn(`[CacheService] Redis get failed for "${key}":`, error);
     }
 
-    // Nếu Redis có dữ liệu: Tự động parse nếu là JSON (Object/Array), giữ nguyên nếu là chuỗi
-    if (redisSuccess && redisVal !== null) {
-      const trimmed = redisVal.trim();
-      if (
-        (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
-        (trimmed.startsWith("[") && trimmed.endsWith("]"))
-      ) {
-        try {
-          return JSON.parse(trimmed) as T;
-        } catch {
-          return redisVal as unknown as T;
-        }
+    // Nếu Redis hoạt động bình thường:
+    // Trả về dữ liệu nếu có, hoặc trả về null nếu cache miss (KHÔNG fallback xuống DB khi Redis online)
+    if (redisSuccess) {
+      if (redisVal === null) {
+        return null;
       }
-      return redisVal as unknown as T;
+      return this.parseValue<T>(redisVal);
     }
 
-    // 2. Fallback xuống PostgreSQL nếu Redis miss hoặc Redis lỗi
+    // 2. Chỉ fallback xuống PostgreSQL nếu Redis lỗi hoặc mất kết nối
     const dbRecord = await this.persistRedisRepository.getValidKey(key);
     if (!dbRecord) {
       return null;
@@ -82,6 +77,24 @@ export class CacheService {
   }
 
   /**
+   * Helper parse chuỗi trả về từ Redis (tự động parse JSON nếu là Object/Array)
+   */
+  private parseValue<T>(val: string): T {
+    const trimmed = val.trim();
+    if (
+      (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
+      (trimmed.startsWith("[") && trimmed.endsWith("]"))
+    ) {
+      try {
+        return JSON.parse(trimmed) as T;
+      } catch {
+        return val as unknown as T;
+      }
+    }
+    return val as unknown as T;
+  }
+
+  /**
    * Ghi dữ liệu đồng thời vào Redis và Database
    */
   public async set(
@@ -106,7 +119,14 @@ export class CacheService {
     }
 
     // 2. Ghi vào PostgreSQL (persist_redis)
-    await this.persistRedisRepository.setKey(key, value, ttlSeconds);
+    try {
+      await this.persistRedisRepository.setKey(key, value, ttlSeconds);
+    } catch (error) {
+      console.warn(
+        `[CacheService] DB persist setKey failed for "${key}":`,
+        error,
+      );
+    }
   }
 
   /**
@@ -168,7 +188,11 @@ export class CacheService {
     }
 
     // 2. Xóa trên Database
-    await this.persistRedisRepository.deleteKeys(validKeys);
+    try {
+      await this.persistRedisRepository.deleteKeys(validKeys);
+    } catch (error) {
+      console.warn(`[CacheService] DB persist deleteKeys failed:`, error);
+    }
   }
 
   /**
@@ -177,15 +201,24 @@ export class CacheService {
   public async ttl(key: string): Promise<number> {
     if (!key) return -2;
 
+    let redisSuccess = false;
+    let redisTtl: number | null = null;
+
     try {
       if (redis.status === "ready") {
-        const redisTtl = await redis.ttl(key);
-        if (redisTtl > 0) return redisTtl;
+        redisTtl = await redis.ttl(key);
+        redisSuccess = true;
       }
     } catch (error) {
       console.warn(`[CacheService] Redis ttl failed for "${key}":`, error);
     }
 
+    // Nếu Redis hoạt động bình thường, trả về kết quả trực tiếp (-2, -1, hoặc > 0)
+    if (redisSuccess && redisTtl !== null) {
+      return redisTtl;
+    }
+
+    // Chỉ kiểm tra DB nếu Redis sập hoặc không kết nối được
     const dbRecord = await this.persistRedisRepository.getValidKey(key);
     if (!dbRecord || !dbRecord.expiredAt) return -2;
 
@@ -220,7 +253,16 @@ export class CacheService {
       count = current + 1;
     }
 
-    await this.persistRedisRepository.setKey(key, count, ttlSeconds);
+    try {
+      await this.persistRedisRepository.setKey(key, count, ttlSeconds, {
+        preserveTtl: true,
+      });
+    } catch (error) {
+      console.warn(
+        `[CacheService] DB persist setKey failed for "${key}":`,
+        error,
+      );
+    }
     return count;
   }
 

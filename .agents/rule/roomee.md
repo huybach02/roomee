@@ -23,8 +23,8 @@
 - **Cache/Redis:** ioredis (`^5.11.1`)
 - **Đa ngôn ngữ (i18n):** Tự xây dựng trên `AsyncLocalStorage` (`node:async_hooks`) + JSON dictionaries (`src/locales/vi.json`, `en.json`)
 - **Tooling:** `tsx`, `typescript`
-- **Các package đã cài đặt:** Argon2 (`argon2`), JWT (`jsonwebtoken`), Cron scheduler (`node-cron`).
-- **Các package trong roadmap nhưng CHƯA cài:** Socket.io, BullMQ, Resend, Cloudinary (chỉ cài khi triển khai tính năng tương ứng).
+- **Các package đã cài đặt:** Argon2 (`argon2`), JWT (`jsonwebtoken`), Cron scheduler (`node-cron`), Hàng đợi BullMQ (`bullmq`).
+- **Các package trong roadmap nhưng CHƯA cài:** Socket.io, Resend, Cloudinary (chỉ cài khi triển khai tính năng tương ứng).
 
 **Mobile (`lib/`):**
 - **Framework:** Flutter + Dart (SDK `^3.13.5`)
@@ -76,6 +76,13 @@ _backend/
       <module>Routes.ts          # Express Router đóng gói trong class @injectable()
       <module>Service.ts         # Business logic
       <module>Schema.ts          # Zod schema & DTO types (z.infer)
+    queues/                      # Quản lý Hàng đợi tác vụ nền (BullMQ: Queue & Worker)
+      baseQueue.ts               # Lớp cơ sở trừu tượng cho mọi Queue (tự động retry, backoff)
+      baseWorker.ts              # Lớp cơ sở trừu tượng cho mọi Worker (concurrency, log, lifecycle)
+      <queue_name>/              # Mỗi loại queue gom vào 1 thư mục riêng (<name>Queue.ts, <name>Worker.ts)
+        mailQueue.ts
+        mailWorker.ts
+      index.ts                   # Export startQueueWorkers(), stopQueueWorkers(), closeAllQueues()
     repositories/                # Repository tùy biến kế thừa Repository<Entity>
       userRepository.ts
       refreshTokenRepository.ts  # Truy vấn phiên, thu hồi session theo id hoặc tokenHash
@@ -109,13 +116,26 @@ _backend/
   `this.router.post("/login", validate(loginSchema), this.authController.loginUser);`
 - Dữ liệu sau parse được gán lại vào `req.body`. Nếu lỗi, tự động trả về `400` qua `CustomResponse.error` với danh sách chi tiết các field vi phạm.
 
-### 3.5 Format Response chuẩn
+### 3.5 Format Response chuẩn & Xử lý lỗi (Error Handling)
 - Luôn dùng `CustomResponse` (`src/utils/customResponse.ts`). **Không** tự `res.json(...)` thủ công.
 - **Lưu ý thứ tự tham số:**
   - Thành công: `CustomResponse.success(res, data, message = "Success", statusCode = 200)` *(data là tham số thứ 2, đứng trước message)*.
     Format: `{ success: true, message: string, data: any }`
   - Thất bại: `CustomResponse.error(res, message = "Internal Server Error", errors = null, statusCode = 500)`.
     Format: `{ success: false, message: string, errors: any }`
+- **Quy chuẩn xử lý lỗi nghiệp vụ (`AppError`):**
+  - Mọi lỗi nghiệp vụ tại tầng Service phải sử dụng `AppError` (`src/utils/appError.ts`) kèm mã HTTP chuẩn:
+    - `AppError.badRequest(message)`: `400` (dữ liệu/OTP/token không hợp lệ).
+    - `AppError.unauthorized(message)`: `401` (sai thông tin đăng nhập, token phiên không hợp lệ/hết hạn).
+    - `AppError.forbidden(message)`: `403` (tài khoản bị vô hiệu hóa, không có quyền).
+    - `AppError.notFound(message)`: `404` (không tìm thấy tài nguyên/user).
+    - `AppError.conflict(message)`: `409` (email/tài nguyên đã tồn tại).
+    - `AppError.locked(message)`: `423` (tài khoản bị tạm khóa do nhập sai nhiều lần).
+    - `AppError.tooManyRequests(message)`: `429` (vượt tần suất gửi OTP / rate limit).
+  - Controller bắt lỗi và chuyển giao cho Express qua `next(error)`.
+  - **Global Error Handler** (`src/app.ts`) tự động phân loại:
+    - Nếu là `AppError`: Trả đúng status code và message nghiệp vụ tương ứng.
+    - Nếu là lỗi hệ thống / DB không mong muốn: Ghi log chi tiết trên server (`console.error`), trả về `500` kèm message chung `t("common.internalServerError")`, tuyệt đối **không để lộ chi tiết câu lệnh SQL hay stack trace** ra client.
 
 ### 3.6 Đa ngôn ngữ (i18n Backend)
 - Từ điển lưu tại `src/locales/vi.json` và `src/locales/en.json`.
@@ -138,13 +158,16 @@ _backend/
   - Mọi thao tác ghi (`cacheService.set`, `setNx`, `incr`) đều được ghi đồng thời vào bảng `persist_redis` (PostgreSQL) với `key` (PK), `value` (`jsonb`), `ttl` (giây) và `expiredAt` (timestamp).
 - **Cơ chế Fallback & Auto-Rehydration:**
   - Khi gọi `cacheService.get<T>(key)`: Ưu tiên đọc từ Redis.
-  - Nếu Redis miss (cache miss, hoặc Redis sập/restart mất dữ liệu RAM), tự động fallback xuống truy vấn bảng `persist_redis` (`expiredAt IS NULL OR expiredAt > NOW()`).
-  - Nếu tìm thấy dữ liệu còn hạn trong DB: tự động tính TTL còn lại và nạp ngược lại (**rehydrate**) lên Redis khi Redis online.
+  - **Phân biệt Cache Miss vs Cache Failure:** Nếu Redis đang online và trả về `null` (Cache Miss), `CacheService` trả về `null` ngay lập tức (< 1ms), **tuyệt đối không query xuống Postgres**.
+  - **Chỉ fallback xuống DB khi Redis sập/lỗi kết nối:** Khi Redis xảy ra sự cố không thể kết nối, hệ thống mới truy vấn bảng `persist_redis` (`expiredAt IS NULL OR expiredAt > NOW()`).
+  - Nếu tìm thấy dữ liệu còn hạn trong DB: tự động tính TTL còn lại và nạp ngược lại (**rehydrate**) lên Redis khi Redis online trở lại.
 - **Tự động nhận diện kiểu dữ liệu (JSON vs String):**
   - `cacheService.get<T>(key)` tự động parse thành Object/Array nếu dữ liệu bắt đầu bằng `{` hoặc `[`.
   - Giữ nguyên kiểu chuỗi (`string`) nếu là chuỗi thông thường (OTP, email, token, cờ boolean) để tránh lỗi ép kiểu ngoài ý muốn.
 - **Xóa đồng bộ (`cacheService.del`):**
   - Luôn xóa key ở cả Redis và Database cùng lúc, chống tái sử dụng token hoặc OTP cũ khi có sự cố.
+- **Thao tác đếm tăng dần (`cacheService.incr` - Chống lệch TTL):**
+  - Khi tăng `count > 1`, phương thức `setKey(..., { preserveTtl: true })` chỉ cập nhật cột `value` trên PostgreSQL (`ON CONFLICT ("key") DO UPDATE SET "value" = EXCLUDED."value"`) và giữ nguyên `expiredAt` ban đầu, chống triệt để lỗi cộng dồn thời gian (TTL Drift) giữa Redis và Database.
 - **Dọn dẹp cache hết hạn (Expiration Cleanup):**
   - **In-app Cron (`node-cron`):** Tự động kích hoạt khi server start (`src/cron/`), cấu hình qua `CLEAN_PERSIST_REDIS_CRON` (mặc định chạy 00:00 hàng ngày: `"0 0 * * *"`), có cờ `noOverlap: true`.
   - **CLI Command:** Chạy độc lập qua `src/commands/cleanExpiredRedis.ts` (`npm run clean:redis` / `npm run clean:redis:prod`).
@@ -161,27 +184,52 @@ _backend/
 
 ### 3.10 Authentication & Security
 - **Mật khẩu & Băm:** Bắt buộc băm mật khẩu bằng Argon2 (`argon2.hash`). Khi query kiểm tra mật khẩu trong `AuthService`, dùng `userRepository.findByEmailWithPassword()` do trường `password` có cấu hình `{ select: false }`.
+- **JWT Security & Chuẩn hóa Token:**
+  - `jwt.verify()` bắt buộc chỉ định rõ `{ algorithms: ["HS256"] }` trong `authMiddleware` để triệt tiêu lỗ hổng Algorithm Confusion và None Algorithm Attack.
+  - Response đăng nhập và refresh token chuẩn hóa theo RFC 6749, chỉ sử dụng cặp trường `accessToken` và `refreshToken` (không trả trường `token` trùng lặp).
 - **Cặp Token (Access Token & Refresh Token) & Quản lý Phiên (Session Management):**
   - **Access Token:** Hạn ngắn **15 phút** (`ACCESS_TOKEN_EXPIRES_IN = "15m"`). Payload chứa: `{ sub: user.id, email: user.email, role: user.role, sid: session.id }`.
-  - **Refresh Token:** Hạn **7 ngày** (`REFRESH_TOKEN_EXPIRES_IN_DAYS = 7`, sliding session). Được sinh ngẫu nhiên 64 ký tự hex an toàn, băm mã hóa SHA-256 (`tokenHash`) và lưu trữ trong bảng `refresh_tokens` (đại diện cho phiên đăng nhập theo thiết bị, lưu `deviceInfo`, `ipAddress`, `isRevoked`, `lastActiveAt`).
-  - **Xoay vòng Token (Refresh Token Rotation - RTR):** Mỗi khi gọi `POST /api/v1/auth/refresh-token`, phiên cũ bị đánh dấu `isRevoked = true`, đưa `blacklist:session:{oldSession.id}` vào Redis (TTL 900s), đồng thời tạo phiên mới mang `sid` mới và cấp cặp token mới (Single-Use Token).
+  - **Refresh Token:** Hạn **7 ngày** (`REFRESH_TOKEN_EXPIRES_IN_DAYS = 7`, sliding session). Được sinh ngẫu nhiên 64 ký tự hex an toàn, băm mã hóa SHA-256 (`tokenHash`, đánh `UNIQUE`) và lưu trữ trong bảng `refresh_tokens` (đại diện cho một phiên thiết bị duy nhất, không tạo dòng mới khi refresh).
+  - **Xoay vòng Token (Refresh Token Rotation - RTR) & Giữ nguyên `sid`:**
+    - Mỗi khi gọi `POST /api/v1/auth/refresh-token`, hệ thống **giữ nguyên `sid` (`session.id`)** và cập nhật nguyên tử trên DB: `previousTokenHash = currentTokenHash`, `tokenHash = newTokenHash`, `rotatedAt = NOW()`, gia hạn `expiresAt` thêm 7 ngày.
+    - **Không blacklist `sid` khi refresh:** Các request đang bay dở mang Access Token cũ vẫn hoàn tất bình thường vì `sid` của chúng không bị đưa vào blacklist.
+    - **Phát hiện dùng lại Token (Token Reuse Detection) & Grace Period:**
+      - Nếu token gửi lên khớp với `previousTokenHash` trong vòng **15 giây** (`rotatedAt` Grace Period do mạng lag gửi lại): Cấp lại Access Token hợp lệ mà không khóa phiên.
+      - Nếu gửi lại token cũ sau 15 giây hoặc câu update không thành công: Phát hiện kẻ gian đánh cắp token $\rightarrow$ Lập tức thu hồi toàn bộ phiên của người dùng (`revokeAllUserSessions`) và blacklist `sid` ngay lập tức.
 - **Thu hồi phiên tức thời (Instant Revocation qua Redis):**
-  - Trong `authMiddleware`, ngoài việc kiểm tra `blacklist:token:${token}`, còn kiểm tra nhanh trong Redis `blacklist:session:${decoded.sid}`.
-  - Khi một thiết bị bị đăng xuất từ xa, server chỉ cần đưa session ID đó vào Redis blacklist là thiết bị đó bị chặn đứng ngay lập tức (< 1ms) ở request tiếp theo.
-- **Cơ chế Tạm khóa tài khoản (Account Lockout qua Redis):**
+  - Trong `authMiddleware`, kiểm tra nhanh trong Redis `blacklist:session:${decoded.sid}`.
+  - **Chỉ đưa `sid` vào Redis blacklist khi:** Người dùng chủ động Đăng xuất (`POST /auth/logout`), Admin thu hồi phiên từ xa, hoặc khi phát hiện Token Reuse Attack. Tuyệt đối không blacklist `sid` trong quá trình Refresh Token Rotation thông thường.
+- **Cơ chế Tạm khóa tài khoản (Account Lockout qua Redis - Chống DoS):**
   - Giới hạn: `MAX_LOGIN_ATTEMPTS = 5`.
-  - Khi người dùng đăng nhập sai quá 5 lần, tài khoản bị tạm khóa 15 phút (`LOGIN_LOCKOUT_SECONDS = 900`).
-  - Sử dụng Redis `login:lockout:{email}` (TTL 15p) để chặn trực tiếp từ đầu hàm `login()` mà không tốn CPU chạy Argon2.
-  - Bộ đếm `login:attempts:{email}` được xóa sạch ngay khi đăng nhập đúng.
+  - Khóa theo cặp `email + IP`: `login:lockout:{email}:{ip}` (TTL 15p) và `login:attempts:{email}:{ip}`. Nếu kẻ xấu cố tình spam sai mật khẩu, chỉ có IP của kẻ xấu bị khóa, chủ tài khoản thật từ IP khác vẫn đăng nhập bình thường.
+  - Bộ đếm `login:attempts:{email}:{ip}` được xóa sạch ngay khi đăng nhập đúng mật khẩu.
+  - Khi đặt lại mật khẩu thành công (`resetPassword`), toàn bộ key lockout trên các IP của email đó được xóa sạch (`login:*:{email}:*`).
+- **Chống dò quét tài khoản (User Enumeration Defense):**
+  - Trạng thái tài khoản `isActive` **bắt buộc kiểm tra SAU KHI** đã xác thực đúng mật khẩu qua `argon2.verify()`. Nếu sai mật khẩu, luôn trả về `401 Unauthorized` chung nhằm che giấu sự tồn tại hoặc trạng thái kích hoạt của tài khoản.
+  - Khi đăng nhập vào tài khoản chưa xác thực email (`!user.isEmailVerified`), nếu việc gửi mail OTP thất bại, lập tức xóa `cooldownKey` để người dùng không bị kẹt 60 giây và có thể gửi lại.
 - **Quên mật khẩu (Forgot Password qua OTP + Reset Token):**
   - Bước 1: `POST /auth/forgot-password` -> Gửi mã OTP 6 số qua email (Redis TTL 10p, cooldown 60s, chống user enumeration).
   - Bước 2: `POST /auth/verify-reset-otp` -> Xác thực OTP -> Cấp `resetToken` (UUID, Redis TTL 15p).
-  - Bước 3: `POST /auth/reset-password` -> Đặt mật khẩu mới với `resetToken` (dùng 1 lần duy nhất, cập nhật Argon2, xóa token và giải phóng lockout).
+  - Bước 3: `POST /auth/reset-password` -> Đặt mật khẩu mới với `resetToken` (dùng 1 lần duy nhất, cập nhật Argon2, thu hồi toàn bộ session đang đăng nhập qua `revokeAllUserSessions(user.id)`, xóa token và giải phóng lockout).
 - **Đăng xuất (Logout & Thu hồi Phiên):**
   - Endpoint `POST /auth/logout` bảo vệ bằng `authMiddleware`.
   - Server giải mã JWT, lấy `sid` và thời gian sống còn lại (`exp - now`).
-  - Đánh dấu phiên `isRevoked = true` trong database.
-  - Đưa cả `blacklist:token:{token}` và `blacklist:session:{sid}` vào Redis với TTL tương ứng.
+  - Đánh dấu phiên `isRevoked = true` trong database qua `refreshTokenRepository.revokeBySessionId(sid)`.
+  - Đưa `blacklist:session:{sid}` vào Redis + DB (CacheService) với TTL tương ứng (thời gian sống còn lại của Access Token).
+- **Rate Limiting & Proxy Trust:**
+  - Cấu hình `app.set("trust proxy", ...)` qua biến môi trường `TRUST_PROXY` (mặc định: `1`) để Express nhận diện chính xác `req.ip` khi đứng sau Nginx / Reverse Proxy.
+  - Rate Limiter (`rateLimitMiddleware.ts`) sử dụng `express-rate-limit` theo dõi IP client qua `req.ip` với cấu hình theo từng endpoint (login: 10/phút, register: 10/15p, OTP: 3-10/phút).
+  - Cắt ngắn độ dài đầu vào của `ipAddress` (tối đa 45 ký tự) và `deviceInfo` (tối đa 255 ký tự) ở cả Controller và Service để bảo đảm không bị lỗi DB overflow (500).
+- **Hàng đợi tác vụ nền (BullMQ Queue & Worker Architecture):**
+  - Cấu trúc thư mục tại `src/queues/`: Gom theo từng tính năng (`src/queues/<feature>/`), ví dụ `src/queues/mail/mailQueue.ts` và `mailWorker.ts`.
+  - Mọi Queue kế thừa `BaseQueue<T>` (`src/queues/baseQueue.ts`), tự động có kết nối Redis độc lập (`maxRetriesPerRequest: null`), cơ chế retry 3 lần kèm exponential backoff (2s, 4s, 8s) và tự động dọn dẹp job cũ.
+  - Mọi Worker kế thừa `BaseWorker<T>` (`src/queues/baseWorker.ts`), tự động quản lý concurrency (mặc định 5), log sự kiện job completed/failed/error.
+  - Quản lý vòng đời tập trung qua `src/queues/index.ts` (`startQueueWorkers()`, `stopQueueWorkers()`, `closeAllQueues()`), tích hợp đồng bộ vào `App.listen()` và Graceful Shutdown của Express.
+  - Toàn bộ các luồng gửi OTP (`register`, `forgotPassword`, `resendOtp`, `login` chưa verify) đều đẩy qua `mailQueue.addSendOtpJob()`. Nhờ đó API phản hồi tức thì (< 5ms) và triệt tiêu hoàn toàn nguy cơ tấn công đo thời gian (Timing Attack) ở `forgotPassword`.
+- **Lấy thông tin người dùng hiện tại (Endpoint `GET /api/v1/auth/me`):**
+  - Bảo vệ bằng `authMiddleware`.
+  - Lấy `userId = req.user.sub`, truy vấn DB kèm quan hệ `province`, `ward`, loại bỏ `password` và trả về profile người dùng mới nhất (`role`, `hasContract`, `isActive`,...).
+  - Nếu user không tồn tại hoặc `isActive: false` $\rightarrow$ ném `AppError.forbidden`.
 - **Tài khoản Seed dữ liệu mẫu (Seeder Accounts):**
   - `UserSeeder` cung cấp sẵn 3 tài khoản kiểm thử (mật khẩu chung: `"password"`):
     1. `minhtuan@roomee.vn` — `tenant` (Người thuê), `hasContract: true` (Tự động vào `TenantScreen`).
@@ -284,14 +332,15 @@ test/
 ### 4.4 State Management & Điều hướng
 - Quản lý state theo `flutter_bloc` (`Bloc` cho luồng nghiệp vụ phức tạp, `Cubit` cho state đơn giản).
 - Điều hướng khai báo tập trung tại `lib/core/router/app_router.dart` qua `GoRouter`. Đặt route path trong `AppRoutes`.
-- **Cơ chế điều phối tự động (Wrapper Router Dispatcher):**
+- **Cơ chế điều phối tự động (Wrapper Router Dispatcher) & Stale-While-Revalidate:**
   - Điểm khởi đầu mặc định của ứng dụng (`initialLocation`): **`AppRoutes.wrapper`** (`WrapperScreen`).
-  - Khi mở app hoặc Hot Restart, `WrapperScreen` tự động kiểm tra phiên đăng nhập từ `AuthBloc`:
-    - Nếu `Unauthenticated`: chuyển về `AppRoutes.welcome`.
-    - Nếu `Authenticated`:
-      - `landlord` / `staff` / `admin` -> `AppRoutes.landlord` (`LandlordScreen`).
-      - `tenant` + `hasContract == true` (đã thuê trọ) -> `AppRoutes.tenant` (`TenantScreen`).
-      - `tenant` + `hasContract == false` (chưa thuê trọ) -> `AppRoutes.home` (`HomeScreen`).
+  - Khi mở app hoặc Hot Restart, `AuthBloc` kích hoạt `AuthCheckEvent` theo chiến lược **Stale-While-Revalidate**:
+    - **Bước 1:** Đọc ngay `cachedUser` từ `FlutterSecureStorage` và emit `Authenticated(user: cachedUser)` tức thì (độ trễ 0ms) để UI render mượt mà, không bị màn hình trắng/spinner chờ mạng.
+    - **Bước 2:** Gọi song song `GET /api/v1/auth/me` (`syncUserProfile`) lên server để làm tươi thông tin mới nhất:
+      - Nếu `role` hoặc `hasContract` trên máy chủ đã thay đổi (ví dụ: tenant vừa ký hợp đồng mới $\rightarrow$ `hasContract: true`): Lưu đè `freshUser` vào storage và emit lại `Authenticated(user: freshUser)`. `WrapperScreen` sẽ tự động bắt sự kiện và chuyển tiếp người dùng sang đúng màn hình mới ([TenantScreen](lib/core/screens/tenant_screen.dart)).
+      - Nếu token hết hạn hoặc tài khoản bị khóa (`401`/`403`): emit `Unauthenticated()` và chuyển về `WelcomeScreen`.
+      - Nếu mất mạng (Offline): Giữ nguyên `cachedUser` để người dùng tiếp tục xem dữ liệu offline.
+  - **Tự động làm tươi khi App chuyển từ Background lên Foreground:** `MyApp` (`lib/main.dart`) kế thừa `WidgetsBindingObserver` để lắng nghe `AppLifecycleState.resumed`. Khi người dùng chuyển app sang ứng dụng khác rồi quay lại, app tự động kích hoạt `AuthCheckEvent()` để làm tươi thông tin mới nhất (`hasContract`, `role`, `isActive`) từ server.
   - `WelcomeScreen` cũng tích hợp `BlocListener` kép để chuyển sang `AppRoutes.wrapper` nếu nhận thấy state `Authenticated`.
 - **Cơ chế Refresh Token ngầm & Hàng đợi Retry (Lock & FIFO Retry Queue qua `AuthInterceptor`):**
   - **Lưu trữ bảo mật:** Lưu cả `access_token`, `refresh_token`, `cached_user` và `app_locale` trong `FlutterSecureStorage`.
@@ -300,8 +349,17 @@ test/
     - Request đầu tiên khóa cờ `_isRefreshing = true`, đưa chính nó vào `_retryQueue` và gọi refresh ngầm.
     - Các request tiếp theo khi thấy `_isRefreshing == true` sẽ được đưa vào cuối hàng đợi `_retryQueue` và tạm dừng chờ.
     - Bỏ qua các request 401 không có `Authorization: Bearer` (như đăng nhập sai mật khẩu) hoặc 401 trên chính endpoint `/auth/refresh-token`.
-  - **Replay FIFO:** Khi refresh thành công, lưu cặp token mới vào `FlutterSecureStorage`, giải phóng cờ `_isRefreshing = false`, và lần lượt replay từng request trong `_retryQueue` theo đúng thứ tự FIFO với token mới (`clientDio.fetch(options)`), resolve trực tiếp về đúng caller ban đầu (trong suốt với UI/BLoC).
-  - **Fail-safe:** Nếu refresh thất bại (hết hạn refresh token hoặc bị thu hồi), toàn bộ hàng đợi bị reject và kích hoạt `onUnauthorized?.call()`.
+  - **Replay FIFO & Chốt chặn Vòng lặp Vô hạn (Circuit Breaker):**
+    - **Chốt chặn lặp:** Đầu hàm `onError`, nếu `err.requestOptions.extra['retried'] == true` thì lập tức dừng lại và gọi `handler.next(err)`, đảm bảo mỗi request chỉ được retry tối đa 1 lần duy nhất, tránh nguy cơ lặp vô hạn nếu server vẫn trả về 401.
+    - **Chống Refresh thừa (Fast-path Staleness Check):** So sánh `sent` token với `current` token trong `FlutterSecureStorage`. Nếu `sent != current` (nghĩa là token đã được một request khác refresh trước đó), lập tức gán token mới, đánh dấu `extra['retried'] = true` và fetch lại ngay mà KHÔNG gọi API refresh thừa thãi.
+    - **Replay FIFO:** Khi refresh thành công, lưu cặp token mới vào `FlutterSecureStorage`, giải phóng cờ `_isRefreshing = false`, và lần lượt replay từng request trong `_retryQueue` theo đúng thứ tự FIFO với token mới và cờ `options.extra['retried'] = true` (`clientDio.fetch(options)`), resolve trực tiếp về đúng caller ban đầu (trong suốt với UI/BLoC).
+  - **Fail-safe:** Nếu refresh thất bại do lỗi danh tính (401/403), toàn bộ hàng đợi bị reject và kích hoạt `onUnauthorized?.call()`.
+  - **Xử lý Lỗi Môi trường (Transient Failure) & Màn hình NoInternetScreen:**
+    - Khi quá trình refresh token gặp lỗi:
+      - **Lỗi danh tính (401 / 403 / mất refresh token trong storage):** Hết hạn phiên thực sự $\rightarrow$ Reject hàng đợi và kích hoạt `onUnauthorized?.call()` để tự động đăng xuất.
+      - **Lỗi môi trường (Mất mạng, Timeout, Server 5xx):** Tuyệt đối **KHÔNG** gọi `onUnauthorized`. Giữ nguyên `_retryQueue`, kích hoạt Timer 10 phút giải phóng bộ nhớ nếu không tương tác, đồng thời hiển thị `NoInternetScreen.show(context)` (`PopScope(canPop: false)` chặn nút back/cử chỉ vuốt để bảo vệ BLoC bên dưới không bị `close()`).
+    - Nút **"Thử lại"** trên `NoInternetScreen`: Đặt `isLoading = true`, ping `/api/health` để kiểm tra kết nối Internet thực tế. Nếu thành công: Gọi `retryPendingQueue()` để replay toàn bộ request dang dở, đóng `NoInternetScreen` và hiển thị `AppNotification.showSuccess`. Nếu vẫn mất mạng: hiển thị `AppNotification.showWarning`.
+    - **Lộ trình Offline Mode:** Thiết kế này hoàn toàn độc lập; khi sau này triển khai Offline Mode (Local DB + SyncManager), chỉ cần gỡ bỏ `NoInternetScreen` hoặc thay bằng thanh banner nhỏ trên cùng mà không làm ảnh hưởng tới core network logic.
 - **Quy trình Đăng xuất & Tự động Đăng xuất (Logout & Auto-Logout):**
   - Khi người dùng đăng xuất thủ công: gửi yêu cầu `POST /auth/logout` lên server (thu hồi session trong DB và đưa vào Redis blacklist), đồng thời luôn xóa sạch cả `access_token`, `refresh_token` và `cached_user` trong `FlutterSecureStorage` (kể cả khi offline) rồi chuyển về `AppRoutes.welcome`.
   - **Tự động Đăng xuất khi 401 Unauthorized:** `AuthInterceptor` liên kết với `AuthBloc` thông qua callback `onUnauthorized` tại `main.dart`. Khi Refresh Token bị từ chối hoặc hết hạn, ứng dụng tự động phát sinh `AuthLogoutEvent()` để dọn dẹp phiên và chuyển người dùng về màn hình chào mừng.

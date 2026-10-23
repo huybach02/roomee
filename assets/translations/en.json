@@ -50,7 +50,11 @@
     "internalServerError": "Internal server error. Please try again later.",
     "requestCancelled": "Request to server was cancelled.",
     "badCertificate": "Invalid server security certificate.",
-    "unexpected": "An unexpected error occurred. Please try again."
+    "unexpected": "An unexpected error occurred. Please try again.",
+    "noInternetTitle": "No Internet Connection",
+    "noInternetMessage": "Cannot connect to server. Please check your WiFi or mobile data connection.",
+    "stillNoInternet": "Still cannot connect to server. Please check your network!",
+    "connectionRestored": "Internet connection restored successfully!"
   },
   "welcomeTitle": "Welcome to Roomee",
   "welcomeSubtitle": "Convenient & effective rental management solution",
