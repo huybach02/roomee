@@ -89,7 +89,8 @@ class _FakeAuthRepo implements IAuthRepository {
   Future<void> resendOtp(String email) async {}
 
   @override
-  Future<void> verifyOtp({required String email, required String otp}) async {}
+  Future<AuthData> verifyOtp({required String email, required String otp}) async =>
+      const AuthData(token: 'fake_tok', code: null);
 
   @override
   Future<void> forgotPassword(String email) async {}
@@ -102,10 +103,11 @@ class _FakeAuthRepo implements IAuthRepository {
       'fake_reset_token';
 
   @override
-  Future<void> resetPassword({
+  Future<AuthData> resetPassword({
     required String resetToken,
     required String newPassword,
-  }) async {}
+  }) async =>
+      const AuthData(token: 'fake_tok', code: null);
 }
 
 void main() {

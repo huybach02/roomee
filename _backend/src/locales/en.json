@@ -28,7 +28,7 @@
     "accountLocked": "Account is temporarily locked due to too many failed attempts. Please try again in {minutes} minutes.",
     "invalidCredentialsWithAttempts": "Incorrect email or password. You have {remaining} attempt(s) left before account lockout.",
     "forgotPasswordSent": "A verification code has been sent to your email (if account exists).",
-    "resetPasswordSuccess": "Password has been reset successfully. Please log in again.",
+    "resetPasswordSuccess": "Password has been reset successfully.",
     "invalidResetToken": "Password reset session is invalid or has expired. Please try again.",
     "invalidRefreshToken": "Session is invalid or has expired. Please log in again.",
     "refreshTokenSuccess": "Session refreshed successfully."

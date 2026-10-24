@@ -251,7 +251,7 @@ void main() {
       expect(requestedData, {'email': 'test@roomee.vn'});
     });
 
-    test('verifyOtp sends post request to /auth/verify-otp', () async {
+    test('verifyOtp sends post request to /auth/verify-otp and persists session', () async {
       String? requestedPath;
       Map<String, dynamic>? requestedData;
 
@@ -267,7 +267,14 @@ void main() {
                 data: {
                   'success': true,
                   'message': 'Thành công',
-                  'data': null,
+                  'data': {
+                    'token': 'verified_jwt_token',
+                    'refreshToken': 'verified_refresh_token',
+                    'user': {
+                      'id': 'usr_300',
+                      'email': 'test@roomee.vn',
+                    },
+                  },
                 },
               ),
             );
@@ -275,10 +282,59 @@ void main() {
         ),
       );
 
-      await repository.verifyOtp(email: 'test@roomee.vn', otp: '123456');
+      final authData = await repository.verifyOtp(email: 'test@roomee.vn', otp: '123456');
 
       expect(requestedPath, '/auth/verify-otp');
       expect(requestedData, {'email': 'test@roomee.vn', 'otp': '123456'});
+      expect(authData.token, 'verified_jwt_token');
+      expect(await localDataSource.getToken(), 'verified_jwt_token');
+      expect(await localDataSource.getRefreshToken(), 'verified_refresh_token');
+    });
+
+    test('resetPassword sends post request to /auth/reset-password and persists session', () async {
+      String? requestedPath;
+      Map<String, dynamic>? requestedData;
+
+      testDio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            requestedPath = options.path;
+            requestedData = options.data as Map<String, dynamic>?;
+            return handler.resolve(
+              Response(
+                requestOptions: options,
+                statusCode: 200,
+                data: {
+                  'success': true,
+                  'message': 'Thành công',
+                  'data': {
+                    'token': 'reset_jwt_token',
+                    'refreshToken': 'reset_refresh_token',
+                    'user': {
+                      'id': 'usr_400',
+                      'email': 'reset@roomee.vn',
+                    },
+                  },
+                },
+              ),
+            );
+          },
+        ),
+      );
+
+      final authData = await repository.resetPassword(
+        resetToken: 'test_token',
+        newPassword: 'new_pass_123',
+      );
+
+      expect(requestedPath, '/auth/reset-password');
+      expect(requestedData, {
+        'token': 'test_token',
+        'newPassword': 'new_pass_123',
+      });
+      expect(authData.token, 'reset_jwt_token');
+      expect(await localDataSource.getToken(), 'reset_jwt_token');
+      expect(await localDataSource.getRefreshToken(), 'reset_refresh_token');
     });
 
     test('refreshToken calls /auth/refresh-token and updates tokens', () async {

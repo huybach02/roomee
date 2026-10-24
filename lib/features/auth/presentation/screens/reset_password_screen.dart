@@ -76,12 +76,18 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       body: BlocConsumer<AuthBloc, AuthState>(
         listenWhen: (previous, current) => previous is AuthLoading,
         listener: (context, state) {
-          if (state is AuthResetPasswordSuccess) {
+          if (state is Authenticated) {
             AppNotification.showSuccess(
               context,
               t('resetPasswordSuccessMessage'),
             );
-            context.go(AppRoutes.login);
+            context.go(AppRoutes.wrapper);
+          } else if (state is AuthResetPasswordSuccess) {
+            AppNotification.showSuccess(
+              context,
+              t('resetPasswordSuccessMessage'),
+            );
+            context.go(AppRoutes.wrapper);
           } else if (state is AuthFailure) {
             AppNotification.showError(context, state.message);
           }

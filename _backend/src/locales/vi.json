@@ -28,7 +28,7 @@
     "accountLocked": "Tài khoản tạm thời bị khóa do nhập sai nhiều lần. Vui lòng thử lại sau {minutes} phút.",
     "invalidCredentialsWithAttempts": "Email hoặc mật khẩu không chính xác. Bạn còn {remaining} lần thử trước khi tài khoản bị khóa.",
     "forgotPasswordSent": "Mã xác thực đã được gửi về email của bạn (nếu tài khoản tồn tại).",
-    "resetPasswordSuccess": "Đặt lại mật khẩu thành công. Vui lòng đăng nhập lại.",
+    "resetPasswordSuccess": "Đặt lại mật khẩu thành công.",
     "invalidResetToken": "Phiên đặt lại mật khẩu không hợp lệ hoặc đã hết hạn. Vui lòng thực hiện lại.",
     "invalidRefreshToken": "Phiên đăng nhập không hợp lệ hoặc đã hết hạn. Vui lòng đăng nhập lại.",
     "refreshTokenSuccess": "Làm mới phiên đăng nhập thành công."

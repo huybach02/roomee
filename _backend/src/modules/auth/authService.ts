@@ -136,19 +136,93 @@ export class AuthService {
     });
   }
 
-  public async verifyOtp(email: string, otp: string): Promise<void> {
+  public async verifyOtp(
+    email: string,
+    otp: string,
+    deviceInfo?: string,
+    ipAddress?: string,
+  ): Promise<{
+    user: User;
+    accessToken: string;
+    refreshToken: string;
+  }> {
     const isOtpValid = await this.otpService.verifyOtp(email, otp, "register");
     if (!isOtpValid) {
       throw AppError.badRequest(t("auth.invalidOtp"));
     }
 
-    const user = await this.userRepository.findOneBy({ email });
+    const user = await this.userRepository.findOne({
+      where: { email },
+      relations: {
+        province: true,
+        ward: true,
+      },
+    });
     if (!user) {
       throw AppError.notFound(t("auth.userNotFound"));
     }
 
+    if (!user.isActive) {
+      throw AppError.forbidden(t("auth.accountInactive"));
+    }
+
     user.isEmailVerified = true;
     await this.userRepository.save(user);
+
+    return this.createSessionAndTokens(user, deviceInfo, ipAddress);
+  }
+
+  private async createSessionAndTokens(
+    user: User,
+    deviceInfo?: string,
+    ipAddress?: string,
+  ): Promise<{
+    user: User;
+    accessToken: string;
+    refreshToken: string;
+  }> {
+    // Sinh Refresh Token (64 ký tự hex ngẫu nhiên) và lưu bản ghi phiên
+    const rawRefreshToken = crypto.randomBytes(32).toString("hex");
+    const tokenHash = crypto
+      .createHash("sha256")
+      .update(rawRefreshToken)
+      .digest("hex");
+    const expiresAt = new Date(
+      Date.now() + REFRESH_TOKEN_EXPIRES_IN_DAYS * 24 * 60 * 60 * 1000,
+    );
+
+    const session = this.refreshTokenRepository.create({
+      userId: user.id,
+      tokenHash,
+      deviceInfo: deviceInfo ? deviceInfo.slice(0, 255) : null,
+      ipAddress: ipAddress ? ipAddress.slice(0, 45) : null,
+      expiresAt,
+      isRevoked: false,
+    });
+    const savedSession = await this.refreshTokenRepository.save(session);
+
+    // Sinh Access Token ngắn hạn mang sid (Session ID)
+    const accessToken = jwt.sign(
+      {
+        sub: user.id,
+        email: user.email,
+        role: user.role,
+        sid: savedSession.id,
+      },
+      this.jwtSecret,
+      {
+        expiresIn: ACCESS_TOKEN_EXPIRES_IN,
+        algorithm: JWT_ALGORITHM,
+      },
+    );
+
+    const { password: _, ...userWithoutPassword } = user;
+
+    return {
+      user: userWithoutPassword as User,
+      accessToken,
+      refreshToken: rawRefreshToken,
+    };
   }
 
   public async login(
@@ -249,46 +323,8 @@ export class AuthService {
       };
     }
 
-    // Sinh Refresh Token (64 ký tự hex ngẫu nhiên) và lưu bản ghi phiên
-    const rawRefreshToken = crypto.randomBytes(32).toString("hex");
-    const tokenHash = crypto
-      .createHash("sha256")
-      .update(rawRefreshToken)
-      .digest("hex");
-    const expiresAt = new Date(
-      Date.now() + REFRESH_TOKEN_EXPIRES_IN_DAYS * 24 * 60 * 60 * 1000,
-    );
-
-    const session = this.refreshTokenRepository.create({
-      userId: user.id,
-      tokenHash,
-      deviceInfo: deviceInfo ? deviceInfo.slice(0, 255) : null,
-      ipAddress: ipAddress ? ipAddress.slice(0, 45) : null,
-      expiresAt,
-      isRevoked: false,
-    });
-    const savedSession = await this.refreshTokenRepository.save(session);
-
-    // Sinh Access Token ngắn hạn mang sid (Session ID)
-    const accessToken = jwt.sign(
-      {
-        sub: user.id,
-        email: user.email,
-        role: user.role,
-        sid: savedSession.id,
-      },
-      this.jwtSecret,
-      {
-        expiresIn: ACCESS_TOKEN_EXPIRES_IN,
-        algorithm: JWT_ALGORITHM,
-      },
-    );
-
-    return {
-      user: userWithoutPassword as User,
-      accessToken,
-      refreshToken: rawRefreshToken,
-    };
+    // Sinh phiên đăng nhập và cặp Token
+    return this.createSessionAndTokens(user, deviceInfo, ipAddress);
   }
 
   public async forgotPassword(email: string): Promise<void> {
@@ -366,7 +402,13 @@ export class AuthService {
   public async resetPassword(
     resetToken: string,
     newPassword: string,
-  ): Promise<void> {
+    deviceInfo?: string,
+    ipAddress?: string,
+  ): Promise<{
+    user: User;
+    accessToken: string;
+    refreshToken: string;
+  }> {
     // 1. Lấy email từ token trong Redis (fallback DB)
     const tokenKey = `password_reset_token:${resetToken}`;
     const email = await this.cacheService.get<string>(tokenKey);
@@ -375,9 +417,19 @@ export class AuthService {
     }
 
     // 2. Tìm user
-    const user = await this.userRepository.findOneBy({ email });
+    const user = await this.userRepository.findOne({
+      where: { email },
+      relations: {
+        province: true,
+        ward: true,
+      },
+    });
     if (!user) {
       throw AppError.notFound(t("auth.userNotFound"));
+    }
+
+    if (!user.isActive) {
+      throw AppError.forbidden(t("auth.accountInactive"));
     }
 
     // 3. Băm mật khẩu mới bằng Argon2 & lưu DB
@@ -405,6 +457,9 @@ export class AuthService {
         error,
       );
     }
+
+    // 7. Tự động sinh phiên đăng nhập mới và trả về Token cho thiết bị vừa đổi mật khẩu
+    return this.createSessionAndTokens(user, deviceInfo, ipAddress);
   }
 
   public async getProfile(userId: number): Promise<User> {

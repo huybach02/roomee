@@ -57,7 +57,7 @@
     "connectionRestored": "Đã khôi phục kết nối Internet thành công!"
   },
   "welcomeTitle": "Chào mừng bạn đến với Roomee",
-  "welcomeSubtitle": "Giải pháp quản lý phòng trọ tiện lợi & hiệu quả",
+  "welcomeSubtitle": "Giải pháp tìm kiếm, quản lý phòng trọ tiện lợi & hiệu quả",
   "register": "Đăng ký",
   "login": "Đăng nhập",
   "languageVietnamese": "Tiếng Việt",
@@ -99,7 +99,7 @@
   "resetPasswordSubtitle": "Tạo mật khẩu mới cho tài khoản của bạn",
   "savePassword": "Lưu mật khẩu mới",
   "forgotPasswordSentMessage": "Mã xác thực đã được gửi về email của bạn (nếu tài khoản tồn tại).",
-  "resetPasswordSuccessMessage": "Đặt lại mật khẩu thành công! Vui lòng đăng nhập lại.",
+  "resetPasswordSuccessMessage": "Đặt lại mật khẩu thành công!",
   "tenantDashboardTitle": "Quản lý phòng thuê",
   "tenantDashboardSubtitle": "Dashboard quản lý dành cho người thuê trọ",
   "landlordDashboardTitle": "Quản lý nhà trọ",

@@ -101,10 +101,16 @@ class _FakeAuthRepository implements IAuthRepository {
   }
 
   @override
-  Future<void> verifyOtp({required String email, required String otp}) async {
+  Future<AuthData> verifyOtp({required String email, required String otp}) async {
     if (errorToThrow != null) throw errorToThrow!;
     lastVerifiedEmail = email;
     lastVerifiedOtp = otp;
+    return const AuthData(
+      token: 'verified_token',
+      refreshToken: 'verified_refresh_token',
+      user: UserModel(id: '1', email: 'test@roomee.vn'),
+      code: null,
+    );
   }
 
   String? lastForgotPasswordEmail;
@@ -127,13 +133,19 @@ class _FakeAuthRepository implements IAuthRepository {
   }
 
   @override
-  Future<void> resetPassword({
+  Future<AuthData> resetPassword({
     required String resetToken,
     required String newPassword,
   }) async {
     if (errorToThrow != null) throw errorToThrow!;
     lastResetToken = resetToken;
     lastNewPassword = newPassword;
+    return const AuthData(
+      token: 'reset_token_access',
+      refreshToken: 'reset_token_refresh',
+      user: UserModel(id: '1', email: 'reset@roomee.vn'),
+      code: null,
+    );
   }
 }
 
@@ -414,10 +426,17 @@ void main() {
   });
 
   group('AuthVerifyOtpEvent', () {
-    test('emits [AuthLoading, AuthOtpVerified] on successful verification', () async {
+    test('emits [AuthLoading, Authenticated] on successful verification', () async {
       expectLater(
         authBloc.stream,
-        emitsInOrder([const AuthLoading(), const AuthOtpVerified()]),
+        emitsInOrder([
+          const AuthLoading(),
+          const Authenticated(
+            user: UserModel(id: '1', email: 'test@roomee.vn'),
+            token: 'verified_token',
+            refreshToken: 'verified_refresh_token',
+          ),
+        ]),
       );
 
       authBloc.add(
@@ -515,12 +534,16 @@ void main() {
   });
 
   group('AuthResetPasswordEvent', () {
-    test('emits [AuthLoading, AuthResetPasswordSuccess] on success', () async {
+    test('emits [AuthLoading, Authenticated] on success', () async {
       expectLater(
         authBloc.stream,
         emitsInOrder([
           const AuthLoading(),
-          const AuthResetPasswordSuccess(),
+          const Authenticated(
+            user: UserModel(id: '1', email: 'reset@roomee.vn'),
+            token: 'reset_token_access',
+            refreshToken: 'reset_token_refresh',
+          ),
         ]),
       );
 

@@ -10,11 +10,11 @@ abstract class IAuthRepository {
   Future<AuthData> register(RegisterRequest request);
 
   Future<void> resendOtp(String email);
-  Future<void> verifyOtp({required String email, required String otp});
+  Future<AuthData> verifyOtp({required String email, required String otp});
 
   Future<void> forgotPassword(String email);
   Future<String> verifyResetOtp({required String email, required String otp});
-  Future<void> resetPassword({
+  Future<AuthData> resetPassword({
     required String resetToken,
     required String newPassword,
   });
@@ -38,15 +38,7 @@ class AuthRepository implements IAuthRepository {
   })  : _remoteDataSource = remoteDataSource ?? AuthRemoteDataSource(),
         _localDataSource = localDataSource ?? AuthLocalDataSource();
 
-  @override
-  Future<AuthData> login(LoginRequest request) async {
-    final response = await _remoteDataSource.login(request);
-
-    final authData = response.data;
-    if (authData == null) {
-      throw const ServerException(message: 'Phản hồi không hợp lệ từ máy chủ.');
-    }
-
+  Future<void> _saveAuthSession(AuthData authData) async {
     if (authData.token.isNotEmpty) {
       await _localDataSource.saveToken(authData.token);
     }
@@ -56,6 +48,18 @@ class AuthRepository implements IAuthRepository {
     if (authData.user != null) {
       await _localDataSource.saveUser(authData.user!);
     }
+  }
+
+  @override
+  Future<AuthData> login(LoginRequest request) async {
+    final response = await _remoteDataSource.login(request);
+
+    final authData = response.data;
+    if (authData == null) {
+      throw const ServerException(message: 'Phản hồi không hợp lệ từ máy chủ.');
+    }
+
+    await _saveAuthSession(authData);
 
     return authData;
   }
@@ -69,15 +73,7 @@ class AuthRepository implements IAuthRepository {
       throw const ServerException(message: 'Phản hồi không hợp lệ từ máy chủ.');
     }
 
-    if (authData.token.isNotEmpty) {
-      await _localDataSource.saveToken(authData.token);
-    }
-    if (authData.refreshToken != null && authData.refreshToken!.isNotEmpty) {
-      await _localDataSource.saveRefreshToken(authData.refreshToken!);
-    }
-    if (authData.user != null) {
-      await _localDataSource.saveUser(authData.user!);
-    }
+    await _saveAuthSession(authData);
 
     return authData;
   }
@@ -88,8 +84,19 @@ class AuthRepository implements IAuthRepository {
   }
 
   @override
-  Future<void> verifyOtp({required String email, required String otp}) async {
-    await _remoteDataSource.verifyOtp(email: email, otp: otp);
+  Future<AuthData> verifyOtp({
+    required String email,
+    required String otp,
+  }) async {
+    final response = await _remoteDataSource.verifyOtp(email: email, otp: otp);
+    final authData = response.data;
+    if (authData == null) {
+      throw const ServerException(message: 'Phản hồi không hợp lệ từ máy chủ.');
+    }
+
+    await _saveAuthSession(authData);
+
+    return authData;
   }
 
   @override
@@ -114,14 +121,22 @@ class AuthRepository implements IAuthRepository {
   }
 
   @override
-  Future<void> resetPassword({
+  Future<AuthData> resetPassword({
     required String resetToken,
     required String newPassword,
   }) async {
-    await _remoteDataSource.resetPassword(
+    final response = await _remoteDataSource.resetPassword(
       token: resetToken,
       newPassword: newPassword,
     );
+    final authData = response.data;
+    if (authData == null) {
+      throw const ServerException(message: 'Phản hồi không hợp lệ từ máy chủ.');
+    }
+
+    await _saveAuthSession(authData);
+
+    return authData;
   }
 
   @override

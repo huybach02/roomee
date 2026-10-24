@@ -76,9 +76,18 @@ export class AuthController {
     next: NextFunction,
   ): Promise<void> => {
     const { email, otp } = req.body as { email: string; otp: string };
+    const userAgent = req.headers["user-agent"];
+    const deviceInfo =
+      typeof userAgent === "string" ? userAgent.slice(0, 255) : null;
+    const ipAddress = req.ip ? req.ip.slice(0, 45) : null;
 
     try {
-      const result = await this.authService.verifyOtp(email, otp);
+      const result = await this.authService.verifyOtp(
+        email,
+        otp,
+        deviceInfo ?? undefined,
+        ipAddress ?? undefined,
+      );
       CustomResponse.success(res, result, t("common.success"), 200);
     } catch (error) {
       next(error);
@@ -121,10 +130,19 @@ export class AuthController {
     next: NextFunction,
   ): Promise<void> => {
     const { token, newPassword } = req.body as ResetPasswordDto;
+    const userAgent = req.headers["user-agent"];
+    const deviceInfo =
+      typeof userAgent === "string" ? userAgent.slice(0, 255) : null;
+    const ipAddress = req.ip ? req.ip.slice(0, 45) : null;
 
     try {
-      await this.authService.resetPassword(token, newPassword);
-      CustomResponse.success(res, null, t("auth.resetPasswordSuccess"), 200);
+      const result = await this.authService.resetPassword(
+        token,
+        newPassword,
+        deviceInfo ?? undefined,
+        ipAddress ?? undefined,
+      );
+      CustomResponse.success(res, result, t("auth.resetPasswordSuccess"), 200);
     } catch (error) {
       next(error);
     }

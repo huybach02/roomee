@@ -96,9 +96,9 @@ void main() {
     );
 
     // Verify welcome greeting text is displayed
-    expect(find.text('Chào mừng bạn đến với Roomee'), findsOneWidget);
+    expect(find.text(t('welcomeTitle')), findsOneWidget);
     expect(
-      find.text('Giải pháp quản lý phòng trọ tiện lợi & hiệu quả'),
+      find.text(t('welcomeSubtitle')),
       findsOneWidget,
     );
 

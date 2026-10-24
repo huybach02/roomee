@@ -157,8 +157,17 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     emit(const AuthLoading());
     try {
-      await _authRepository.verifyOtp(email: event.email, otp: event.otp);
-      emit(const AuthOtpVerified());
+      final authData = await _authRepository.verifyOtp(
+        email: event.email,
+        otp: event.otp,
+      );
+      emit(
+        Authenticated(
+          user: authData.user,
+          token: authData.token,
+          refreshToken: authData.refreshToken,
+        ),
+      );
     } on ApiException catch (e) {
       emit(
         AuthFailure(
@@ -244,11 +253,17 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     emit(const AuthLoading());
     try {
-      await _authRepository.resetPassword(
+      final authData = await _authRepository.resetPassword(
         resetToken: event.resetToken,
         newPassword: event.newPassword,
       );
-      emit(const AuthResetPasswordSuccess());
+      emit(
+        Authenticated(
+          user: authData.user,
+          token: authData.token,
+          refreshToken: authData.refreshToken,
+        ),
+      );
     } on ApiException catch (e) {
       emit(
         AuthFailure(

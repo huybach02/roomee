@@ -436,9 +436,12 @@ class _OtpScreenState extends State<OtpScreen> {
       return BlocConsumer<AuthBloc, AuthState>(
         bloc: authBloc,
         listener: (context, state) {
-          if (state is AuthOtpVerified) {
+          if (state is Authenticated) {
             AppNotification.showSuccess(context, t('otpVerifiedSuccess'));
-            context.go(AppRoutes.login);
+            context.go(AppRoutes.wrapper);
+          } else if (state is AuthOtpVerified) {
+            AppNotification.showSuccess(context, t('otpVerifiedSuccess'));
+            context.go(AppRoutes.wrapper);
           } else if (state is AuthResetOtpVerified) {
             context.pushReplacement(
               AppRoutes.resetPassword,

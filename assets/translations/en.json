@@ -57,7 +57,7 @@
     "connectionRestored": "Internet connection restored successfully!"
   },
   "welcomeTitle": "Welcome to Roomee",
-  "welcomeSubtitle": "Convenient & effective rental management solution",
+  "welcomeSubtitle": "A convenient and effective solution for finding and managing rental housing",
   "register": "Register",
   "login": "Log in",
   "languageVietnamese": "Tiếng Việt",
@@ -99,7 +99,7 @@
   "resetPasswordSubtitle": "Create a new password for your account",
   "savePassword": "Save new password",
   "forgotPasswordSentMessage": "A verification code has been sent to your email (if account exists).",
-  "resetPasswordSuccessMessage": "Password reset successfully! Please log in again.",
+  "resetPasswordSuccessMessage": "Password reset successfully!",
   "tenantDashboardTitle": "Rental Management",
   "tenantDashboardSubtitle": "Dashboard for tenants with active contracts",
   "landlordDashboardTitle": "Property Management",

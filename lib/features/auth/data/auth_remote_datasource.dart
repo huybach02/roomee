@@ -35,13 +35,14 @@ class AuthRemoteDataSource extends BaseService {
     );
   }
 
-  Future<ApiResponse<dynamic>> verifyOtp({
+  Future<ApiResponse<AuthData>> verifyOtp({
     required String email,
     required String otp,
   }) {
-    return postData<dynamic>(
+    return postData<AuthData>(
       '/auth/verify-otp',
       data: {'email': email, 'otp': otp},
+      fromJsonT: (json) => AuthData.fromJson(json as Map<String, dynamic>),
     );
   }
 
@@ -64,13 +65,14 @@ class AuthRemoteDataSource extends BaseService {
     );
   }
 
-  Future<ApiResponse<dynamic>> resetPassword({
+  Future<ApiResponse<AuthData>> resetPassword({
     required String token,
     required String newPassword,
   }) {
-    return postData<dynamic>(
+    return postData<AuthData>(
       '/auth/reset-password',
       data: {'token': token, 'newPassword': newPassword},
+      fromJsonT: (json) => AuthData.fromJson(json as Map<String, dynamic>),
     );
   }
 
