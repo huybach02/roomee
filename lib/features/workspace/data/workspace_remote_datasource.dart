@@ -4,24 +4,38 @@ import 'package:roomee/core/network/network.dart';
 class WorkspaceRemoteDataSource extends BaseService {
   WorkspaceRemoteDataSource({super.client});
 
-  Future<ApiResponse<List<WorkspaceModel>>> getWorkspaces({
+  Future<ApiResponse<PaginationModel<WorkspaceModel>>> getWorkspaces({
     Map<String, dynamic>? queryParameters,
   }) {
-    return getDataAll<List<WorkspaceModel>>(
+    return getDataAll<PaginationModel<WorkspaceModel>>(
       '/workspaces',
       queryParameters: queryParameters,
       fromJsonT: (json) {
-        if (json is Map<String, dynamic> && json['data'] is List) {
-          return (json['data'] as List)
-              .map((e) => WorkspaceModel.fromJson(e as Map<String, dynamic>))
-              .toList();
+        if (json is Map<String, dynamic>) {
+          return PaginationModel.fromJson(
+            json,
+            (item) => WorkspaceModel.fromJson(item as Map<String, dynamic>),
+          );
         }
         if (json is List) {
-          return json
+          final list = json
               .map((e) => WorkspaceModel.fromJson(e as Map<String, dynamic>))
               .toList();
+          return PaginationModel<WorkspaceModel>(
+            data: list,
+            total: list.length,
+            page: 1,
+            limit: list.length,
+            totalPages: 1,
+          );
         }
-        return <WorkspaceModel>[];
+        return const PaginationModel<WorkspaceModel>(
+          data: [],
+          total: 0,
+          page: 1,
+          limit: 20,
+          totalPages: 1,
+        );
       },
     );
   }

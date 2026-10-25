@@ -82,7 +82,9 @@
     "saveChanges": "Save Changes",
     "editSuccess": "Updated successfully!",
     "deleteButton": "Delete",
-    "deleteSuccess": "Deleted successfully!"
+    "deleteSuccess": "Deleted successfully!",
+    "totalRecords": "Total: {count} records",
+    "showOf": "Showing {count} / {total} records"
   },
   "welcomeTitle": "Welcome to Roomee",
   "welcomeSubtitle": "A convenient and effective solution for finding and managing rental housing",
@@ -180,5 +182,21 @@
   "contactInfo": "Contact Information",
   "systemInfo": "System Information",
   "createdAtLabel": "Created at",
-  "updatedAtLabel": "Last updated"
+  "updatedAtLabel": "Last updated",
+  "filterTitle": "Filter & Sort",
+  "filterReset": "Reset",
+  "filterApply": "Apply",
+  "filterAll": "All",
+  "sortBy": "Sort by",
+  "sortByScale": "Sort by scale",
+  "sortNewest": "Newest",
+  "sortOldest": "Oldest",
+  "sortNameAZ": "Name A-Z",
+  "sortNameZA": "Name Z-A",
+  "sortAreaAsc": "Area: Low to High",
+  "sortAreaDesc": "Area: High to Low",
+  "sortRoomsAsc": "Rooms: Low to High",
+  "sortRoomsDesc": "Rooms: High to Low",
+  "filterActiveCount": "{count} filters",
+  "searchHintGeneric": "Search..."
 }

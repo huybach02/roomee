@@ -82,7 +82,9 @@
     "editedSuccess": "Cập nhật thành công!",
     "saveChanges": "Lưu thay đổi",
     "deleteButton": "Xóa",
-    "deletedSuccess": "Xóa thành công!"
+    "deletedSuccess": "Xóa thành công!",
+    "totalRecords": "Tổng cộng: {count} bản ghi",
+    "showOf": "Hiển thị {count} / {total} bản ghi"
   },
   "welcomeTitle": "Chào mừng bạn đến với Roomee",
   "welcomeSubtitle": "Giải pháp tìm kiếm, quản lý phòng trọ tiện lợi & hiệu quả",
@@ -180,5 +182,21 @@
   "contactInfo": "Thông tin liên hệ",
   "systemInfo": "Thông tin hệ thống",
   "createdAtLabel": "Ngày tạo",
-  "updatedAtLabel": "Cập nhật lần cuối"
+  "updatedAtLabel": "Cập nhật lần cuối",
+  "filterTitle": "Bộ lọc & Sắp xếp",
+  "filterReset": "Thiết lập lại",
+  "filterApply": "Áp dụng",
+  "filterAll": "Tất cả",
+  "sortBy": "Sắp xếp theo",
+  "sortByScale": "Sắp xếp theo quy mô",
+  "sortNewest": "Mới nhất",
+  "sortOldest": "Cũ nhất",
+  "sortNameAZ": "Tên A-Z",
+  "sortNameZA": "Tên Z-A",
+  "sortAreaAsc": "Diện tích tăng dần",
+  "sortAreaDesc": "Diện tích giảm dần",
+  "sortRoomsAsc": "Số phòng tăng dần",
+  "sortRoomsDesc": "Số phòng giảm dần",
+  "filterActiveCount": "{count} bộ lọc",
+  "searchHintGeneric": "Tìm kiếm..."
 }

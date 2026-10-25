@@ -1,6 +1,7 @@
 import { DataSource } from "typeorm";
 import { DataUnitsSeeder } from "./dataUnitsSeeder.js";
 import { UserSeeder } from "./userSeeder.js";
+import { WorkspaceSeeder } from "./workspaceSeeder.js";
 
 export interface ISeeder {
   readonly name: string;
@@ -10,6 +11,7 @@ export interface ISeeder {
 export const seeders: ISeeder[] = [
   new DataUnitsSeeder(),
   new UserSeeder(),
+  new WorkspaceSeeder(),
 ];
 
-export { DataUnitsSeeder, UserSeeder };
+export { DataUnitsSeeder, UserSeeder, WorkspaceSeeder };

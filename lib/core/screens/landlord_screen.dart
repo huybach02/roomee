@@ -156,19 +156,21 @@ class _LandlordScreenState extends State<LandlordScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: DefaultColors.white,
-      appBar: AppBar(
-        backgroundColor: DefaultColors.white,
-        elevation: 0,
-        automaticallyImplyLeading: false,
-        title: Text(
-          _getAppBarTitle(_selectedIndex),
-          style: const TextStyle(
-            color: DefaultColors.primary,
-            fontSize: FontSizes.medium,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
+      appBar: _selectedIndex == 1
+          ? null
+          : AppBar(
+              backgroundColor: DefaultColors.white,
+              elevation: 0,
+              automaticallyImplyLeading: false,
+              title: Text(
+                _getAppBarTitle(_selectedIndex),
+                style: const TextStyle(
+                  color: DefaultColors.primary,
+                  fontSize: FontSizes.medium,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
       body: IndexedStack(
         index: _selectedIndex,
         children: [

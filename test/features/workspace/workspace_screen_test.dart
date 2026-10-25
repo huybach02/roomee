@@ -8,6 +8,7 @@ import 'package:roomee/core/localization/app_localizations.dart';
 import 'package:roomee/core/models/models.dart';
 import 'package:roomee/core/router/app_router.dart';
 import 'package:roomee/core/screens/landlord_screen.dart';
+import 'package:roomee/core/widgets/filter/app_search_app_bar.dart';
 import 'package:roomee/features/auth/data/auth_dto.dart';
 import 'package:roomee/features/auth/data/auth_repository.dart';
 import 'package:roomee/features/auth/presentation/bloc/auth_bloc.dart';
@@ -75,12 +76,23 @@ class _FakeAuthRepo implements IAuthRepository {
 
 class _FakeWorkspaceRepo implements IWorkspaceRepository {
   final List<WorkspaceModel> workspaces;
+  final Map<int, PaginationModel<WorkspaceModel>>? pages;
 
-  _FakeWorkspaceRepo({this.workspaces = const []});
+  _FakeWorkspaceRepo({this.workspaces = const [], this.pages});
 
   @override
-  Future<List<WorkspaceModel>> getWorkspaces({Map<String, dynamic>? queryParameters}) async {
-    return workspaces;
+  Future<PaginationModel<WorkspaceModel>> getWorkspaces({Map<String, dynamic>? queryParameters}) async {
+    final page = queryParameters?['page'] as int? ?? 1;
+    if (pages != null && pages!.containsKey(page)) {
+      return pages![page]!;
+    }
+    return PaginationModel(
+      data: workspaces,
+      total: workspaces.length,
+      page: 1,
+      limit: 20,
+      totalPages: 1,
+    );
   }
 
   @override
@@ -171,7 +183,19 @@ void main() {
       expect(find.byType(WorkspaceScreen), findsOneWidget);
       expect(find.byType(ListWorkspaceScreen), findsOneWidget);
 
-      // Thanh tìm kiếm
+      // Icon tìm kiếm và icon bộ lọc trên AppBar
+      expect(find.byIcon(Icons.search_rounded), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(AppSearchAppBar),
+          matching: find.byIcon(Icons.tune_rounded),
+        ),
+        findsOneWidget,
+      );
+
+      // Bấm vào icon tìm kiếm để mở Morphing AppBar
+      await tester.tap(find.byIcon(Icons.search_rounded));
+      await tester.pumpAndSettle();
       expect(find.text(t('searchWorkspaceHint')), findsOneWidget);
 
       // Trạng thái trống
@@ -214,6 +238,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(ListWorkspaceScreen), findsOneWidget);
+      expect(find.text(t('common.totalRecords', {'count': '1'})), findsOneWidget);
+      expect(find.text(t('common.showOf', {'count': '1', 'total': '1'})), findsOneWidget);
       expect(find.text('Nhà trọ Hoa Hồng'), findsOneWidget);
       expect(find.text('150.0 m²'), findsOneWidget);
       expect(find.text('15 phòng'), findsOneWidget);
@@ -537,6 +563,83 @@ void main() {
       expect(find.text('77 Xã Đàn'), findsOneWidget);
       expect(find.text('Anh Quản Lý'), findsOneWidget);
       expect(find.text('0912345678'), findsWidgets);
+    });
+
+    test('WorkspaceBloc loads first page and appends data on WorkspaceLoadMoreEvent', () async {
+      const ws1 = WorkspaceModel(
+        id: 1,
+        userId: 1,
+        name: 'Nhà trọ 1',
+        area: 50,
+        numberOfRooms: 5,
+        provinceId: 1,
+        wardId: 1,
+        address: 'Địa chỉ 1',
+        contactName: 'Người quản lý 1',
+        contactPhone: '0901',
+      );
+      const ws2 = WorkspaceModel(
+        id: 2,
+        userId: 1,
+        name: 'Nhà trọ 2',
+        area: 60,
+        numberOfRooms: 6,
+        provinceId: 1,
+        wardId: 1,
+        address: 'Địa chỉ 2',
+        contactName: 'Người quản lý 2',
+        contactPhone: '0902',
+      );
+
+      final bloc = WorkspaceBloc(
+        repository: _FakeWorkspaceRepo(pages: {
+          1: const PaginationModel(
+            data: [ws1],
+            total: 2,
+            page: 1,
+            limit: 1,
+            totalPages: 2,
+          ),
+          2: const PaginationModel(
+            data: [ws2],
+            total: 2,
+            page: 2,
+            limit: 1,
+            totalPages: 2,
+          ),
+        }),
+      );
+
+      bloc.add(const WorkspaceLoadEvent());
+      await expectLater(
+        bloc.stream,
+        emitsInOrder([
+          isA<WorkspaceLoading>(),
+          predicate<WorkspaceLoaded>((s) =>
+              s.workspaces.length == 1 &&
+              s.workspaces.first.id == 1 &&
+              s.total == 2 &&
+              s.page == 1 &&
+              !s.hasReachedMax &&
+              !s.isLoadingMore),
+        ]),
+      );
+
+      bloc.add(const WorkspaceLoadMoreEvent());
+      await expectLater(
+        bloc.stream,
+        emitsInOrder([
+          predicate<WorkspaceLoaded>((s) => s.isLoadingMore && s.workspaces.length == 1),
+          predicate<WorkspaceLoaded>((s) =>
+              !s.isLoadingMore &&
+              s.workspaces.length == 2 &&
+              s.workspaces.last.id == 2 &&
+              s.page == 2 &&
+              s.hasReachedMax),
+        ]),
+      );
+
+      await bloc.close();
     });
   });
 }

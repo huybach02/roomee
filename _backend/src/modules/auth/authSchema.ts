@@ -5,51 +5,39 @@ import { Gender, UserRole } from "../../utils/constanst.js";
 export const registerSchema = z.object({
   email: ruleValidates.emailRule,
   password: ruleValidates.passwordRule({ min: 8 }),
-  fullName: ruleValidates.optionalString("Full name", { max: 100, min: 0 }),
-  phoneNumber: ruleValidates.phoneRule("Phone number").optional().nullable(),
-  avatarUrl: ruleValidates.optionalString("Avatar URL", { max: 255, min: 0 }),
-  bio: ruleValidates.optionalString("Bio", { max: 500, min: 0 }),
-  birthday: ruleValidates.dateRule("Birthday").optional().nullable(),
+  fullName: ruleValidates.optionalString({ max: 100 }),
+  phoneNumber: ruleValidates.phoneRule().optional().nullable(),
+  avatarUrl: ruleValidates.optionalString({ max: 255 }),
+  bio: ruleValidates.optionalString({ max: 500 }),
+  birthday: ruleValidates.dateRule().optional().nullable(),
   gender: ruleValidates
-    .enumRule("Gender", [Gender.MALE, Gender.FEMALE, Gender.OTHER] as const)
+    .enumRule([Gender.MALE, Gender.FEMALE, Gender.OTHER] as const)
     .optional(),
   role: ruleValidates
-    .enumRule("Role", [UserRole.LANDLORD, UserRole.TENANT] as const)
+    .enumRule([UserRole.LANDLORD, UserRole.TENANT] as const)
     .optional(),
-  provinceId: ruleValidates
-    .numberRule("Province ID", { int: true, min: 1 })
-    .optional()
-    .nullable(),
-  wardId: ruleValidates
-    .numberRule("Ward ID", { int: true, min: 1 })
-    .optional()
-    .nullable(),
+  provinceId: ruleValidates.idRule().optional().nullable(),
+  wardId: ruleValidates.idRule().optional().nullable(),
 });
 
 export const loginSchema = z.object({
   email: ruleValidates.emailRule,
   password: ruleValidates.passwordRule({ min: 1 }),
-  phoneNumber: ruleValidates.phoneRule("Phone number").optional().nullable(),
+  phoneNumber: ruleValidates.phoneRule().optional().nullable(),
   rememberMe: z.boolean().optional(),
 });
 
 export const updateProfileSchema = z.object({
-  fullName: ruleValidates.optionalString("Full name", { max: 100, min: 0 }),
-  phoneNumber: ruleValidates.phoneRule("Phone number").optional().nullable(),
-  avatarUrl: ruleValidates.optionalString("Avatar URL", { max: 255, min: 0 }),
-  bio: ruleValidates.optionalString("Bio", { max: 500, min: 0 }),
-  birthday: ruleValidates.dateRule("Birthday").optional().nullable(),
+  fullName: ruleValidates.optionalString({ max: 100 }),
+  phoneNumber: ruleValidates.phoneRule().optional().nullable(),
+  avatarUrl: ruleValidates.optionalString({ max: 255 }),
+  bio: ruleValidates.optionalString({ max: 500 }),
+  birthday: ruleValidates.dateRule().optional().nullable(),
   gender: ruleValidates
-    .enumRule("Gender", [Gender.MALE, Gender.FEMALE, Gender.OTHER] as const)
+    .enumRule([Gender.MALE, Gender.FEMALE, Gender.OTHER] as const)
     .optional(),
-  provinceId: ruleValidates
-    .numberRule("Province ID", { int: true, min: 1 })
-    .optional()
-    .nullable(),
-  wardId: ruleValidates
-    .numberRule("Ward ID", { int: true, min: 1 })
-    .optional()
-    .nullable(),
+  provinceId: ruleValidates.idRule().optional().nullable(),
+  wardId: ruleValidates.idRule().optional().nullable(),
 });
 
 export const forgotPasswordSchema = z.object({
@@ -57,16 +45,13 @@ export const forgotPasswordSchema = z.object({
 });
 
 export const resetPasswordSchema = z.object({
-  token: ruleValidates.requiredString("Reset token"),
+  token: ruleValidates.requiredString(),
   newPassword: ruleValidates.passwordRule({ min: 8 }),
 });
 
 export const changePasswordSchema = z.object({
-  currentPassword: ruleValidates.passwordRule({
-    min: 1,
-    label: "Current password",
-  }),
-  newPassword: ruleValidates.passwordRule({ min: 8, label: "New password" }),
+  currentPassword: ruleValidates.passwordRule({ min: 1 }),
+  newPassword: ruleValidates.passwordRule({ min: 8 }),
 });
 
 export const resendOtpSchema = z.object({
@@ -75,13 +60,11 @@ export const resendOtpSchema = z.object({
 
 export const verifyOtpSchema = z.object({
   email: ruleValidates.emailRule,
-  otp: ruleValidates
-    .requiredString("OTP")
-    .regex(/^\d{6}$/, "OTP must be 6 digits"),
+  otp: ruleValidates.otpRule(),
 });
 
 export const refreshTokenSchema = z.object({
-  refreshToken: ruleValidates.requiredString("Refresh token"),
+  refreshToken: ruleValidates.requiredString(),
 });
 
 export type RegisterDto = z.infer<typeof registerSchema>;

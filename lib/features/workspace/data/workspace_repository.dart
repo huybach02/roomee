@@ -4,7 +4,7 @@ import 'package:roomee/core/network/api_exceptions.dart';
 import 'package:roomee/features/workspace/data/workspace_remote_datasource.dart';
 
 abstract class IWorkspaceRepository {
-  Future<List<WorkspaceModel>> getWorkspaces({
+  Future<PaginationModel<WorkspaceModel>> getWorkspaces({
     Map<String, dynamic>? queryParameters,
   });
   Future<WorkspaceModel> getWorkspaceById(int id);
@@ -20,7 +20,7 @@ class WorkspaceRepository implements IWorkspaceRepository {
       : _remoteDataSource = remoteDataSource ?? WorkspaceRemoteDataSource();
 
   @override
-  Future<List<WorkspaceModel>> getWorkspaces({
+  Future<PaginationModel<WorkspaceModel>> getWorkspaces({
     Map<String, dynamic>? queryParameters,
   }) async {
     final response = await _remoteDataSource.getWorkspaces(

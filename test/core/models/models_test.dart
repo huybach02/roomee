@@ -195,4 +195,67 @@ void main() {
       expect(ws2.area, 50.0);
     });
   });
+
+  group('PaginationModel', () {
+    test('fromJson and toJson parse pagination data properly', () {
+      final json = {
+        'data': [
+          {'id': 1, 'name': 'Item 1'},
+          {'id': 2, 'name': 'Item 2'},
+        ],
+        'total': 45,
+        'page': 1,
+        'limit': 20,
+        'totalPages': 3,
+      };
+
+      final pagination = PaginationModel<String>.fromJson(
+        json,
+        (item) => (item as Map<String, dynamic>)['name'] as String,
+      );
+
+      expect(pagination.data.length, 2);
+      expect(pagination.data[0], 'Item 1');
+      expect(pagination.data[1], 'Item 2');
+      expect(pagination.total, 45);
+      expect(pagination.page, 1);
+      expect(pagination.limit, 20);
+      expect(pagination.totalPages, 3);
+      expect(pagination.hasReachedMax, isFalse);
+
+      final output = pagination.toJson((item) => item);
+      expect(output['total'], 45);
+      expect(output['page'], 1);
+      expect(output['totalPages'], 3);
+      expect((output['data'] as List).length, 2);
+    });
+
+    test('hasReachedMax returns true when page >= totalPages', () {
+      const pagination = PaginationModel<int>(
+        data: [1, 2],
+        total: 2,
+        page: 2,
+        limit: 10,
+        totalPages: 2,
+      );
+
+      expect(pagination.hasReachedMax, isTrue);
+    });
+
+    test('copyWith works properly', () {
+      const p1 = PaginationModel<int>(
+        data: [1],
+        total: 10,
+        page: 1,
+        limit: 5,
+        totalPages: 2,
+      );
+      final p2 = p1.copyWith(data: [1, 2], page: 2);
+
+      expect(p2.data, [1, 2]);
+      expect(p2.page, 2);
+      expect(p2.total, 10);
+      expect(p2.totalPages, 2);
+    });
+  });
 }

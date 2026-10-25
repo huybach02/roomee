@@ -11,6 +11,12 @@ class WorkspaceLoadEvent extends WorkspaceEvent {
   const WorkspaceLoadEvent({this.queryParameters});
 }
 
+class WorkspaceLoadMoreEvent extends WorkspaceEvent {
+  final Map<String, dynamic>? queryParameters;
+
+  const WorkspaceLoadMoreEvent({this.queryParameters});
+}
+
 class WorkspaceCreateEvent extends WorkspaceEvent {
   final Map<String, dynamic> data;
 

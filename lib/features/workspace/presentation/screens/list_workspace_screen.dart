@@ -10,7 +10,11 @@ import 'package:roomee/core/widgets/app_confirm_dialog.dart';
 import 'package:roomee/core/widgets/app_empty_state.dart';
 import 'package:roomee/core/widgets/app_notification.dart';
 import 'package:roomee/core/widgets/app_popup_menu.dart';
-import 'package:roomee/core/widgets/app_text_field.dart';
+import 'package:roomee/core/widgets/filter/app_filter_drawer.dart';
+import 'package:roomee/core/widgets/filter/app_search_app_bar.dart';
+import 'package:roomee/core/widgets/filter/filter_field_config.dart';
+import 'package:roomee/features/general/data/general_repository.dart';
+import 'package:roomee/features/general/presentation/bloc/general_bloc.dart';
 import 'package:roomee/features/workspace/presentation/bloc/workspace_bloc.dart';
 import 'package:roomee/utils/constanst.dart';
 
@@ -22,28 +26,171 @@ class ListWorkspaceScreen extends StatefulWidget {
 }
 
 class _ListWorkspaceScreenState extends State<ListWorkspaceScreen> {
-  final TextEditingController _searchController = TextEditingController();
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  final ScrollController _scrollController = ScrollController();
+  String _searchKeyword = '';
+  Map<String, dynamic> _filters = {'sortBy': 'createdAt_desc'};
+  bool _isFilterOpen = false;
+
+  int get _activeFilterCount {
+    int count = 0;
+    _filters.forEach((key, val) {
+      if (val != null) {
+        if (key == 'sortBy' && val == 'createdAt_desc') {
+          return;
+        }
+        count++;
+      }
+    });
+    return count;
+  }
 
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_onScroll);
     _loadWorkspaces();
   }
 
   @override
   void dispose() {
-    _searchController.dispose();
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
     super.dispose();
   }
 
-  void _loadWorkspaces({String? search}) {
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final currentScroll = _scrollController.position.pixels;
+    if (maxScroll - currentScroll <= 200) {
+      _loadMoreWorkspaces();
+    }
+  }
+
+  Map<String, dynamic> _buildQueryParams() {
     final queryParams = <String, dynamic>{};
-    if (search != null && search.trim().isNotEmpty) {
-      queryParams['search'] = search.trim();
+    if (_searchKeyword.isNotEmpty) {
+      queryParams['search'] = _searchKeyword;
+    }
+    _filters.forEach((key, val) {
+      if (val != null) {
+        if (key == 'sortBy') {
+          final parts = (val as String).split('_');
+          if (parts.length == 2) {
+            queryParams['sortBy'] = parts[0];
+            queryParams['sortOrder'] = parts[1];
+          }
+        } else if (key == 'sortByScale') {
+          final parts = (val as String).split('_');
+          if (parts.length == 2) {
+            queryParams['sortByScale'] = parts[0];
+            queryParams['sortOrderScale'] = parts[1];
+          }
+        } else {
+          queryParams[key] = val;
+        }
+      }
+    });
+    return queryParams;
+  }
+
+  void _loadWorkspaces() {
+    if (_scrollController.hasClients) {
+      _scrollController.jumpTo(0);
     }
     context.read<WorkspaceBloc>().add(
-      WorkspaceLoadEvent(queryParameters: queryParams),
-    );
+          WorkspaceLoadEvent(queryParameters: _buildQueryParams()),
+        );
+  }
+
+  void _loadMoreWorkspaces() {
+    context.read<WorkspaceBloc>().add(
+          WorkspaceLoadMoreEvent(queryParameters: _buildQueryParams()),
+        );
+  }
+
+  List<FilterFieldConfig> _getFilterConfigs() {
+    return [
+      FilterFieldConfig.chips(
+        key: 'sortBy',
+        title: t('sortBy'),
+        defaultValue: 'createdAt_desc',
+        options: [
+          FilterOption(label: t('sortNewest'), value: 'createdAt_desc'),
+          FilterOption(label: t('sortOldest'), value: 'createdAt_asc'),
+          FilterOption(label: t('sortNameAZ'), value: 'name_asc'),
+          FilterOption(label: t('sortNameZA'), value: 'name_desc'),
+        ],
+      ),
+      FilterFieldConfig.chips(
+        key: 'sortByScale',
+        title: t('sortByScale'),
+        options: [
+          FilterOption(label: t('sortAreaAsc'), value: 'area_asc'),
+          FilterOption(label: t('sortAreaDesc'), value: 'area_desc'),
+          FilterOption(label: t('sortRoomsAsc'), value: 'numberOfRooms_asc'),
+          FilterOption(label: t('sortRoomsDesc'), value: 'numberOfRooms_desc'),
+        ],
+      ),
+      FilterFieldConfig.chips(
+        key: 'status',
+        title: t('fields.status'),
+        options: [
+          FilterOption(label: t('filterAll'), value: null),
+          FilterOption(label: t('workspaceStatusActive'), value: 1),
+          FilterOption(label: t('workspaceStatusInactive'), value: 0),
+        ],
+      ),
+      FilterFieldConfig.chips(
+        key: 'type',
+        title: t('fields.workspaceType'),
+        options: [
+          FilterOption(label: t('filterAll'), value: null),
+          FilterOption(
+            label: t('workspaceTypeRentedRoom'),
+            value: 'rented_room',
+          ),
+          FilterOption(
+            label: t('workspaceTypeApartment'),
+            value: 'apartment_mini_house',
+          ),
+          FilterOption(
+            label: t('workspaceTypeDormitory'),
+            value: 'dormitory',
+          ),
+        ],
+      ),
+      FilterFieldConfig.dropdown(
+        key: 'provinceId',
+        title: t('fields.province'),
+        loadOptionsAsync: () async {
+          final generalState = context.read<GeneralBloc>().state;
+          List<ProvinceModel> provinces = [];
+          if (generalState is GeneralLoaded &&
+              generalState.provinces.isNotEmpty) {
+            provinces = generalState.provinces;
+          } else {
+            try {
+              provinces = await GeneralRepository().getProvinces();
+            } catch (_) {}
+          }
+          return [
+            FilterOption(label: t('filterAll'), value: null),
+            ...provinces.map(
+              (p) => FilterOption(label: p.fullName, value: p.id),
+            ),
+          ];
+        },
+      ),
+    ];
+  }
+
+  Future<void> _openCreateWorkspace() async {
+    final result = await context.push(AppRoutes.createWorkspace);
+    if (result == true && mounted) {
+      _loadWorkspaces();
+    }
   }
 
   Future<void> _handleViewDetail(WorkspaceModel ws) async {
@@ -162,39 +309,6 @@ class _ListWorkspaceScreenState extends State<ListWorkspaceScreen> {
     return parts.join(', ');
   }
 
-  Widget _buildSearchBar() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-      child: AppTextField(
-        controller: _searchController,
-        textInputAction: TextInputAction.search,
-        hintText: t('searchWorkspaceHint'),
-        prefixIcon: const Icon(
-          Icons.search_rounded,
-          color: DefaultColors.textSecondary,
-        ),
-        suffixIcon: _searchController.text.isNotEmpty
-            ? IconButton(
-                icon: const Icon(
-                  Icons.clear_rounded,
-                  color: DefaultColors.textSecondary,
-                  size: 20,
-                ),
-                onPressed: () {
-                  _searchController.clear();
-                  setState(() {});
-                  _loadWorkspaces();
-                },
-              )
-            : null,
-        onChanged: (val) {
-          setState(() {});
-          _loadWorkspaces(search: val);
-        },
-      ),
-    );
-  }
-
   Widget _buildEmptyState() {
     return AppEmptyState(
       icon: Icons.domain_disabled_rounded,
@@ -213,8 +327,7 @@ class _ListWorkspaceScreenState extends State<ListWorkspaceScreen> {
         child: AppButton(
           text: t('retry'),
           type: AppButtonType.outline,
-          onPressed: () =>
-              _loadWorkspaces(search: _searchController.text.trim()),
+          onPressed: _loadWorkspaces,
         ),
       ),
     );
@@ -308,7 +421,6 @@ class _ListWorkspaceScreenState extends State<ListWorkspaceScreen> {
                   ],
                 ),
                 const SizedBox(height: 12),
-
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -332,7 +444,6 @@ class _ListWorkspaceScreenState extends State<ListWorkspaceScreen> {
                   ],
                 ),
                 const SizedBox(height: 8),
-
                 if (ws.contactName.isNotEmpty ||
                     ws.contactPhone.isNotEmpty) ...[
                   Row(
@@ -349,8 +460,8 @@ class _ListWorkspaceScreenState extends State<ListWorkspaceScreen> {
                                   ws.contactPhone.isNotEmpty
                               ? '${ws.contactName} - ${ws.contactPhone}'
                               : (ws.contactName.isNotEmpty
-                                    ? ws.contactName
-                                    : ws.contactPhone),
+                                  ? ws.contactName
+                                  : ws.contactPhone),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
@@ -387,10 +498,8 @@ class _ListWorkspaceScreenState extends State<ListWorkspaceScreen> {
                   ),
                   const SizedBox(height: 8),
                 ],
-
                 const Divider(height: 1, color: DefaultColors.border),
                 const SizedBox(height: 6),
-
                 Row(
                   children: [
                     Row(
@@ -413,8 +522,6 @@ class _ListWorkspaceScreenState extends State<ListWorkspaceScreen> {
                       ],
                     ),
                     const SizedBox(width: 20),
-
-                    // Số phòng
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -467,77 +574,182 @@ class _ListWorkspaceScreenState extends State<ListWorkspaceScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocConsumer<WorkspaceBloc, WorkspaceState>(
-      listener: (context, state) {
-        if (state is WorkspaceDeleteSuccess) {
-          AppNotification.showSuccess(context, t('deleteWorkspaceSuccess'));
-          _loadWorkspaces(search: _searchController.text.trim());
-        } else if (state is WorkspaceFailure) {
-          AppNotification.showError(context, state.message);
-        }
-      },
-      builder: (context, state) {
-        if (state is WorkspaceLoading) {
-          return _buildLoadingState();
-        }
+    return Scaffold(
+      key: _scaffoldKey,
+      backgroundColor: DefaultColors.white,
+      appBar: AppSearchAppBar(
+        title: t('workspaceTitle'),
+        searchHint: t('searchWorkspaceHint'),
+        initialSearch: _searchKeyword,
+        activeFilterCount: _activeFilterCount,
+        onSearchChanged: (keyword) {
+          setState(() {
+            _searchKeyword = keyword;
+          });
+          _loadWorkspaces();
+        },
+        onFilterTap: () {
+          setState(() {
+            _isFilterOpen = !_isFilterOpen;
+          });
+        },
+      ),
+      floatingActionButton: _isFilterOpen
+          ? null
+          : FloatingActionButton(
+              backgroundColor: DefaultColors.primary,
+              foregroundColor: DefaultColors.white,
+              tooltip: t('createWorkspace'),
+              onPressed: _openCreateWorkspace,
+              child: const Icon(Icons.add),
+            ),
+      body: PopScope(
+        canPop: !_isFilterOpen,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop && _isFilterOpen) {
+            setState(() {
+              _isFilterOpen = false;
+            });
+          }
+        },
+        child: Stack(
+          children: [
+            BlocConsumer<WorkspaceBloc, WorkspaceState>(
+              listener: (context, state) {
+                if (state is WorkspaceDeleteSuccess) {
+                  AppNotification.showSuccess(
+                    context,
+                    t('deleteWorkspaceSuccess'),
+                  );
+                  _loadWorkspaces();
+                } else if (state is WorkspaceFailure) {
+                  AppNotification.showError(context, state.message);
+                }
+              },
+              builder: (context, state) {
+                if (state is WorkspaceLoading) {
+                  return _buildLoadingState();
+                }
 
-        if (state is WorkspaceFailure) {
-          return _buildErrorState(state.message);
-        }
+                if (state is WorkspaceFailure) {
+                  return _buildErrorState(state.message);
+                }
 
-        final workspaces = state is WorkspaceLoaded
-            ? state.workspaces
-            : const <WorkspaceModel>[];
+                final workspaces = state is WorkspaceLoaded
+                    ? state.workspaces
+                    : const <WorkspaceModel>[];
 
-        return RefreshIndicator(
-          onRefresh: () async {
-            _loadWorkspaces(search: _searchController.text.trim());
-          },
-          color: DefaultColors.primary,
-          child: Column(
-            children: [
-              _buildSearchBar(),
-              if (workspaces.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16.0,
-                    vertical: 4.0,
-                  ),
-                  child: Row(
+                return RefreshIndicator(
+                  onRefresh: () async {
+                    _loadWorkspaces();
+                  },
+                  color: DefaultColors.primary,
+                  child: Column(
                     children: [
-                      Text(
-                        t('totalWorkspaces', {
-                          'count': workspaces.length.toString(),
-                        }),
-                        style: const TextStyle(
-                          fontSize: FontSizes.small,
-                          fontWeight: FontWeight.w500,
-                          color: DefaultColors.textSecondary,
+                      if (workspaces.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                t('common.totalRecords', {
+                                  'count': (state is WorkspaceLoaded
+                                          ? state.total
+                                          : workspaces.length)
+                                      .toString(),
+                                }),
+                                style: const TextStyle(
+                                  fontSize: FontSizes.small,
+                                  fontWeight: FontWeight.w500,
+                                  color: DefaultColors.textSecondary,
+                                ),
+                              ),
+                              Text(
+                                t('common.showOf', {
+                                  'count': workspaces.length.toString(),
+                                  'total': (state is WorkspaceLoaded
+                                          ? state.total
+                                          : workspaces.length)
+                                      .toString(),
+                                }),
+                                style: const TextStyle(
+                                  fontSize: FontSizes.small,
+                                  fontWeight: FontWeight.w500,
+                                  color: DefaultColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
+                      Expanded(
+                        child: workspaces.isEmpty
+                            ? _buildEmptyState()
+                            : ListView.separated(
+                                controller: _scrollController,
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 8,
+                                ),
+                                itemCount: (state is WorkspaceLoaded &&
+                                        !state.hasReachedMax)
+                                    ? workspaces.length + 1
+                                    : workspaces.length,
+                                separatorBuilder: (context, index) =>
+                                    const SizedBox(height: 12),
+                                itemBuilder: (context, index) {
+                                  if (index >= workspaces.length) {
+                                    return const Padding(
+                                      padding:
+                                          EdgeInsets.symmetric(vertical: 16),
+                                      child: Center(
+                                        child: SizedBox(
+                                          width: 24,
+                                          height: 24,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: DefaultColors.primary,
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                  final ws = workspaces[index];
+                                  return _buildWorkspaceCard(ws);
+                                },
+                              ),
                       ),
                     ],
                   ),
-                ),
-              Expanded(
-                child: workspaces.isEmpty
-                    ? _buildEmptyState()
-                    : ListView.separated(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        itemCount: workspaces.length,
-                        separatorBuilder: (context, index) =>
-                            const SizedBox(height: 12),
-                        itemBuilder: (context, index) {
-                          return _buildWorkspaceCard(workspaces[index]);
-                        },
-                      ),
-              ),
-            ],
-          ),
-        );
-      },
+                );
+              },
+            ),
+            AppFilterDrawer(
+              isOpen: _isFilterOpen,
+              onClose: () {
+                setState(() {
+                  _isFilterOpen = false;
+                });
+              },
+              configs: _getFilterConfigs(),
+              initialFilters: _filters,
+              onApply: (newFilters) {
+                setState(() {
+                  _filters = Map<String, dynamic>.from(newFilters);
+                });
+                _loadWorkspaces();
+              },
+              onReset: () {
+                setState(() {
+                  _filters = {'sortBy': 'createdAt_desc'};
+                });
+                _loadWorkspaces();
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

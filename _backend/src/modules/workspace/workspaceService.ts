@@ -7,11 +7,35 @@ import { WardRepository } from "../../repositories/wardRepository.js";
 import { UserRole } from "../../utils/constanst.js";
 import { AppError } from "../../utils/appError.js";
 import { t } from "../../utils/i18n.js";
+import { QueryHelper, FilterSchema } from "../../utils/queryHelper.js";
 import {
   CreateWorkspaceDto,
   UpdateWorkspaceDto,
   WorkspaceQueryDto,
 } from "./workspaceSchema.js";
+
+const WORKSPACE_SEARCH_FIELDS = [
+  "workspace.name",
+  "workspace.address",
+  "workspace.contactName",
+  "workspace.contactPhone",
+  "province.fullName",
+  "ward.fullName",
+];
+
+const WORKSPACE_FILTER_SCHEMA: FilterSchema<WorkspaceQueryDto> = {
+  type: { field: "workspace.type", operator: "eq" },
+  status: { field: "workspace.status", operator: "eq" },
+  provinceId: { field: "workspace.provinceId", operator: "eq" },
+  wardId: { field: "workspace.wardId", operator: "eq" },
+};
+
+const WORKSPACE_SORT_MAP: Record<string, string> = {
+  createdAt: "workspace.createdAt",
+  name: "workspace.name",
+  area: "workspace.area",
+  numberOfRooms: "workspace.numberOfRooms",
+};
 
 @injectable()
 export class WorkspaceService {
@@ -42,55 +66,29 @@ export class WorkspaceService {
       qb.andWhere("workspace.userId = :userId", { userId });
     }
 
-    if (query.search && query.search.trim().length > 0) {
-      qb.andWhere(
-        "(workspace.name ILIKE :search OR workspace.address ILIKE :search OR workspace.contactName ILIKE :search OR workspace.contactPhone ILIKE :search)",
-        { search: `%${query.search.trim()}%` },
-      );
-    }
+    QueryHelper.applySearch(qb, query.search, WORKSPACE_SEARCH_FIELDS);
+    QueryHelper.applyFilters(qb, query, WORKSPACE_FILTER_SCHEMA);
 
-    if (query.type) {
-      qb.andWhere("workspace.type = :type", { type: query.type });
-    }
-
-    if (query.provinceId) {
-      qb.andWhere("workspace.provinceId = :provinceId", {
-        provinceId: query.provinceId,
+    const sortList = [];
+    if (query.sortByScale) {
+      sortList.push({
+        field: query.sortByScale,
+        order: query.sortOrderScale,
       });
     }
-
-    if (query.wardId) {
-      qb.andWhere("workspace.wardId = :wardId", { wardId: query.wardId });
+    if (query.sortBy) {
+      sortList.push({ field: query.sortBy, order: query.sortOrder });
     }
 
-    qb.orderBy("workspace.createdAt", "DESC");
+    QueryHelper.applySorting(
+      qb,
+      sortList.length > 0 ? sortList : undefined,
+      WORKSPACE_SORT_MAP,
+      {},
+      { field: "workspace.createdAt", order: "DESC" },
+    );
 
-    if (query.all) {
-      const data = await qb.getMany();
-      return {
-        data,
-        total: data.length,
-        page: 1,
-        limit: data.length,
-        totalPages: 1,
-      };
-    }
-
-    const page = query.page ?? 1;
-    const limit = query.limit ?? 20;
-    const skip = (page - 1) * limit;
-
-    qb.skip(skip).take(limit);
-
-    const [data, total] = await qb.getManyAndCount();
-
-    return {
-      data,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit) || 1,
-    };
+    return QueryHelper.paginate(qb, query.page, query.limit, query.all);
   }
 
   public async getWorkspaceById(
