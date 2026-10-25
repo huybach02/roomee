@@ -1,3 +1,4 @@
+import 'package:roomee/core/localization/app_localizations.dart';
 import 'package:roomee/core/models/models.dart';
 import 'package:roomee/core/network/api_exceptions.dart';
 import 'package:roomee/features/general/data/general_remote_datasource.dart';
@@ -19,7 +20,7 @@ class GeneralRepository implements IGeneralRepository {
 
     final data = response.data;
     if (data == null) {
-      throw const ServerException(message: 'Phản hồi không hợp lệ từ máy chủ.');
+      throw ServerException(message: t('errors.invalidServerResponse'));
     }
 
     return data;
@@ -31,7 +32,7 @@ class GeneralRepository implements IGeneralRepository {
 
     final data = response.data;
     if (data == null) {
-      throw const ServerException(message: 'Phản hồi không hợp lệ từ máy chủ.');
+      throw ServerException(message: t('errors.invalidServerResponse'));
     }
 
     return data;

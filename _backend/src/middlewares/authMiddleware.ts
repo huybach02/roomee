@@ -4,6 +4,7 @@ import { container } from "tsyringe";
 import { CacheService } from "../services/cacheService.js";
 import { CustomResponse } from "../utils/customResponse.js";
 import { JWT_ALLOWED_ALGORITHMS } from "../utils/constanst.js";
+import { RequestContext } from "../utils/requestContext.js";
 
 export const authMiddleware = async (
   req: Request,
@@ -55,7 +56,19 @@ export const authMiddleware = async (
 
     req.user = decoded;
     req.token = token;
-    next();
+
+    // Thiết lập ngữ cảnh người dùng hiện tại vào RequestContext
+    const userId = Number(decoded.sub);
+    const store = RequestContext.getStore();
+    if (store) {
+      store.userId = userId;
+      store.role = decoded.role;
+      next();
+    } else {
+      RequestContext.run({ userId, role: decoded.role }, () => {
+        next();
+      });
+    }
   } catch (error) {
     CustomResponse.error(res, t("common.unauthorized"), null, 401);
   }

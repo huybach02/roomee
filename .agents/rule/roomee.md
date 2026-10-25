@@ -149,6 +149,10 @@ _backend/
 - Quy trình: sửa entity → `npm run migration:generate -- src/migrations/<TenMigration>` → review file migration → `npm run migration:run`.
 - Entity dùng `Mixin(AuditableTrait)` (`src/mixins/auditableTrait.ts`) để tự động có các cột: `createdAt`, `updatedAt`, `createdBy`, `updatedBy`.
 - Bảng đặt tên snake_case số nhiều (`users`); cột dùng camelCase (`fullName`, `phoneNumber`, `isActive`).
+- **Quy chuẩn truy vấn Database (QueryBuilder vs Simple Query):**
+  - Mọi thao tác truy vấn lấy dữ liệu từ database phải ưu tiên sử dụng `createQueryBuilder(...)` (đặc biệt khi cần join quan hệ, điều kiện lọc phức tạp, phân trang, sắp xếp, gom nhóm, hoặc tối ưu select cột).
+  - **Trường hợp ngoại lệ được phép:** Chỉ sử dụng các hàm truy vấn có sẵn của TypeORM như `findOneBy`, `findBy`, `countBy`, `existsBy` cho các truy vấn **cực kỳ đơn giản** (ví dụ: tìm nhanh theo ID/khóa chính hoặc một điều kiện đẳng thức duy nhất trên một bảng đơn lẻ, không join, không logic phức tạp).
+  - Các truy vấn phức tạp hoặc tái sử dụng nhiều lần nên được đóng gói vào các method trong Custom Repository tương ứng.
 
 ### 3.8 Cache, Redis & Cơ chế Persist/Fallback
 - Cấu hình qua `REDIS_URL` trong `.env`, khởi tạo trong `src/config/redis.ts` với `lazyConnect: true`.
@@ -402,6 +406,7 @@ test/
 - [ ] Form input phía mobile validate qua `FieldRules` / `Validators` (`lib/core/validation/app_validators.dart`), đồng bộ với BE schema.
 - [ ] Backend input validate qua Zod & `ruleValidates`.
 - [ ] Thao tác Cache/Redis phía backend phải qua `CacheService` để đồng bộ persist và fallback DB.
+- [ ] Truy vấn database ưu tiên dùng `createQueryBuilder` (trừ các query cực kỳ đơn giản như `findOneBy`).
 - [ ] Backend response chuẩn theo `CustomResponse.success(res, data, message)` / `CustomResponse.error(res, message, errors)`.
 - [ ] Typecheck (`npm run typecheck`) / analyze (`flutter analyze`) / test (`flutter test`) đều pass.
 - [ ] Có migration nếu đổi schema.

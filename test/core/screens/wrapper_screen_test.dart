@@ -13,6 +13,7 @@ import 'package:roomee/core/screens/tenant_screen.dart';
 import 'package:roomee/features/auth/data/auth_dto.dart';
 import 'package:roomee/features/auth/data/auth_repository.dart';
 import 'package:roomee/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:roomee/features/workspace/presentation/bloc/workspace_bloc.dart';
 import 'package:roomee/utils/constanst.dart';
 
 class _FakeAuthRepo implements IAuthRepository {
@@ -96,6 +97,7 @@ void main() {
       providers: [
         BlocProvider<AuthBloc>.value(value: authBloc),
         BlocProvider<LocaleCubit>(create: (_) => LocaleCubit()),
+        BlocProvider<WorkspaceBloc>(create: (_) => WorkspaceBloc()),
       ],
       child: MaterialApp.router(
         locale: const Locale('vi'),

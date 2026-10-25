@@ -11,6 +11,10 @@ import 'package:roomee/features/auth/presentation/screens/login_screen.dart';
 import 'package:roomee/features/auth/presentation/screens/otp_screen.dart';
 import 'package:roomee/features/auth/presentation/screens/register_screen.dart';
 import 'package:roomee/features/auth/presentation/screens/reset_password_screen.dart';
+import 'package:roomee/features/workspace/presentation/screens/detail_workspace_screen.dart';
+import 'package:roomee/features/workspace/presentation/screens/workspace_form_screen.dart';
+import 'package:roomee/features/workspace/presentation/screens/workspace_screen.dart';
+import 'package:roomee/core/models/models.dart';
 
 class AppRoutes {
   AppRoutes._();
@@ -25,6 +29,10 @@ class AppRoutes {
   static const String home = '/home';
   static const String tenant = '/tenant';
   static const String landlord = '/landlord';
+  static const String workspace = '/workspace';
+  static const String createWorkspace = '/workspace/create';
+  static const String editWorkspace = '/workspace/edit';
+  static const String workspaceDetail = '/workspace/detail';
 }
 
 Page<void> _buildSlidePage(GoRouterState state, Widget child) {
@@ -120,6 +128,40 @@ GoRouter createAppRouter({
         name: 'landlord',
         pageBuilder: (context, state) =>
             _buildSlidePage(state, const LandlordScreen()),
+      ),
+      GoRoute(
+        path: AppRoutes.workspace,
+        name: 'workspace',
+        pageBuilder: (context, state) =>
+            _buildSlidePage(state, const WorkspaceScreen()),
+      ),
+      GoRoute(
+        path: AppRoutes.createWorkspace,
+        name: 'createWorkspace',
+        pageBuilder: (context, state) =>
+            _buildSlidePage(state, const WorkspaceFormScreen()),
+      ),
+      GoRoute(
+        path: AppRoutes.editWorkspace,
+        name: 'editWorkspace',
+        pageBuilder: (context, state) {
+          final workspace = state.extra as WorkspaceModel?;
+          return _buildSlidePage(
+            state,
+            WorkspaceFormScreen(workspace: workspace),
+          );
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.workspaceDetail,
+        name: 'workspaceDetail',
+        pageBuilder: (context, state) {
+          final workspace = state.extra as WorkspaceModel;
+          return _buildSlidePage(
+            state,
+            DetailWorkspaceScreen(workspace: workspace),
+          );
+        },
       ),
     ],
   );

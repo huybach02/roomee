@@ -11,6 +11,7 @@ import { Mixin } from "ts-mixer";
 import { AuditableTrait } from "../mixins/auditableTrait.js";
 import { Province } from "./province.js";
 import { User } from "./user.js";
+import { Workspace } from "./workspace.js";
 
 @Entity({ name: "wards" })
 export class Ward extends Mixin(AuditableTrait) {
@@ -40,4 +41,7 @@ export class Ward extends Mixin(AuditableTrait) {
 
   @OneToMany(() => User, (user) => user.ward)
   users: Relation<User[]>;
+
+  @OneToMany(() => Workspace, (workspace) => workspace.ward)
+  workspaces: Relation<Workspace[]>;
 }

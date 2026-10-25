@@ -6,10 +6,10 @@ import 'package:roomee/core/localization/app_localizations.dart';
 import 'package:roomee/core/router/app_router.dart';
 import 'package:roomee/core/widgets/app_button.dart';
 import 'package:roomee/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:roomee/features/workspace/presentation/screens/workspace_screen.dart';
 import 'package:roomee/utils/constanst.dart';
 
 /// Màn hình Dashboard dành cho Chủ trọ / Nhân viên quản lý (role = landlord | staff | admin).
-/// Sau này sẽ là phần dashboard quản lý tòa nhà, phòng trọ, danh sách khách thuê, thu chi...
 class LandlordScreen extends StatefulWidget {
   const LandlordScreen({super.key});
 
@@ -20,6 +20,138 @@ class LandlordScreen extends StatefulWidget {
 class _LandlordScreenState extends State<LandlordScreen> {
   int _selectedIndex = 0;
 
+  String _getAppBarTitle(int index) {
+    switch (index) {
+      case 1:
+        return t('workspaceTitle');
+      case 2:
+        return t('navManageRentals');
+      case 3:
+        return t('navMessages');
+      case 4:
+        return t('navMenu');
+      case 0:
+      default:
+        return t('landlordDashboardTitle');
+    }
+  }
+
+  Widget _buildPlaceholderTab(String titleKey, IconData icon) {
+    return SafeArea(
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 64, color: DefaultColors.primary),
+            const SizedBox(height: 16),
+            Text(
+              t(titleKey),
+              style: const TextStyle(
+                fontSize: FontSizes.medium,
+                fontWeight: FontWeight.bold,
+                color: DefaultColors.textPrimary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHomeDashboard(BuildContext context) {
+    return BlocConsumer<AuthBloc, AuthState>(
+      listener: (context, state) {
+        if (state is Unauthenticated) {
+          context.go(AppRoutes.welcome);
+        }
+      },
+      builder: (context, state) {
+        final user = state is Authenticated ? state.user : null;
+        final displayName = user?.fullName?.isNotEmpty == true
+            ? user!.fullName!
+            : (user?.email ?? 'Landlord');
+
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.domain_rounded,
+                    size: 64,
+                    color: DefaultColors.primary,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    t('welcomeUser', {'name': displayName}),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: FontSizes.medium,
+                      fontWeight: FontWeight.bold,
+                      color: DefaultColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    t('landlordDashboardSubtitle'),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: FontSizes.standard,
+                      color: DefaultColors.textSecondary,
+                    ),
+                  ),
+                  if (user?.role != null) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          '${t('userRole')}: ',
+                          style: const TextStyle(
+                            fontSize: FontSizes.standard,
+                            color: DefaultColors.textSecondary,
+                          ),
+                        ),
+                        Text(
+                          user!.role.name.toUpperCase(),
+                          style: const TextStyle(
+                            fontSize: FontSizes.standard,
+                            fontWeight: FontWeight.bold,
+                            color: DefaultColors.secondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  if (user?.email != null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      user!.email,
+                      style: const TextStyle(
+                        fontSize: FontSizes.standard,
+                        color: DefaultColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 32),
+                  AppButton(
+                    text: t('logout'),
+                    type: AppButtonType.outline,
+                    onPressed: () {
+                      context.read<AuthBloc>().add(const AuthLogoutEvent());
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -27,8 +159,9 @@ class _LandlordScreenState extends State<LandlordScreen> {
       appBar: AppBar(
         backgroundColor: DefaultColors.white,
         elevation: 0,
+        automaticallyImplyLeading: false,
         title: Text(
-          t('landlordDashboardTitle'),
+          _getAppBarTitle(_selectedIndex),
           style: const TextStyle(
             color: DefaultColors.primary,
             fontSize: FontSizes.medium,
@@ -36,96 +169,15 @@ class _LandlordScreenState extends State<LandlordScreen> {
           ),
         ),
       ),
-      body: BlocConsumer<AuthBloc, AuthState>(
-        listener: (context, state) {
-          if (state is Unauthenticated) {
-            context.go(AppRoutes.welcome);
-          }
-        },
-        builder: (context, state) {
-          final user = state is Authenticated ? state.user : null;
-          final displayName = user?.fullName?.isNotEmpty == true
-              ? user!.fullName!
-              : (user?.email ?? 'Landlord');
-
-          return SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0),
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(
-                      Icons.domain_rounded,
-                      size: 64,
-                      color: DefaultColors.primary,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      t('welcomeUser', {'name': displayName}),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: FontSizes.medium,
-                        fontWeight: FontWeight.bold,
-                        color: DefaultColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      t('landlordDashboardSubtitle'),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: FontSizes.standard,
-                        color: DefaultColors.textSecondary,
-                      ),
-                    ),
-                    if (user?.role != null) ...[
-                      const SizedBox(height: 6),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            '${t('userRole')}: ',
-                            style: const TextStyle(
-                              fontSize: FontSizes.standard,
-                              color: DefaultColors.textSecondary,
-                            ),
-                          ),
-                          Text(
-                            user!.role.name.toUpperCase(),
-                            style: const TextStyle(
-                              fontSize: FontSizes.standard,
-                              fontWeight: FontWeight.bold,
-                              color: DefaultColors.secondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                    if (user?.email != null) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        user!.email,
-                        style: const TextStyle(
-                          fontSize: FontSizes.standard,
-                          color: DefaultColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 32),
-                    AppButton(
-                      text: t('logout'),
-                      type: AppButtonType.outline,
-                      onPressed: () {
-                        context.read<AuthBloc>().add(const AuthLogoutEvent());
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: [
+          _buildHomeDashboard(context),
+          const WorkspaceScreen(),
+          _buildPlaceholderTab('navManageRentals', Icons.apartment_outlined),
+          _buildPlaceholderTab('navMessages', Icons.chat_bubble_outline),
+          _buildPlaceholderTab('navMenu', Icons.menu),
+        ],
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,

@@ -24,6 +24,8 @@ class AppCardSelect<T> extends StatelessWidget {
   final Set<T>? selectedValues;
   final ValueChanged<T>? onChanged;
   final ValueChanged<Set<T>>? onMultiChanged;
+  final FormFieldValidator<T>? validator;
+  final AutovalidateMode? autovalidateMode;
 
   const AppCardSelect({
     super.key,
@@ -32,6 +34,8 @@ class AppCardSelect<T> extends StatelessWidget {
     required ValueChanged<T> this.onChanged,
     this.labelText,
     this.spacing = 12.0,
+    this.validator,
+    this.autovalidateMode,
   })  : isMultiSelect = false,
         selectedValues = null,
         onMultiChanged = null;
@@ -43,11 +47,13 @@ class AppCardSelect<T> extends StatelessWidget {
     required ValueChanged<Set<T>> this.onMultiChanged,
     this.labelText,
     this.spacing = 12.0,
+    this.validator,
+    this.autovalidateMode,
   })  : isMultiSelect = true,
         selected = null,
         onChanged = null;
 
-  void _handleTap(T value) {
+  void _handleTap(T value, FormFieldState<T>? formState) {
     if (isMultiSelect) {
       final current = Set<T>.from(selectedValues ?? {});
       if (current.contains(value)) {
@@ -57,19 +63,22 @@ class AppCardSelect<T> extends StatelessWidget {
       }
       onMultiChanged?.call(current);
     } else {
+      formState?.didChange(value);
       onChanged?.call(value);
     }
   }
 
-  bool _isSelected(T value) {
+  bool _isSelected(T value, FormFieldState<T>? formState) {
     if (isMultiSelect) {
       return selectedValues?.contains(value) ?? false;
     }
-    return selected == value;
+    final effectiveSelected = formState?.value ?? selected;
+    return effectiveSelected == value;
   }
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildContent(BuildContext context, FormFieldState<T>? formState) {
+    final hasError = formState?.hasError ?? false;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
@@ -87,14 +96,18 @@ class AppCardSelect<T> extends StatelessWidget {
         ],
         Row(
           children: options.map((option) {
-            final isSelected = _isSelected(option.value);
+            final isSelected = _isSelected(option.value, formState);
             final isLast = option == options.last;
+
+            final borderColor = isSelected
+                ? DefaultColors.primary
+                : (hasError ? DefaultColors.danger : DefaultColors.border);
 
             return Expanded(
               child: Padding(
                 padding: EdgeInsets.only(right: isLast ? 0 : spacing),
                 child: GestureDetector(
-                  onTap: () => _handleTap(option.value),
+                  onTap: () => _handleTap(option.value, formState),
                   behavior: HitTestBehavior.opaque,
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
@@ -105,7 +118,7 @@ class AppCardSelect<T> extends StatelessWidget {
                           : DefaultColors.background,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: isSelected ? DefaultColors.primary : DefaultColors.border,
+                        color: borderColor,
                         width: isSelected ? 1.8 : 1.0,
                       ),
                     ),
@@ -148,7 +161,34 @@ class AppCardSelect<T> extends StatelessWidget {
             );
           }).toList(),
         ),
+        if (hasError && formState?.errorText != null) ...[
+          const SizedBox(height: 6),
+          Padding(
+            padding: const EdgeInsets.only(left: 4.0),
+            child: Text(
+              formState!.errorText!,
+              style: const TextStyle(
+                fontSize: FontSizes.small - 1,
+                color: DefaultColors.danger,
+              ),
+            ),
+          ),
+        ],
       ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (validator == null) {
+      return _buildContent(context, null);
+    }
+
+    return FormField<T>(
+      initialValue: selected,
+      validator: validator,
+      autovalidateMode: autovalidateMode,
+      builder: (formState) => _buildContent(context, formState),
     );
   }
 }

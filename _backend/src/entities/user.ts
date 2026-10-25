@@ -3,21 +3,26 @@ import {
   PrimaryGeneratedColumn,
   Column,
   ManyToOne,
+  OneToMany,
   JoinColumn,
+  Index,
   type Relation,
 } from "typeorm";
 import { Mixin } from "ts-mixer";
 import { Gender, UserRole } from "../utils/constanst.js";
 import { AuditableTrait } from "../mixins/auditableTrait.js";
+import { SoftDeletableTrait } from "../mixins/softDeletableTrait.js";
 import { Province } from "./province.js";
 import { Ward } from "./ward.js";
+import { Workspace } from "./workspace.js";
 
 @Entity({ name: "users" })
-export class User extends Mixin(AuditableTrait) {
+@Index(["email"], { unique: true, where: '"deletedAt" IS NULL' })
+export class User extends Mixin(AuditableTrait, SoftDeletableTrait) {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ type: "varchar", length: 255, unique: true })
+  @Column({ type: "varchar", length: 255 })
   email: string;
 
   @Column({ type: "varchar", length: 255, select: false })
@@ -80,4 +85,7 @@ export class User extends Mixin(AuditableTrait) {
 
   @Column({ type: "boolean", default: false })
   hasContract: boolean;
+
+  @OneToMany(() => Workspace, (workspace) => workspace.user)
+  workspaces: Relation<Workspace[]>;
 }

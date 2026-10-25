@@ -22,6 +22,8 @@ class AppDropdownField<T> extends StatefulWidget {
   final Widget? prefixIcon;
   final bool enabled;
   final bool isLoading;
+  final AutovalidateMode? autovalidateMode;
+  final String? initialLabel;
 
   const AppDropdownField({
     super.key,
@@ -37,6 +39,8 @@ class AppDropdownField<T> extends StatefulWidget {
     this.prefixIcon,
     this.enabled = true,
     this.isLoading = false,
+    this.autovalidateMode,
+    this.initialLabel,
   });
 
   @override
@@ -49,30 +53,57 @@ class _AppDropdownFieldState<T> extends State<AppDropdownField<T>> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialLabel != null && widget.initialLabel!.isNotEmpty) {
+      _controller.text = widget.initialLabel!;
+    }
     _syncText();
   }
 
   @override
   void didUpdateWidget(covariant AppDropdownField<T> oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.value != oldWidget.value || widget.options != oldWidget.options) {
+    if (widget.value != oldWidget.value ||
+        widget.options != oldWidget.options ||
+        widget.initialLabel != oldWidget.initialLabel) {
       _syncText(isPostFrame: true);
     }
   }
 
   void _syncText({bool isPostFrame = false}) {
-    final matches = widget.options.where((o) => o.value == widget.value);
-    final newText = matches.isEmpty ? '' : matches.first.label;
-    if (_controller.text != newText) {
-      if (isPostFrame) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            _controller.text = newText;
-          }
-        });
-      } else {
-        _controller.text = newText;
+    if (widget.value == null) {
+      if (_controller.text.isNotEmpty) {
+        _updateControllerText('', isPostFrame);
       }
+      return;
+    }
+
+    if (widget.options.isEmpty) {
+      if (_controller.text.isEmpty &&
+          widget.initialLabel != null &&
+          widget.initialLabel!.isNotEmpty) {
+        _updateControllerText(widget.initialLabel!, isPostFrame);
+      }
+      return;
+    }
+
+    final matches = widget.options.where((o) => o.value == widget.value);
+    final newText = matches.isEmpty
+        ? (widget.initialLabel ?? '')
+        : matches.first.label;
+    if (_controller.text != newText) {
+      _updateControllerText(newText, isPostFrame);
+    }
+  }
+
+  void _updateControllerText(String text, bool isPostFrame) {
+    if (isPostFrame) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _controller.text = text;
+        }
+      });
+    } else {
+      _controller.text = text;
     }
   }
 
@@ -136,6 +167,7 @@ class _AppDropdownFieldState<T> extends State<AppDropdownField<T>> {
               color: DefaultColors.textSecondary,
             ),
       validator: widget.validator,
+      autovalidateMode: widget.autovalidateMode,
     );
   }
 }
@@ -181,8 +213,8 @@ class _DropdownSheetState<T> extends State<_DropdownSheet<T>> {
       _filtered = keyword.isEmpty
           ? widget.options
           : widget.options
-              .where((o) => o.label.toLowerCase().contains(keyword))
-              .toList();
+                .where((o) => o.label.toLowerCase().contains(keyword))
+                .toList();
     });
   }
 

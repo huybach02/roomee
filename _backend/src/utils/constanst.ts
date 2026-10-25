@@ -26,6 +26,12 @@ export enum UserRole {
   ADMIN = "admin", // Quản trị viên
 }
 
+export enum WorkspaceType {
+  RENTED_ROOM = "rented_room", // Phòng trọ
+  APARTMENT_MINI_HOUSE = "apartment/mini_house", // Căn hộ / Nhà nguyên căn / Chung cư mini
+  DORMITORY = "dormitory", // Ký túc xá
+}
+
 export enum Gender {
   MALE = "male",
   FEMALE = "female",

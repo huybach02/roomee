@@ -11,6 +11,7 @@ import 'package:roomee/core/router/app_router.dart';
 import 'package:roomee/core/screens/no_internet_screen.dart';
 import 'package:roomee/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:roomee/features/general/presentation/bloc/general_bloc.dart';
+import 'package:roomee/features/workspace/presentation/bloc/workspace_bloc.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -47,6 +48,7 @@ class MyApp extends StatefulWidget {
   final GoRouter? router;
   final AuthBloc? authBloc;
   final GeneralBloc? generalBloc;
+  final WorkspaceBloc? workspaceBloc;
 
   const MyApp({
     super.key,
@@ -54,6 +56,7 @@ class MyApp extends StatefulWidget {
     this.router,
     this.authBloc,
     this.generalBloc,
+    this.workspaceBloc,
   });
 
   @override
@@ -93,6 +96,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           create: (_) => LocaleCubit(initialLocale: widget.initialLocale),
         ),
         BlocProvider(create: (_) => widget.generalBloc ?? GeneralBloc()),
+        BlocProvider(create: (_) => widget.workspaceBloc ?? WorkspaceBloc()),
         BlocProvider.value(value: _authBloc),
       ],
       child: BlocBuilder<LocaleCubit, Locale>(

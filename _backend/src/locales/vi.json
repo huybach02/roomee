@@ -46,5 +46,16 @@
     "footerNote": "Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email.",
     "otpEmailText": "Mã OTP xác thực của bạn là: {otp}. Mã này có hiệu lực trong {minutes} phút.",
     "copyright": "Tất cả các quyền được bảo lưu."
+  },
+  "workspace": {
+    "createSuccess": "Tạo nhà trọ / khu trọ thành công.",
+    "updateSuccess": "Cập nhật khu trọ thành công.",
+    "deleteSuccess": "Xóa khu trọ thành công.",
+    "notFound": "Không tìm thấy khu trọ yêu cầu.",
+    "forbidden": "Bạn không có quyền quản lý khu trọ này.",
+    "onlyLandlordCanCreate": "Chỉ có chủ trọ mới có quyền tạo khu trọ mới.",
+    "provinceNotFound": "Tỉnh/Thành phố không tồn tại.",
+    "wardNotFound": "Phường/Xã không tồn tại.",
+    "wardNotInProvince": "Phường/Xã không thuộc Tỉnh/Thành phố đã chọn."
   }
 }

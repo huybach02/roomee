@@ -7,6 +7,7 @@ import { stopCronJobs } from "./cron/index.js";
 import { Routes } from "./routes.js";
 import { CustomResponse } from "./utils/customResponse.js";
 import { i18nMiddleware } from "./middlewares/i18nMiddleware.js";
+import { requestContextMiddleware } from "./middlewares/requestContextMiddleware.js";
 import { AppError } from "./utils/appError.js";
 import { t } from "./utils/i18n.js";
 import {
@@ -55,6 +56,7 @@ export class App {
     this.app.use(cors());
     this.app.use(express.json());
     this.app.use(express.urlencoded({ extended: true }));
+    this.app.use(requestContextMiddleware);
     this.app.use(i18nMiddleware);
 
     // Request logger for development

@@ -21,6 +21,18 @@ enum UserRole { staff, landlord, tenant, admin }
 
 enum Gender { male, female, other }
 
+enum WorkspaceType {
+  rentedRoom('rented_room'),
+  apartmentMiniHouse('apartment/mini_house'),
+  dormitory('dormitory');
+
+  final String value;
+  const WorkspaceType(this.value);
+
+  static WorkspaceType fromValue(String? value) =>
+      values.firstWhere((e) => e.value == value, orElse: () => rentedRoom);
+}
+
 /// Danh sách các item trong Bottom Bar của Chủ trọ / Quản lý trọ
 const List<AppNavItem> landlordNavItems = [
   AppNavItem(

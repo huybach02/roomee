@@ -21,6 +21,7 @@ class AppTextField extends StatelessWidget {
   final FocusNode? focusNode;
   final bool autofocus;
   final List<TextInputFormatter>? inputFormatters;
+  final AutovalidateMode? autovalidateMode;
 
   const AppTextField({
     super.key,
@@ -42,6 +43,7 @@ class AppTextField extends StatelessWidget {
     this.focusNode,
     this.autofocus = false,
     this.inputFormatters,
+    this.autovalidateMode,
   });
 
   @override
@@ -60,6 +62,7 @@ class AppTextField extends StatelessWidget {
       onChanged: onChanged,
       validator: validator,
       inputFormatters: inputFormatters,
+      autovalidateMode: autovalidateMode,
       style: const TextStyle(
         fontSize: FontSizes.standard,
         color: DefaultColors.textPrimary,

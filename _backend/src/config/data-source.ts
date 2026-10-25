@@ -3,6 +3,7 @@ import "dotenv/config";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { DataSource } from "typeorm";
+import { AuditSubscriber } from "../subscribers/auditSubscriber.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -10,7 +11,14 @@ const __dirname = path.dirname(__filename);
 class CustomDataSource extends DataSource {
   async buildMetadatas(): Promise<void> {
     await super.buildMetadatas();
-    const auditProps = ["createdAt", "updatedAt", "createdBy", "updatedBy"];
+    const auditProps = [
+      "createdAt",
+      "updatedAt",
+      "createdBy",
+      "updatedBy",
+      "deletedAt",
+      "deletedBy",
+    ];
 
     for (const meta of this.entityMetadatas) {
       const sortFn = (
@@ -42,5 +50,5 @@ export const AppDataSource = new CustomDataSource({
   logging: process.env.NODE_ENV === "development" ? ["error"] : false,
   entities: [path.join(__dirname, "..", "entities/**/*.{ts,js}")],
   migrations: [path.join(__dirname, "..", "migrations/**/*.{ts,js}")],
-  subscribers: [],
+  subscribers: [AuditSubscriber],
 });

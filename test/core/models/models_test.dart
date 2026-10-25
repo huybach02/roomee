@@ -132,4 +132,67 @@ void main() {
       expect(user.toJson()['birthday'], '2000-05-15');
     });
   });
+
+  group('WorkspaceModel', () {
+    test('fromJson and toJson parse Workspace data properly', () {
+      final json = {
+        'id': 1,
+        'userId': 2,
+        'type': 'apartment/mini_house',
+        'name': 'Khu trọ Thăng Long',
+        'area': 120.5,
+        'numberOfRooms': 10,
+        'provinceId': 1,
+        'wardId': 5,
+        'address': 'Số 10 Cầu Giấy',
+        'description': 'Khu trọ an ninh tốt',
+        'contactName': 'Nguyễn Văn Chủ',
+        'contactPhone': '0901234567',
+        'contactZalo': '0901234567',
+        'createdBy': 2,
+        'updatedBy': 2,
+      };
+
+      final workspace = WorkspaceModel.fromJson(json);
+
+      expect(workspace.id, 1);
+      expect(workspace.userId, 2);
+      expect(workspace.type, WorkspaceType.apartmentMiniHouse);
+      expect(workspace.name, 'Khu trọ Thăng Long');
+      expect(workspace.area, 120.5);
+      expect(workspace.numberOfRooms, 10);
+      expect(workspace.provinceId, 1);
+      expect(workspace.wardId, 5);
+      expect(workspace.address, 'Số 10 Cầu Giấy');
+      expect(workspace.description, 'Khu trọ an ninh tốt');
+      expect(workspace.contactName, 'Nguyễn Văn Chủ');
+      expect(workspace.contactPhone, '0901234567');
+      expect(workspace.contactZalo, '0901234567');
+
+      final output = workspace.toJson();
+      expect(output['type'], 'apartment/mini_house');
+      expect(output['name'], 'Khu trọ Thăng Long');
+      expect(output['area'], 120.5);
+    });
+
+    test('copyWith works properly', () {
+      const ws1 = WorkspaceModel(
+        id: 1,
+        userId: 2,
+        name: 'Nhà A',
+        area: 50.0,
+        provinceId: 1,
+        wardId: 1,
+        address: 'Địa chỉ',
+        contactName: 'Chủ',
+        contactPhone: '0900000000',
+      );
+      final ws2 = ws1.copyWith(name: 'Nhà B', numberOfRooms: 5);
+
+      expect(ws2.id, 1);
+      expect(ws2.name, 'Nhà B');
+      expect(ws2.numberOfRooms, 5);
+      expect(ws2.area, 50.0);
+    });
+  });
 }

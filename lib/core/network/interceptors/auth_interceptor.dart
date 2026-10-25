@@ -29,6 +29,7 @@ class AuthInterceptor extends Interceptor {
   static const Duration inactivityTimeout = Duration(minutes: 10);
 
   bool _isRefreshing = false;
+  Completer<String?>? _refreshCompleter;
   Timer? _inactivityTimer;
   final List<_RetryQueueItem> _retryQueue = [];
 
@@ -115,33 +116,40 @@ class AuthInterceptor extends Interceptor {
       return handler.next(err);
     }
 
-    // 5. Kiểm tra Token Staleness (So sánh token đã gửi với token mới nhất trong storage):
-    // Nếu token đã được refresh bởi một request khác trước đó -> retry ngay lập tức, không refresh nữa!
-    final sent = authHeader.substring(7).trim();
-    final current = await _storage.read(key: tokenKey);
-    if (current != null && current.isNotEmpty && current != sent) {
-      final opts = err.requestOptions
-        ..headers['Authorization'] = 'Bearer $current'
-        ..extra['retried'] = true;
-
-      final dioInstance = clientDio ?? _refreshDio;
+    // 5. Nếu ĐANG có tiến trình refresh token chạy dở từ một request khác:
+    // Đợi trực tiếp Completer hoàn tất và dùng token mới để retry ngay mà KHÔNG gọi API thừa
+    if (_refreshCompleter != null) {
+      _resetInactivityTimer();
       try {
-        final response = await dioInstance.fetch(opts);
-        return handler.resolve(response);
+        final newAccessToken = await _refreshCompleter!.future;
+        if (newAccessToken != null && newAccessToken.isNotEmpty) {
+          final opts = err.requestOptions
+            ..headers['Authorization'] = 'Bearer $newAccessToken'
+            ..extra['retried'] = true;
+          final dioInstance = clientDio ?? _refreshDio;
+          final response = await dioInstance.fetch(opts);
+          return handler.resolve(response);
+        } else {
+          // Refresh thất bại (mất mạng / lỗi), đưa vào queue để chờ thử lại
+          _retryQueue.add(
+            _RetryQueueItem(options: err.requestOptions, handler: handler),
+          );
+          return;
+        }
       } catch (retryErr) {
         if (retryErr is DioException) {
           return handler.reject(retryErr);
         }
         return handler.reject(
           DioException(
-            requestOptions: opts,
+            requestOptions: err.requestOptions,
             error: retryErr,
           ),
         );
       }
     }
 
-    // 6. Nếu đang refresh HOẶC đang có hàng đợi bị treo do mất mạng -> đưa vào hàng đợi chờ
+    // 6. Nếu có hàng đợi đang bị treo do mất mạng -> đưa vào hàng đợi chờ
     if (_isRefreshing || _retryQueue.isNotEmpty) {
       _resetInactivityTimer();
       _retryQueue.add(
@@ -150,7 +158,9 @@ class AuthInterceptor extends Interceptor {
       return;
     }
 
-    // 7. Bắt đầu tiến trình refresh ngầm (chỉ 1 request đầu tiên được thực hiện)
+    // 7. Khóa đồng bộ NGAY LẬP TỨC (0ms latency, triệt tiêu hoàn toàn async gap)
+    final completer = Completer<String?>();
+    _refreshCompleter = completer;
     _isRefreshing = true;
     _resetInactivityTimer();
     _retryQueue.add(
@@ -158,46 +168,60 @@ class AuthInterceptor extends Interceptor {
     );
 
     try {
-      final refreshToken = await _storage.read(key: refreshTokenKey);
-      if (refreshToken == null || refreshToken.isEmpty) {
-        throw const FormatException('Missing refresh token');
-      }
+      // Kiểm tra Token Staleness: nếu token trong storage đã mới hơn token request đã gửi thì không cần gọi API
+      final sent = authHeader.substring(7).trim();
+      final current = await _storage.read(key: tokenKey);
+      String newAccessToken;
 
-      final locale = await _storage.read(key: localeKey) ?? 'vi';
+      if (current != null && current.isNotEmpty && current != sent) {
+        newAccessToken = current;
+      } else {
+        final refreshToken = await _storage.read(key: refreshTokenKey);
+        if (refreshToken == null || refreshToken.isEmpty) {
+          throw const FormatException('Missing refresh token');
+        }
 
-      // Gọi endpoint refresh token qua _refreshDio độc lập (chống đệ quy vô hạn)
-      final response = await _refreshDio.post(
-        '/auth/refresh-token',
-        data: {'refreshToken': refreshToken},
-        options: Options(
-          headers: {
-            'Accept-Language': locale,
-          },
-        ),
-      );
+        final locale = await _storage.read(key: localeKey) ?? 'vi';
 
-      final data = response.data;
-      String? newAccessToken;
-      String? newRefreshToken;
+        // Gọi endpoint refresh token qua _refreshDio độc lập (chống đệ quy vô hạn)
+        final response = await _refreshDio.post(
+          '/auth/refresh-token',
+          data: {'refreshToken': refreshToken},
+          options: Options(
+            headers: {
+              'Accept-Language': locale,
+            },
+          ),
+        );
 
-      if (data is Map<String, dynamic>) {
-        final payload = data['data'] as Map<String, dynamic>? ?? data;
-        newAccessToken =
-            payload['accessToken'] as String? ?? payload['token'] as String?;
-        newRefreshToken = payload['refreshToken'] as String?;
-      }
+        final data = response.data;
+        String? extractedAccessToken;
+        String? newRefreshToken;
 
-      if (newAccessToken == null || newAccessToken.isEmpty) {
-        throw const FormatException('Invalid refresh response');
-      }
+        if (data is Map<String, dynamic>) {
+          final payload = data['data'] as Map<String, dynamic>? ?? data;
+          extractedAccessToken =
+              payload['accessToken'] as String? ?? payload['token'] as String?;
+          newRefreshToken = payload['refreshToken'] as String?;
+        }
 
-      // Lưu cặp token mới vào Secure Storage
-      await _storage.write(key: tokenKey, value: newAccessToken);
-      if (newRefreshToken != null && newRefreshToken.isNotEmpty) {
-        await _storage.write(key: refreshTokenKey, value: newRefreshToken);
+        if (extractedAccessToken == null || extractedAccessToken.isEmpty) {
+          throw const FormatException('Invalid refresh response');
+        }
+
+        newAccessToken = extractedAccessToken;
+
+        // Lưu cặp token mới vào Secure Storage
+        await _storage.write(key: tokenKey, value: newAccessToken);
+        // Chỉ lưu refresh token mới nếu có giá trị và không rỗng (chống ghi đè token cũ khi grace period trả về rỗng)
+        if (newRefreshToken != null && newRefreshToken.isNotEmpty) {
+          await _storage.write(key: refreshTokenKey, value: newRefreshToken);
+        }
       }
 
       _cancelInactivityTimer();
+      completer.complete(newAccessToken);
+      _refreshCompleter = null;
 
       // Lấy danh sách hàng đợi và giải phóng trạng thái khóa
       final queueToRetry = List<_RetryQueueItem>.from(_retryQueue);
@@ -230,6 +254,8 @@ class AuthInterceptor extends Interceptor {
       onNetworkRestored?.call();
     } catch (refreshErr) {
       _isRefreshing = false;
+      completer.complete(null);
+      _refreshCompleter = null;
 
       bool isAuthFailure = false;
       DioException? authException;

@@ -1,3 +1,4 @@
+import 'package:roomee/core/localization/app_localizations.dart';
 import 'package:roomee/core/models/models.dart';
 import 'package:roomee/core/network/api_exceptions.dart';
 import 'package:roomee/features/auth/data/auth_dto.dart';
@@ -56,7 +57,7 @@ class AuthRepository implements IAuthRepository {
 
     final authData = response.data;
     if (authData == null) {
-      throw const ServerException(message: 'Phản hồi không hợp lệ từ máy chủ.');
+      throw ServerException(message: t('errors.invalidServerResponse'));
     }
 
     await _saveAuthSession(authData);
@@ -70,7 +71,7 @@ class AuthRepository implements IAuthRepository {
 
     final authData = response.data;
     if (authData == null) {
-      throw const ServerException(message: 'Phản hồi không hợp lệ từ máy chủ.');
+      throw ServerException(message: t('errors.invalidServerResponse'));
     }
 
     await _saveAuthSession(authData);
@@ -91,7 +92,7 @@ class AuthRepository implements IAuthRepository {
     final response = await _remoteDataSource.verifyOtp(email: email, otp: otp);
     final authData = response.data;
     if (authData == null) {
-      throw const ServerException(message: 'Phản hồi không hợp lệ từ máy chủ.');
+      throw ServerException(message: t('errors.invalidServerResponse'));
     }
 
     await _saveAuthSession(authData);
@@ -131,7 +132,7 @@ class AuthRepository implements IAuthRepository {
     );
     final authData = response.data;
     if (authData == null) {
-      throw const ServerException(message: 'Phản hồi không hợp lệ từ máy chủ.');
+      throw ServerException(message: t('errors.invalidServerResponse'));
     }
 
     await _saveAuthSession(authData);
@@ -180,7 +181,7 @@ class AuthRepository implements IAuthRepository {
     final response = await _remoteDataSource.refreshToken(currentRefreshToken);
     final data = response.data;
     if (data == null) {
-      throw const ServerException(message: 'Phản hồi không hợp lệ từ máy chủ.');
+      throw ServerException(message: t('errors.invalidServerResponse'));
     }
 
     await _localDataSource.saveToken(data.accessToken);

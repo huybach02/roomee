@@ -48,11 +48,14 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         try {
           final freshUser = await _authRepository.syncUserProfile();
           if (freshUser != null) {
+            final latestToken = await _authRepository.getToken() ?? token;
+            final latestRefreshToken =
+                await _authRepository.getRefreshToken() ?? refreshToken;
             emit(
               Authenticated(
                 user: freshUser,
-                token: token,
-                refreshToken: refreshToken,
+                token: latestToken,
+                refreshToken: latestRefreshToken,
               ),
             );
           }

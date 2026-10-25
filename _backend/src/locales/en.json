@@ -46,5 +46,16 @@
     "footerNote": "If you did not request this, please ignore this email.",
     "otpEmailText": "Your verification OTP is: {otp}. This code is valid for {minutes} minutes.",
     "copyright": "All rights reserved."
+  },
+  "workspace": {
+    "createSuccess": "Workspace created successfully.",
+    "updateSuccess": "Workspace updated successfully.",
+    "deleteSuccess": "Workspace deleted successfully.",
+    "notFound": "Requested workspace not found.",
+    "forbidden": "You do not have permission to manage this workspace.",
+    "onlyLandlordCanCreate": "Only landlords are allowed to create workspaces.",
+    "provinceNotFound": "Province not found.",
+    "wardNotFound": "Ward not found.",
+    "wardNotInProvince": "Ward does not belong to the selected province."
   }
 }

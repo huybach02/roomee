@@ -33,7 +33,10 @@ class AppDatePickerField extends StatefulWidget {
     this.prefixIcon = const Icon(Icons.calendar_today_outlined, color: DefaultColors.textSecondary),
     this.suffixIcon = const Icon(Icons.arrow_drop_down, color: DefaultColors.textSecondary),
     this.enabled = true,
+    this.autovalidateMode,
   });
+
+  final AutovalidateMode? autovalidateMode;
 
   @override
   State<AppDatePickerField> createState() => _AppDatePickerFieldState();
@@ -132,6 +135,7 @@ class _AppDatePickerFieldState extends State<AppDatePickerField> {
       prefixIcon: widget.prefixIcon,
       suffixIcon: widget.suffixIcon,
       validator: widget.validator,
+      autovalidateMode: widget.autovalidateMode,
     );
   }
 }

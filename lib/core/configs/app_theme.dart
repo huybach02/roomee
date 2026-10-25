@@ -45,6 +45,16 @@ class DefaultColors {
 class AppTheme {
   static ThemeData get mainTheme {
     return ThemeData(
+      dividerColor: DefaultColors.divider,
+      popupMenuTheme: PopupMenuThemeData(
+        color: DefaultColors.white,
+        surfaceTintColor: Colors.transparent,
+        elevation: 6,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: const BorderSide(color: DefaultColors.border, width: 1),
+        ),
+      ),
       appBarTheme: const AppBarTheme(
         backgroundColor: Color(0xFF1B202D),
         elevation: 0,

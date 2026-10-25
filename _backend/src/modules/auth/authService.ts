@@ -564,7 +564,8 @@ export class AuthService {
         nowMs - rotatedAtMs <= REFRESH_TOKEN_GRACE_PERIOD_MS;
 
       if (isWithinGracePeriod) {
-        // Cho phép cấp lại Access Token hợp lệ mà không khóa tài khoản
+        // Cho phép cấp lại Access Token hợp lệ mà không khóa tài khoản.
+        // Không trả về refreshToken cũ để tránh client ghi đè ngược token đã rotate vào storage.
         const reissuedAccessToken = jwt.sign(
           {
             sub: session.user.id,
@@ -575,12 +576,13 @@ export class AuthService {
           this.jwtSecret,
           {
             expiresIn: ACCESS_TOKEN_EXPIRES_IN,
+            algorithm: JWT_ALGORITHM,
           },
         );
 
         return {
           accessToken: reissuedAccessToken,
-          refreshToken: refreshTokenString,
+          refreshToken: "",
         };
       }
 
@@ -633,6 +635,43 @@ export class AuthService {
       .execute();
 
     if (updateResult.affected !== 1) {
+      // Kiểm tra xem có phải do request song song đã vừa rotate thành công trong Grace Period không
+      const currentSession = await this.refreshTokenRepository.findOne({
+        where: { id: session.id },
+        relations: { user: true },
+      });
+
+      if (
+        currentSession &&
+        !currentSession.isRevoked &&
+        currentSession.previousTokenHash === session.tokenHash
+      ) {
+        const nowMs = Date.now();
+        const rotatedAtMs = currentSession.rotatedAt
+          ? new Date(currentSession.rotatedAt).getTime()
+          : 0;
+        if (nowMs - rotatedAtMs <= REFRESH_TOKEN_GRACE_PERIOD_MS) {
+          const reissuedAccessToken = jwt.sign(
+            {
+              sub: session.user.id,
+              email: session.user.email,
+              role: session.user.role,
+              sid: session.id,
+            },
+            this.jwtSecret,
+            {
+              expiresIn: ACCESS_TOKEN_EXPIRES_IN,
+              algorithm: JWT_ALGORITHM,
+            },
+          );
+
+          return {
+            accessToken: reissuedAccessToken,
+            refreshToken: "",
+          };
+        }
+      }
+
       await this.refreshTokenRepository.revokeAllUserSessions(session.userId);
       throw AppError.unauthorized(t("auth.invalidRefreshToken"));
     }

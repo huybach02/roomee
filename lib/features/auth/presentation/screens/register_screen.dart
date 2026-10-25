@@ -45,6 +45,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   WardModel? _selectedWard;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  AutovalidateMode _autovalidateMode = AutovalidateMode.disabled;
 
   @override
   void initState() {
@@ -82,6 +83,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
         ),
       );
+    } else {
+      setState(() {
+        _autovalidateMode = AutovalidateMode.onUserInteraction;
+      });
     }
   }
 
@@ -149,6 +154,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 child: Form(
                   key: _formKey,
+                  autovalidateMode: _autovalidateMode,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [

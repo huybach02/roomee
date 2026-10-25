@@ -43,6 +43,10 @@ SAFETY GUIDELINES:
 Execute only READ-only queries (SELECT, SHOW, EXPLAIN).
 DO NOT, under any circumstances, execute queries that modify the database structure or data (INSERT, UPDATE, DELETE, DROP, ALTER, TRUNCATE) unless explicitly requested by the user.
 Always include a `LIMIT` clause in `SELECT` statements to prevent loading excessive amounts of data, which could overwhelm the context window.
+
+QUERY STANDARD (TypeORM):
+- Ưu tiên sử dụng `createQueryBuilder` cho các truy vấn lấy dữ liệu từ database. Chỉ sử dụng các hàm truy vấn có sẵn như `findOneBy`, `findBy` cho các trường hợp cực kỳ đơn giản (tra cứu theo ID/khóa chính, 1 điều kiện cơ bản) theo quy tắc tại `@./.agents/rule/roomee.md`.
+
 If the MCP server is not yet installed, please let me know so I can set it up for you.
 
 Whenever you read this, please respond with ✅ READED AGENTS.md
