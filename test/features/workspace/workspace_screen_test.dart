@@ -95,6 +95,15 @@ class _FakeWorkspaceRepo implements IWorkspaceRepository {
 
   @override
   Future<WorkspaceModel> updateWorkspace(int id, Map<String, dynamic> data) async {
+    final existingIndex = workspaces.indexWhere((w) => w.id == id);
+    if (existingIndex != -1) {
+      final existing = workspaces[existingIndex];
+      final updated = existing.copyWith(
+        status: data.containsKey('status') ? (data['status'] as num).toInt() : existing.status,
+      );
+      workspaces[existingIndex] = updated;
+      return updated;
+    }
     return WorkspaceModel.fromJson({...data, 'id': id, 'userId': 1});
   }
 
@@ -239,6 +248,112 @@ void main() {
       expect(find.byType(AlertDialog), findsNothing);
     });
 
+    testWidgets('workspace card shows switch and toggling from true to false shows confirm dialog',
+        (tester) async {
+      final sampleWorkspace = WorkspaceModel(
+        id: 1,
+        userId: 1,
+        name: 'Nhà trọ Hoa Hồng',
+        type: WorkspaceType.apartmentMiniHouse,
+        area: 150.0,
+        numberOfRooms: 15,
+        status: 1,
+        provinceId: 1,
+        wardId: 1,
+        address: '123 Đường Láng',
+        contactName: 'Bác Hoa',
+        contactPhone: '0901234567',
+        province: const ProvinceModel(id: 1, code: 1, fullName: 'Hà Nội', codeName: 'hn'),
+        ward: const WardModel(id: 1, code: 1, provinceId: 1, fullName: 'Phường Láng Thượng', codeName: 'lt'),
+      );
+
+      final fakeRepo = _FakeWorkspaceRepo(workspaces: [sampleWorkspace]);
+      final workspaceBloc = WorkspaceBloc(repository: fakeRepo);
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          child: const WorkspaceScreen(),
+          workspaceBloc: workspaceBloc,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final switchFinder = find.byType(Switch);
+      expect(switchFinder, findsOneWidget);
+      expect(tester.widget<Switch>(switchFinder).value, isTrue);
+
+      // Gạt switch từ true sang false -> Hiển thị confirm dialog
+      await tester.tap(switchFinder);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(find.text(t('workspaceStatusConfirmTitle')), findsOneWidget);
+      expect(
+        find.text(t('workspaceStatusDeactivateConfirm', {'name': 'Nhà trọ Hoa Hồng'})),
+        findsOneWidget,
+      );
+      expect(find.text(t('actionDeactivate')), findsOneWidget);
+      expect(find.text(t('cancel')), findsOneWidget);
+
+      // Bấm Hủy -> Không đổi trạng thái
+      await tester.tap(find.text(t('cancel')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(tester.widget<Switch>(switchFinder).value, isTrue);
+
+      // Gạt switch lại và xác nhận Tạm dừng
+      await tester.tap(switchFinder);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text(t('actionDeactivate')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(tester.widget<Switch>(find.byType(Switch)).value, isFalse);
+    });
+
+    testWidgets('toggling switch from false to true activates directly without confirm dialog',
+        (tester) async {
+      final sampleInactive = WorkspaceModel(
+        id: 1,
+        userId: 1,
+        name: 'Nhà trọ Tạm Dừng',
+        type: WorkspaceType.rentedRoom,
+        area: 100.0,
+        numberOfRooms: 5,
+        status: 0,
+        provinceId: 1,
+        wardId: 1,
+        address: '123 Đường Láng',
+        contactName: 'Bác Hoa',
+        contactPhone: '0901234567',
+        province: const ProvinceModel(id: 1, code: 1, fullName: 'Hà Nội', codeName: 'hn'),
+        ward: const WardModel(id: 1, code: 1, provinceId: 1, fullName: 'Phường Láng Thượng', codeName: 'lt'),
+      );
+
+      final fakeRepo = _FakeWorkspaceRepo(workspaces: [sampleInactive]);
+      final workspaceBloc = WorkspaceBloc(repository: fakeRepo);
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          child: const WorkspaceScreen(),
+          workspaceBloc: workspaceBloc,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final switchFinder = find.byType(Switch);
+      expect(tester.widget<Switch>(switchFinder).value, isFalse);
+
+      // Gạt switch từ false sang true -> Kích hoạt ngay, không hiện dialog
+      await tester.tap(switchFinder);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(tester.widget<Switch>(find.byType(Switch)).value, isTrue);
+    });
+
     testWidgets('tapping Workspace item in LandlordScreen switches tab and displays WorkspaceScreen with FAB',
         (tester) async {
       final fakeAuth = _FakeAuthRepo();
@@ -332,7 +447,7 @@ void main() {
       expect(find.text(t('fields.workspaceAddress')), findsOneWidget);
       expect(find.text(t('fields.contactName')), findsOneWidget);
       expect(find.text(t('fields.contactPhone')), findsOneWidget);
-      expect(find.text(t('createWorkspaceButton')), findsOneWidget);
+      expect(find.text(t('common.createButton')), findsOneWidget);
     });
 
     testWidgets('DetailWorkspaceScreen renders details and navigates to edit mode', (tester) async {
@@ -415,7 +530,7 @@ void main() {
 
       expect(find.byType(WorkspaceFormScreen), findsOneWidget);
       expect(find.text(t('editWorkspaceTitle')), findsOneWidget);
-      expect(find.text(t('saveChanges')), findsOneWidget);
+      expect(find.text(t('common.saveChanges')), findsOneWidget);
       expect(find.text('Nhà trọ Đã Có Sẵn'), findsOneWidget);
       expect(find.text('85.5'), findsOneWidget);
       expect(find.text('6'), findsOneWidget);

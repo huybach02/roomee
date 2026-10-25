@@ -78,4 +78,7 @@ export class Workspace extends Mixin(AuditableTrait, SoftDeletableTrait) {
 
   @Column({ type: "varchar", length: 20, nullable: true })
   contactZalo: string | null;
+
+  @Column({ type: "integer", default: 1 })
+  status: number;
 }

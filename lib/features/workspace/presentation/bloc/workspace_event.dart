@@ -29,3 +29,10 @@ class WorkspaceDeleteEvent extends WorkspaceEvent {
 
   const WorkspaceDeleteEvent(this.id);
 }
+
+class WorkspaceToggleStatusEvent extends WorkspaceEvent {
+  final int id;
+  final int status;
+
+  const WorkspaceToggleStatusEvent({required this.id, required this.status});
+}

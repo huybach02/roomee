@@ -40,6 +40,14 @@ export const createWorkspaceSchema = z.object({
   contactName: ruleValidates.requiredString("Tên người liên hệ", { max: 100 }),
   contactPhone: ruleValidates.phoneRule("Số điện thoại liên hệ"),
   contactZalo: ruleValidates.phoneRule("Số Zalo liên hệ").nullish(),
+  status: z
+    .preprocess((val) => {
+      if (typeof val === "boolean") return val ? 1 : 0;
+      if (val === "true") return 1;
+      if (val === "false") return 0;
+      return val;
+    }, z.coerce.number().int().min(0).max(1))
+    .default(1),
 });
 
 export type CreateWorkspaceDto = z.infer<typeof createWorkspaceSchema>;

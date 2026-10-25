@@ -42,7 +42,8 @@
     "contactPhone": "Số điện thoại liên hệ",
     "contactPhoneHint": "Số điện thoại nhận cuộc gọi thuê trọ",
     "contactZalo": "Số Zalo (tùy chọn)",
-    "contactZaloHint": "Số điện thoại liên hệ qua Zalo"
+    "contactZaloHint": "Số điện thoại liên hệ qua Zalo",
+    "status": "Trạng thái"
   },
   "validateErrors": {
     "fieldRequired": "Vui lòng nhập trường này",
@@ -158,6 +159,12 @@
   "actionViewDetail": "Xem chi tiết",
   "actionEdit": "Chỉnh sửa",
   "actionDelete": "Xóa",
+  "actionDeactivate": "Tạm dừng",
+  "workspaceStatusConfirmTitle": "Tạm dừng hoạt động",
+  "workspaceStatusDeactivateConfirm": "Bạn có chắc chắn muốn tạm dừng hoạt động khu trọ \"{name}\" không?",
+  "workspaceStatusUpdateSuccess": "Cập nhật trạng thái khu trọ thành công!",
+  "workspaceStatusActive": "Đang hoạt động",
+  "workspaceStatusInactive": "Tạm dừng hoạt động",
   "deleteConfirmTitle": "Xác nhận xóa",
   "deleteWorkspaceConfirm": "Bạn có chắc chắn muốn xóa khu trọ \"{name}\" không?",
   "cancel": "Hủy",

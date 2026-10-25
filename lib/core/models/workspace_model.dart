@@ -18,6 +18,7 @@ class WorkspaceModel {
   final String contactName;
   final String contactPhone;
   final String? contactZalo;
+  final int status;
   final DateTime? createdAt;
   final DateTime? updatedAt;
   final int? createdBy;
@@ -41,6 +42,7 @@ class WorkspaceModel {
     required this.contactName,
     required this.contactPhone,
     this.contactZalo,
+    this.status = 1,
     this.createdAt,
     this.updatedAt,
     this.createdBy,
@@ -48,6 +50,8 @@ class WorkspaceModel {
     this.deletedAt,
     this.deletedBy,
   });
+
+  bool get isActive => status == 1;
 
   factory WorkspaceModel.fromJson(Map<String, dynamic> json) {
     return WorkspaceModel(
@@ -70,6 +74,7 @@ class WorkspaceModel {
       contactName: json['contactName'] as String? ?? '',
       contactPhone: json['contactPhone'] as String? ?? '',
       contactZalo: json['contactZalo'] as String?,
+      status: (json['status'] as num?)?.toInt() ?? 1,
       createdAt: json['createdAt'] != null
           ? DateTime.tryParse(json['createdAt'] as String)
           : null,
@@ -102,6 +107,7 @@ class WorkspaceModel {
       'contactName': contactName,
       'contactPhone': contactPhone,
       if (contactZalo != null) 'contactZalo': contactZalo,
+      'status': status,
       if (createdAt != null) 'createdAt': createdAt!.toIso8601String(),
       if (updatedAt != null) 'updatedAt': updatedAt!.toIso8601String(),
       if (createdBy != null) 'createdBy': createdBy,
@@ -127,6 +133,7 @@ class WorkspaceModel {
     String? contactName,
     String? contactPhone,
     String? contactZalo,
+    int? status,
     DateTime? createdAt,
     DateTime? updatedAt,
     int? createdBy,
@@ -150,6 +157,7 @@ class WorkspaceModel {
       contactName: contactName ?? this.contactName,
       contactPhone: contactPhone ?? this.contactPhone,
       contactZalo: contactZalo ?? this.contactZalo,
+      status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       createdBy: createdBy ?? this.createdBy,

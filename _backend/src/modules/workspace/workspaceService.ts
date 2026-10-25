@@ -151,6 +151,7 @@ export class WorkspaceService {
       contactName: dto.contactName,
       contactPhone: dto.contactPhone,
       contactZalo: dto.contactZalo ?? null,
+      status: dto.status ?? 1,
     });
 
     const savedWorkspace = await this.workspaceRepository.save(workspace);

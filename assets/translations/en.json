@@ -42,7 +42,8 @@
     "contactPhone": "Contact Phone",
     "contactPhoneHint": "Phone number for rental inquiries",
     "contactZalo": "Zalo Number (optional)",
-    "contactZaloHint": "Contact number via Zalo"
+    "contactZaloHint": "Contact number via Zalo",
+    "status": "Status"
   },
   "validateErrors": {
     "fieldRequired": "This field is required",
@@ -78,6 +79,7 @@
     "createButton": "Create",
     "createdSuccess": "Created successfully!",
     "editButton": "Save Changes",
+    "saveChanges": "Save Changes",
     "editSuccess": "Updated successfully!",
     "deleteButton": "Delete",
     "deleteSuccess": "Deleted successfully!"
@@ -157,6 +159,12 @@
   "actionViewDetail": "View Details",
   "actionEdit": "Edit",
   "actionDelete": "Delete",
+  "actionDeactivate": "Deactivate",
+  "workspaceStatusConfirmTitle": "Deactivate Workspace",
+  "workspaceStatusDeactivateConfirm": "Are you sure you want to deactivate workspace \"{name}\"?",
+  "workspaceStatusUpdateSuccess": "Workspace status updated successfully!",
+  "workspaceStatusActive": "Active",
+  "workspaceStatusInactive": "Inactive",
   "deleteConfirmTitle": "Confirm Deletion",
   "deleteWorkspaceConfirm": "Are you sure you want to delete workspace \"{name}\"?",
   "cancel": "Cancel",

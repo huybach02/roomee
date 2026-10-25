@@ -11,12 +11,13 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
   final IWorkspaceRepository _workspaceRepository;
 
   WorkspaceBloc({IWorkspaceRepository? repository})
-      : _workspaceRepository = repository ?? WorkspaceRepository(),
-        super(const WorkspaceInitial()) {
+    : _workspaceRepository = repository ?? WorkspaceRepository(),
+      super(const WorkspaceInitial()) {
     on<WorkspaceLoadEvent>(_onWorkspaceLoadRequested);
     on<WorkspaceCreateEvent>(_onWorkspaceCreateRequested);
     on<WorkspaceUpdateEvent>(_onWorkspaceUpdateRequested);
     on<WorkspaceDeleteEvent>(_onWorkspaceDeleteRequested);
+    on<WorkspaceToggleStatusEvent>(_onWorkspaceToggleStatusRequested);
   }
 
   Future<void> _onWorkspaceLoadRequested(
@@ -80,6 +81,34 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
     } on ApiException catch (e) {
       emit(WorkspaceFailure(e.message));
     } catch (e) {
+      emit(WorkspaceFailure(e.toString()));
+    }
+  }
+
+  Future<void> _onWorkspaceToggleStatusRequested(
+    WorkspaceToggleStatusEvent event,
+    Emitter<WorkspaceState> emit,
+  ) async {
+    if (state is! WorkspaceLoaded) return;
+    final currentWorkspaces = (state as WorkspaceLoaded).workspaces;
+
+    emit(
+      WorkspaceLoaded(
+        workspaces: currentWorkspaces.map((ws) {
+          return ws.id == event.id ? ws.copyWith(status: event.status) : ws;
+        }).toList(),
+      ),
+    );
+
+    try {
+      await _workspaceRepository.updateWorkspace(event.id, {
+        'status': event.status,
+      });
+    } on ApiException catch (e) {
+      emit(WorkspaceLoaded(workspaces: currentWorkspaces));
+      emit(WorkspaceFailure(e.message));
+    } catch (e) {
+      emit(WorkspaceLoaded(workspaces: currentWorkspaces));
       emit(WorkspaceFailure(e.toString()));
     }
   }

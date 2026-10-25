@@ -267,25 +267,57 @@ class _DetailWorkspaceScreenState extends State<DetailWorkspaceScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 6),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: DefaultColors.secondary.withValues(
-                                      alpha: 0.1,
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 4,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color:
+                                            DefaultColors.secondary.withValues(
+                                          alpha: 0.1,
+                                        ),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        _getWorkspaceTypeLabel(_workspace.type),
+                                        style: const TextStyle(
+                                          fontSize: FontSizes.small,
+                                          fontWeight: FontWeight.bold,
+                                          color: DefaultColors.secondary,
+                                        ),
+                                      ),
                                     ),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    _getWorkspaceTypeLabel(_workspace.type),
-                                    style: const TextStyle(
-                                      fontSize: FontSizes.small,
-                                      fontWeight: FontWeight.bold,
-                                      color: DefaultColors.secondary,
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: (_workspace.isActive
+                                                ? DefaultColors.success
+                                                : DefaultColors.danger)
+                                            .withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        _workspace.isActive
+                                            ? t('workspaceStatusActive')
+                                            : t('workspaceStatusInactive'),
+                                        style: TextStyle(
+                                          fontSize: FontSizes.small,
+                                          fontWeight: FontWeight.bold,
+                                          color: _workspace.isActive
+                                              ? DefaultColors.success
+                                              : DefaultColors.danger,
+                                        ),
+                                      ),
                                     ),
-                                  ),
+                                  ],
                                 ),
                               ],
                             ),
@@ -389,6 +421,13 @@ class _DetailWorkspaceScreenState extends State<DetailWorkspaceScreen> {
                     _buildSection(
                       title: t('systemInfo'),
                       children: [
+                        _buildInfoRow(
+                          t('fields.status'),
+                          _workspace.isActive
+                              ? t('workspaceStatusActive')
+                              : t('workspaceStatusInactive'),
+                          icon: Icons.toggle_on_outlined,
+                        ),
                         _buildInfoRow(
                           t('createdAtLabel'),
                           FunctionHelper.formatDateTime(_workspace.createdAt),

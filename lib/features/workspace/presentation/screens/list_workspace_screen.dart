@@ -79,6 +79,27 @@ class _ListWorkspaceScreenState extends State<ListWorkspaceScreen> {
     );
   }
 
+  void _handleToggleStatus(WorkspaceModel ws, bool value) {
+    if (!value) {
+      AppConfirmDialog.show(
+        context,
+        title: t('workspaceStatusConfirmTitle'),
+        message: t('workspaceStatusDeactivateConfirm', {'name': ws.name}),
+        confirmText: t('actionDeactivate'),
+        isDanger: true,
+        onConfirm: () {
+          context.read<WorkspaceBloc>().add(
+                WorkspaceToggleStatusEvent(id: ws.id, status: 0),
+              );
+        },
+      );
+    } else {
+      context.read<WorkspaceBloc>().add(
+            WorkspaceToggleStatusEvent(id: ws.id, status: 1),
+          );
+    }
+  }
+
   Widget _buildCardMenu(WorkspaceModel ws) {
     return AppPopupMenu<String>(
       items: [
@@ -414,6 +435,25 @@ class _ListWorkspaceScreenState extends State<ListWorkspaceScreen> {
                       ],
                     ),
                     const Spacer(),
+                    SizedBox(
+                      height: 32,
+                      child: Transform.scale(
+                        scale: 0.8,
+                        child: Switch(
+                          value: ws.isActive,
+                          activeTrackColor: DefaultColors.primary,
+                          activeThumbColor: DefaultColors.white,
+                          inactiveThumbColor: DefaultColors.white,
+                          inactiveTrackColor: DefaultColors.disabled,
+                          trackOutlineColor: WidgetStateProperty.resolveWith(
+                            (states) => Colors.transparent,
+                          ),
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                          onChanged: (val) => _handleToggleStatus(ws, val),
+                        ),
+                      ),
+                    ),
                     _buildCardMenu(ws),
                   ],
                 ),
