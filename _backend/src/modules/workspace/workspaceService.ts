@@ -47,7 +47,7 @@ export class WorkspaceService {
   ) {}
 
   public async getWorkspaces(
-    userId: number,
+    userId: string,
     userRole: string,
     query: WorkspaceQueryDto,
   ): Promise<{
@@ -92,8 +92,8 @@ export class WorkspaceService {
   }
 
   public async getWorkspaceById(
-    id: number,
-    userId: number,
+    id: string,
+    userId: string,
     userRole: string,
   ): Promise<Workspace> {
     const workspace = await this.workspaceRepository.findByIdWithRelations(id);
@@ -110,7 +110,7 @@ export class WorkspaceService {
   }
 
   public async createWorkspace(
-    userId: number,
+    userId: string,
     dto: CreateWorkspaceDto,
   ): Promise<Workspace> {
     const user = await this.userRepository.findOneBy({ id: userId });
@@ -160,8 +160,8 @@ export class WorkspaceService {
   }
 
   public async updateWorkspace(
-    id: number,
-    userId: number,
+    id: string,
+    userId: string,
     userRole: string,
     dto: UpdateWorkspaceDto,
   ): Promise<Workspace> {
@@ -206,7 +206,7 @@ export class WorkspaceService {
     return this.getWorkspaceById(id, userId, userRole);
   }
 
-  public async deleteWorkspace(id: number, userId: number): Promise<boolean> {
+  public async deleteWorkspace(id: string, userId: string): Promise<boolean> {
     const workspace = await this.workspaceRepository.findOneBy({ id });
 
     if (!workspace) {

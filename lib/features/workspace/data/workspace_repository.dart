@@ -7,10 +7,10 @@ abstract class IWorkspaceRepository {
   Future<PaginationModel<WorkspaceModel>> getWorkspaces({
     Map<String, dynamic>? queryParameters,
   });
-  Future<WorkspaceModel> getWorkspaceById(int id);
+  Future<WorkspaceModel> getWorkspaceById(String id);
   Future<WorkspaceModel> createWorkspace(Map<String, dynamic> data);
-  Future<WorkspaceModel> updateWorkspace(int id, Map<String, dynamic> data);
-  Future<void> deleteWorkspace(int id);
+  Future<WorkspaceModel> updateWorkspace(String id, Map<String, dynamic> data);
+  Future<void> deleteWorkspace(String id);
 }
 
 class WorkspaceRepository implements IWorkspaceRepository {
@@ -34,7 +34,7 @@ class WorkspaceRepository implements IWorkspaceRepository {
   }
 
   @override
-  Future<WorkspaceModel> getWorkspaceById(int id) async {
+  Future<WorkspaceModel> getWorkspaceById(String id) async {
     final response = await _remoteDataSource.getWorkspaceById(id);
     final data = response.data;
     if (data == null) {
@@ -54,7 +54,7 @@ class WorkspaceRepository implements IWorkspaceRepository {
   }
 
   @override
-  Future<WorkspaceModel> updateWorkspace(int id, Map<String, dynamic> data) async {
+  Future<WorkspaceModel> updateWorkspace(String id, Map<String, dynamic> data) async {
     final response = await _remoteDataSource.updateWorkspace(id, data);
     final responseData = response.data;
     if (responseData == null) {
@@ -64,7 +64,7 @@ class WorkspaceRepository implements IWorkspaceRepository {
   }
 
   @override
-  Future<void> deleteWorkspace(int id) async {
+  Future<void> deleteWorkspace(String id) async {
     await _remoteDataSource.deleteWorkspace(id);
   }
 }

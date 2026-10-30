@@ -8,9 +8,9 @@ export class AuditableTrait {
   @decorate(UpdateDateColumn({ type: "timestamp with time zone" }))
   updatedAt: Date;
 
-  @decorate(Column({ type: "integer", nullable: true }))
-  createdBy: number | null;
+  @decorate(Column({ type: "uuid", nullable: true }))
+  createdBy: string | null;
 
-  @decorate(Column({ type: "integer", nullable: true }))
-  updatedBy: number | null;
+  @decorate(Column({ type: "uuid", nullable: true }))
+  updatedBy: string | null;
 }

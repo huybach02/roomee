@@ -17,12 +17,12 @@ import { Ward } from "./ward.js";
 
 @Entity({ name: "workspaces" })
 export class Workspace extends Mixin(AuditableTrait, SoftDeletableTrait) {
-  @PrimaryGeneratedColumn()
-  id: number;
+  @PrimaryGeneratedColumn("uuid")
+  id: string;
 
   @Index()
-  @Column({ type: "integer" })
-  userId: number;
+  @Column({ type: "uuid" })
+  userId: string;
 
   @ManyToOne(() => User, (user) => user.workspaces, {
     onDelete: "CASCADE",

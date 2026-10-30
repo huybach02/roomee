@@ -21,8 +21,8 @@ class UserModel {
   final WardModel? ward;
   final DateTime? createdAt;
   final DateTime? updatedAt;
-  final int? createdBy;
-  final int? updatedBy;
+  final String? createdBy;
+  final String? updatedBy;
 
   const UserModel({
     required this.id,
@@ -75,8 +75,8 @@ class UserModel {
       updatedAt: json['updatedAt'] != null
           ? DateTime.tryParse(json['updatedAt'].toString())
           : null,
-      createdBy: json['createdBy'] as int?,
-      updatedBy: json['updatedBy'] as int?,
+      createdBy: json['createdBy']?.toString(),
+      updatedBy: json['updatedBy']?.toString(),
     );
   }
 
@@ -122,8 +122,8 @@ class UserModel {
     WardModel? ward,
     DateTime? createdAt,
     DateTime? updatedAt,
-    int? createdBy,
-    int? updatedBy,
+    String? createdBy,
+    String? updatedBy,
   }) {
     return UserModel(
       id: id ?? this.id,

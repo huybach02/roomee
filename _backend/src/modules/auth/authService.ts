@@ -288,7 +288,6 @@ export class AuthService {
       return await handleFailedAttempt();
     }
 
-    // Kiểm tra trạng thái tài khoản CHỈ KHI đã xác thực đúng mật khẩu (chống User Enumeration)
     if (!user.isActive) {
       throw AppError.forbidden(t("auth.accountInactive"));
     }
@@ -462,7 +461,7 @@ export class AuthService {
     return this.createSessionAndTokens(user, deviceInfo, ipAddress);
   }
 
-  public async getProfile(userId: number): Promise<User> {
+  public async getProfile(userId: string): Promise<User> {
     const user = await this.userRepository.findOne({
       where: { id: userId },
       relations: {

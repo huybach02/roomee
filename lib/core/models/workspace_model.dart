@@ -3,8 +3,8 @@ import 'package:roomee/core/models/ward_model.dart';
 import 'package:roomee/utils/constanst.dart';
 
 class WorkspaceModel {
-  final int id;
-  final int userId;
+  final String id;
+  final String userId;
   final WorkspaceType type;
   final String name;
   final double area;
@@ -21,10 +21,10 @@ class WorkspaceModel {
   final int status;
   final DateTime? createdAt;
   final DateTime? updatedAt;
-  final int? createdBy;
-  final int? updatedBy;
+  final String? createdBy;
+  final String? updatedBy;
   final DateTime? deletedAt;
-  final int? deletedBy;
+  final String? deletedBy;
 
   const WorkspaceModel({
     required this.id,
@@ -55,8 +55,8 @@ class WorkspaceModel {
 
   factory WorkspaceModel.fromJson(Map<String, dynamic> json) {
     return WorkspaceModel(
-      id: (json['id'] as num).toInt(),
-      userId: (json['userId'] as num).toInt(),
+      id: json['id']?.toString() ?? '',
+      userId: json['userId']?.toString() ?? '',
       type: WorkspaceType.fromValue(json['type'] as String?),
       name: json['name'] as String? ?? '',
       area: (json['area'] as num?)?.toDouble() ?? 0.0,
@@ -81,12 +81,12 @@ class WorkspaceModel {
       updatedAt: json['updatedAt'] != null
           ? DateTime.tryParse(json['updatedAt'] as String)
           : null,
-      createdBy: (json['createdBy'] as num?)?.toInt(),
-      updatedBy: (json['updatedBy'] as num?)?.toInt(),
+      createdBy: json['createdBy']?.toString(),
+      updatedBy: json['updatedBy']?.toString(),
       deletedAt: json['deletedAt'] != null
           ? DateTime.tryParse(json['deletedAt'] as String)
           : null,
-      deletedBy: (json['deletedBy'] as num?)?.toInt(),
+      deletedBy: json['deletedBy']?.toString(),
     );
   }
 
@@ -118,8 +118,8 @@ class WorkspaceModel {
   }
 
   WorkspaceModel copyWith({
-    int? id,
-    int? userId,
+    String? id,
+    String? userId,
     WorkspaceType? type,
     String? name,
     double? area,
@@ -136,10 +136,10 @@ class WorkspaceModel {
     int? status,
     DateTime? createdAt,
     DateTime? updatedAt,
-    int? createdBy,
-    int? updatedBy,
+    String? createdBy,
+    String? updatedBy,
     DateTime? deletedAt,
-    int? deletedBy,
+    String? deletedBy,
   }) {
     return WorkspaceModel(
       id: id ?? this.id,

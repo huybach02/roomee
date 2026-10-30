@@ -96,17 +96,17 @@ class _FakeWorkspaceRepo implements IWorkspaceRepository {
   }
 
   @override
-  Future<WorkspaceModel> getWorkspaceById(int id) async {
+  Future<WorkspaceModel> getWorkspaceById(String id) async {
     return workspaces.first;
   }
 
   @override
   Future<WorkspaceModel> createWorkspace(Map<String, dynamic> data) async {
-    return WorkspaceModel.fromJson({...data, 'id': 99, 'userId': 1});
+    return WorkspaceModel.fromJson({...data, 'id': 'ws-99', 'userId': 'user-1'});
   }
 
   @override
-  Future<WorkspaceModel> updateWorkspace(int id, Map<String, dynamic> data) async {
+  Future<WorkspaceModel> updateWorkspace(String id, Map<String, dynamic> data) async {
     final existingIndex = workspaces.indexWhere((w) => w.id == id);
     if (existingIndex != -1) {
       final existing = workspaces[existingIndex];
@@ -116,11 +116,11 @@ class _FakeWorkspaceRepo implements IWorkspaceRepository {
       workspaces[existingIndex] = updated;
       return updated;
     }
-    return WorkspaceModel.fromJson({...data, 'id': id, 'userId': 1});
+    return WorkspaceModel.fromJson({...data, 'id': id, 'userId': 'user-1'});
   }
 
   @override
-  Future<void> deleteWorkspace(int id) async {}
+  Future<void> deleteWorkspace(String id) async {}
 }
 
 Widget _buildTestApp({
@@ -211,8 +211,8 @@ void main() {
     testWidgets('renders list of workspace cards when workspaces are loaded',
         (tester) async {
       const sampleWorkspace = WorkspaceModel(
-        id: 1,
-        userId: 1,
+        id: 'ws-1',
+        userId: 'user-1',
         name: 'Nhà trọ Hoa Hồng',
         type: WorkspaceType.apartmentMiniHouse,
         area: 150.0,
@@ -277,8 +277,8 @@ void main() {
     testWidgets('workspace card shows switch and toggling from true to false shows confirm dialog',
         (tester) async {
       final sampleWorkspace = WorkspaceModel(
-        id: 1,
-        userId: 1,
+        id: 'ws-1',
+        userId: 'user-1',
         name: 'Nhà trọ Hoa Hồng',
         type: WorkspaceType.apartmentMiniHouse,
         area: 150.0,
@@ -342,8 +342,8 @@ void main() {
     testWidgets('toggling switch from false to true activates directly without confirm dialog',
         (tester) async {
       final sampleInactive = WorkspaceModel(
-        id: 1,
-        userId: 1,
+        id: 'ws-1',
+        userId: 'user-1',
         name: 'Nhà trọ Tạm Dừng',
         type: WorkspaceType.rentedRoom,
         area: 100.0,
@@ -478,8 +478,8 @@ void main() {
 
     testWidgets('DetailWorkspaceScreen renders details and navigates to edit mode', (tester) async {
       const sampleWorkspace = WorkspaceModel(
-        id: 1,
-        userId: 1,
+        id: 'ws-1',
+        userId: 'user-1',
         name: 'Nhà trọ Minh Khai',
         type: WorkspaceType.apartmentMiniHouse,
         area: 120.0,
@@ -532,8 +532,8 @@ void main() {
 
     testWidgets('WorkspaceFormScreen in edit mode pre-populates existing data', (tester) async {
       const sampleWorkspace = WorkspaceModel(
-        id: 1,
-        userId: 1,
+        id: 'ws-1',
+        userId: 'user-1',
         name: 'Nhà trọ Đã Có Sẵn',
         type: WorkspaceType.dormitory,
         area: 85.5,
@@ -567,8 +567,8 @@ void main() {
 
     test('WorkspaceBloc loads first page and appends data on WorkspaceLoadMoreEvent', () async {
       const ws1 = WorkspaceModel(
-        id: 1,
-        userId: 1,
+        id: 'ws-1',
+        userId: 'user-1',
         name: 'Nhà trọ 1',
         area: 50,
         numberOfRooms: 5,
@@ -579,8 +579,8 @@ void main() {
         contactPhone: '0901',
       );
       const ws2 = WorkspaceModel(
-        id: 2,
-        userId: 1,
+        id: 'ws-2',
+        userId: 'user-1',
         name: 'Nhà trọ 2',
         area: 60,
         numberOfRooms: 6,
@@ -617,7 +617,7 @@ void main() {
           isA<WorkspaceLoading>(),
           predicate<WorkspaceLoaded>((s) =>
               s.workspaces.length == 1 &&
-              s.workspaces.first.id == 1 &&
+              s.workspaces.first.id == 'ws-1' &&
               s.total == 2 &&
               s.page == 1 &&
               !s.hasReachedMax &&
@@ -633,7 +633,7 @@ void main() {
           predicate<WorkspaceLoaded>((s) =>
               !s.isLoadingMore &&
               s.workspaces.length == 2 &&
-              s.workspaces.last.id == 2 &&
+              s.workspaces.last.id == 'ws-2' &&
               s.page == 2 &&
               s.hasReachedMax),
         ]),

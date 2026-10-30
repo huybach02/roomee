@@ -9,7 +9,7 @@ export class WorkspaceRepository extends Repository<Workspace> {
     super(Workspace, AppDataSource.manager);
   }
 
-  public async findByIdWithRelations(id: number): Promise<Workspace | null> {
+  public async findByIdWithRelations(id: string): Promise<Workspace | null> {
     return this.createQueryBuilder("workspace")
       .leftJoinAndSelect("workspace.province", "province")
       .leftJoinAndSelect("workspace.ward", "ward")

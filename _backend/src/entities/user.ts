@@ -19,8 +19,8 @@ import { Workspace } from "./workspace.js";
 @Entity({ name: "users" })
 @Index(["email"], { unique: true, where: '"deletedAt" IS NULL' })
 export class User extends Mixin(AuditableTrait, SoftDeletableTrait) {
-  @PrimaryGeneratedColumn()
-  id: number;
+  @PrimaryGeneratedColumn("uuid")
+  id: string;
 
   @Column({ type: "varchar", length: 255 })
   email: string;

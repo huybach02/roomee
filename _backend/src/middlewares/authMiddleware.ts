@@ -35,7 +35,7 @@ export const authMiddleware = async (
     const decoded = jwt.verify(token, jwtSecret, {
       algorithms: JWT_ALLOWED_ALGORITHMS,
     }) as unknown as {
-      sub: number;
+      sub: string;
       email: string;
       role: string;
       sid?: string;
@@ -58,7 +58,7 @@ export const authMiddleware = async (
     req.token = token;
 
     // Thiết lập ngữ cảnh người dùng hiện tại vào RequestContext
-    const userId = Number(decoded.sub);
+    const userId = decoded.sub;
     const store = RequestContext.getStore();
     if (store) {
       store.userId = userId;

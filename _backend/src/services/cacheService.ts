@@ -131,6 +131,7 @@ export class CacheService {
 
   /**
    * Ghi dữ liệu với cờ NX (Not Exists) - Dùng cho cooldown và distributed lock
+   * Nếu ghi lần đầu thành công, trả về true. Nếu key đã tồn tại, trả về false.
    */
   public async setNx(
     key: string,

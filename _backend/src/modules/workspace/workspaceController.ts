@@ -24,7 +24,7 @@ export class WorkspaceController {
 
       const query = workspaceQuerySchema.parse(req.query);
       const result = await this.workspaceService.getWorkspaces(
-        userId as number,
+        userId as string,
         req.user?.role ?? "",
         query,
       );
@@ -44,8 +44,8 @@ export class WorkspaceController {
 
       const { id } = workspaceParamSchema.parse(req.params);
       const workspace = await this.workspaceService.getWorkspaceById(
-        id as number,
-        userId as number,
+        id as string,
+        userId as string,
         req.user?.role ?? "",
       );
       CustomResponse.success(res, workspace, t("common.success"));
@@ -64,7 +64,7 @@ export class WorkspaceController {
 
       const dto = req.body as CreateWorkspaceDto;
       const workspace = await this.workspaceService.createWorkspace(
-        userId as number,
+        userId as string,
         dto,
       );
       CustomResponse.success(res, workspace, t("workspace.createSuccess"), 201);
@@ -84,8 +84,8 @@ export class WorkspaceController {
       const { id } = workspaceParamSchema.parse(req.params);
       const dto = req.body as UpdateWorkspaceDto;
       const workspace = await this.workspaceService.updateWorkspace(
-        id as number,
-        userId as number,
+        id as string,
+        userId as string,
         req.user?.role ?? "",
         dto,
       );
@@ -105,8 +105,8 @@ export class WorkspaceController {
 
       const { id } = workspaceParamSchema.parse(req.params);
       await this.workspaceService.deleteWorkspace(
-        id as number,
-        userId as number,
+        id as string,
+        userId as string,
       );
       CustomResponse.success(res, null, t("workspace.deleteSuccess"));
     } catch (error) {

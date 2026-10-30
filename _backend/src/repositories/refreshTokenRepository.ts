@@ -39,7 +39,7 @@ export class RefreshTokenRepository extends Repository<RefreshToken> {
   }
 
   public async revokeAllUserSessions(
-    userId: number,
+    userId: string,
     exceptSessionId?: string,
   ): Promise<void> {
     const qb = this.createQueryBuilder()

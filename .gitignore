@@ -51,3 +51,5 @@ node_modules/
 _backend/node_modules/
 _backend/.env
 .commandcode
+
+.claude

@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 
 export interface RequestStore {
-  userId?: number | null;
+  userId?: string | null;
   role?: string | null;
   [key: string]: any;
 }
@@ -19,7 +19,7 @@ export class RequestContext {
   /**
    * Lấy ID của user hiện tại đang đăng nhập. Trả về null nếu chưa đăng nhập hoặc chạy ngoài request.
    */
-  static getUserId(): number | null {
+  static getUserId(): string | null {
     return requestContextStorage.getStore()?.userId ?? null;
   }
 
@@ -33,7 +33,7 @@ export class RequestContext {
   /**
    * Cập nhật ID user vào store của request hiện tại
    */
-  static setUserId(userId: number | null): void {
+  static setUserId(userId: string | null): void {
     const store = requestContextStorage.getStore();
     if (store) {
       store.userId = userId;

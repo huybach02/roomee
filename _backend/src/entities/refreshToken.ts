@@ -17,8 +17,8 @@ export class RefreshToken extends Mixin(AuditableTrait) {
   id: string;
 
   @Index()
-  @Column({ type: "integer" })
-  userId: number;
+  @Column({ type: "uuid" })
+  userId: string;
 
   @ManyToOne(() => User, { onDelete: "CASCADE" })
   @JoinColumn({ name: "userId" })

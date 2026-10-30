@@ -4,7 +4,7 @@ import { ruleValidates } from "../../utils/ruleValidate.js";
 import { baseQuerySchema } from "../../utils/queryHelper.js";
 
 export const workspaceParamSchema = z.object({
-  id: ruleValidates.idRule(),
+  id: ruleValidates.uuidRule(),
 });
 
 export type WorkspaceParam = z.infer<typeof workspaceParamSchema>;

@@ -6,7 +6,7 @@ declare global {
       locale: SupportedLocale;
       t: (key: string, params?: Record<string, string | number>) => string;
       user?: {
-        sub: number;
+        sub: string;
         email: string;
         role: string;
         [key: string]: any;

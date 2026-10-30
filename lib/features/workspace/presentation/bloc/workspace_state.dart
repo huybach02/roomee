@@ -68,7 +68,7 @@ class WorkspaceUpdateSuccess extends WorkspaceState {
 }
 
 class WorkspaceDeleteSuccess extends WorkspaceState {
-  final int id;
+  final String id;
 
   const WorkspaceDeleteSuccess(this.id);
 }

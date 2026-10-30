@@ -136,8 +136,8 @@ void main() {
   group('WorkspaceModel', () {
     test('fromJson and toJson parse Workspace data properly', () {
       final json = {
-        'id': 1,
-        'userId': 2,
+        'id': 'ws-1',
+        'userId': 'user-2',
         'type': 'apartment/mini_house',
         'name': 'Khu trọ Thăng Long',
         'area': 120.5,
@@ -149,14 +149,14 @@ void main() {
         'contactName': 'Nguyễn Văn Chủ',
         'contactPhone': '0901234567',
         'contactZalo': '0901234567',
-        'createdBy': 2,
-        'updatedBy': 2,
+        'createdBy': 'user-2',
+        'updatedBy': 'user-2',
       };
 
       final workspace = WorkspaceModel.fromJson(json);
 
-      expect(workspace.id, 1);
-      expect(workspace.userId, 2);
+      expect(workspace.id, 'ws-1');
+      expect(workspace.userId, 'user-2');
       expect(workspace.type, WorkspaceType.apartmentMiniHouse);
       expect(workspace.name, 'Khu trọ Thăng Long');
       expect(workspace.area, 120.5);
@@ -177,8 +177,8 @@ void main() {
 
     test('copyWith works properly', () {
       const ws1 = WorkspaceModel(
-        id: 1,
-        userId: 2,
+        id: 'ws-1',
+        userId: 'user-2',
         name: 'Nhà A',
         area: 50.0,
         provinceId: 1,
@@ -189,7 +189,7 @@ void main() {
       );
       final ws2 = ws1.copyWith(name: 'Nhà B', numberOfRooms: 5);
 
-      expect(ws2.id, 1);
+      expect(ws2.id, 'ws-1');
       expect(ws2.name, 'Nhà B');
       expect(ws2.numberOfRooms, 5);
       expect(ws2.area, 50.0);

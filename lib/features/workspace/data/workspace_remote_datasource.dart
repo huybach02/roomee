@@ -40,7 +40,7 @@ class WorkspaceRemoteDataSource extends BaseService {
     );
   }
 
-  Future<ApiResponse<WorkspaceModel>> getWorkspaceById(int id) {
+  Future<ApiResponse<WorkspaceModel>> getWorkspaceById(String id) {
     return getDataById<WorkspaceModel>(
       '/workspaces',
       id,
@@ -59,7 +59,7 @@ class WorkspaceRemoteDataSource extends BaseService {
   }
 
   Future<ApiResponse<WorkspaceModel>> updateWorkspace(
-    int id,
+    String id,
     Map<String, dynamic> data,
   ) {
     return putData<WorkspaceModel>(
@@ -70,7 +70,7 @@ class WorkspaceRemoteDataSource extends BaseService {
     );
   }
 
-  Future<ApiResponse<void>> deleteWorkspace(int id) {
+  Future<ApiResponse<void>> deleteWorkspace(String id) {
     return deleteData(
       '/workspaces',
       id: id,
