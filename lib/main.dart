@@ -7,6 +7,8 @@ import 'package:roomee/core/bloc/locale/locale_cubit.dart';
 import 'package:roomee/core/configs/app_theme.dart';
 import 'package:roomee/core/localization/app_localizations.dart';
 import 'package:roomee/core/network/api_client.dart';
+import 'package:roomee/core/offline/hive/cache_boxes.dart';
+import 'package:roomee/core/offline/hive/hive_initializer.dart';
 import 'package:roomee/core/router/app_router.dart';
 import 'package:roomee/core/screens/no_internet_screen.dart';
 import 'package:roomee/features/auth/presentation/bloc/auth_bloc.dart';
@@ -15,6 +17,7 @@ import 'package:roomee/features/workspace/presentation/bloc/workspace_bloc.dart'
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  final cacheBoxes = await HiveInitializer.initialize();
   await AppLocalizations.preload();
   Locale initialLocale = const Locale('vi');
 
@@ -40,7 +43,13 @@ void main() async {
     },
   );
 
-  runApp(MyApp(initialLocale: initialLocale, authBloc: authBloc));
+  runApp(
+    MyApp(
+      initialLocale: initialLocale,
+      authBloc: authBloc,
+      cacheBoxes: cacheBoxes,
+    ),
+  );
 }
 
 class MyApp extends StatefulWidget {
@@ -49,6 +58,7 @@ class MyApp extends StatefulWidget {
   final AuthBloc? authBloc;
   final GeneralBloc? generalBloc;
   final WorkspaceBloc? workspaceBloc;
+  final CacheBoxes? cacheBoxes;
 
   const MyApp({
     super.key,
@@ -57,6 +67,7 @@ class MyApp extends StatefulWidget {
     this.authBloc,
     this.generalBloc,
     this.workspaceBloc,
+    this.cacheBoxes,
   });
 
   @override
@@ -90,7 +101,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    return MultiBlocProvider(
+    final app = MultiBlocProvider(
       providers: [
         BlocProvider(
           create: (_) => LocaleCubit(initialLocale: widget.initialLocale),
@@ -117,5 +128,12 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         },
       ),
     );
+
+    final cacheBoxes = widget.cacheBoxes;
+    if (cacheBoxes == null) {
+      return app;
+    }
+
+    return RepositoryProvider.value(value: cacheBoxes, child: app);
   }
 }

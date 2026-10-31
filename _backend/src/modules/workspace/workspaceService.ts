@@ -59,6 +59,7 @@ export class WorkspaceService {
   }> {
     const qb = this.workspaceRepository
       .createQueryBuilder("workspace")
+      .leftJoinAndSelect("workspace.user", "user")
       .leftJoinAndSelect("workspace.province", "province")
       .leftJoinAndSelect("workspace.ward", "ward");
 

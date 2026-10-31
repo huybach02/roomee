@@ -104,19 +104,19 @@ class _ListWorkspaceScreenState extends State<ListWorkspaceScreen> {
     return queryParams;
   }
 
-  void _loadWorkspaces() {
+  Future<void> _loadWorkspaces() async {
     if (_scrollController.hasClients) {
       _scrollController.jumpTo(0);
     }
     context.read<WorkspaceBloc>().add(
-          WorkspaceLoadEvent(queryParameters: _buildQueryParams()),
-        );
+      WorkspaceLoadEvent(queryParameters: _buildQueryParams()),
+    );
   }
 
-  void _loadMoreWorkspaces() {
+  Future<void> _loadMoreWorkspaces() async {
     context.read<WorkspaceBloc>().add(
-          WorkspaceLoadMoreEvent(queryParameters: _buildQueryParams()),
-        );
+      WorkspaceLoadMoreEvent(queryParameters: _buildQueryParams()),
+    );
   }
 
   List<FilterFieldConfig> _getFilterConfigs() {
@@ -164,12 +164,9 @@ class _ListWorkspaceScreenState extends State<ListWorkspaceScreen> {
           ),
           FilterOption(
             label: t('workspaceTypeApartment'),
-            value: 'apartment_mini_house',
+            value: WorkspaceType.apartmentMiniHouse.value,
           ),
-          FilterOption(
-            label: t('workspaceTypeDormitory'),
-            value: 'dormitory',
-          ),
+          FilterOption(label: t('workspaceTypeDormitory'), value: 'dormitory'),
         ],
       ),
       FilterFieldConfig.dropdown(
@@ -247,14 +244,14 @@ class _ListWorkspaceScreenState extends State<ListWorkspaceScreen> {
         isDanger: true,
         onConfirm: () {
           context.read<WorkspaceBloc>().add(
-                WorkspaceToggleStatusEvent(id: ws.id, status: 0),
-              );
+            WorkspaceToggleStatusEvent(id: ws.id, status: 0),
+          );
         },
       );
     } else {
       context.read<WorkspaceBloc>().add(
-            WorkspaceToggleStatusEvent(id: ws.id, status: 1),
-          );
+        WorkspaceToggleStatusEvent(id: ws.id, status: 1),
+      );
     }
   }
 
@@ -471,8 +468,8 @@ class _ListWorkspaceScreenState extends State<ListWorkspaceScreen> {
                                   ws.contactPhone.isNotEmpty
                               ? '${ws.contactName} - ${ws.contactPhone}'
                               : (ws.contactName.isNotEmpty
-                                  ? ws.contactName
-                                  : ws.contactPhone),
+                                    ? ws.contactName
+                                    : ws.contactPhone),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
@@ -652,7 +649,7 @@ class _ListWorkspaceScreenState extends State<ListWorkspaceScreen> {
 
                 return RefreshIndicator(
                   onRefresh: () async {
-                    _loadWorkspaces();
+                    await _loadWorkspaces();
                   },
                   color: DefaultColors.primary,
                   child: Column(
@@ -665,10 +662,11 @@ class _ListWorkspaceScreenState extends State<ListWorkspaceScreen> {
                             children: [
                               Text(
                                 t('common.totalRecords', {
-                                  'count': (state is WorkspaceLoaded
-                                          ? state.total
-                                          : workspaces.length)
-                                      .toString(),
+                                  'count':
+                                      (state is WorkspaceLoaded
+                                              ? state.total
+                                              : workspaces.length)
+                                          .toString(),
                                 }),
                                 style: const TextStyle(
                                   fontSize: FontSizes.small,
@@ -679,10 +677,11 @@ class _ListWorkspaceScreenState extends State<ListWorkspaceScreen> {
                               Text(
                                 t('common.showOf', {
                                   'count': workspaces.length.toString(),
-                                  'total': (state is WorkspaceLoaded
-                                          ? state.total
-                                          : workspaces.length)
-                                      .toString(),
+                                  'total':
+                                      (state is WorkspaceLoaded
+                                              ? state.total
+                                              : workspaces.length)
+                                          .toString(),
                                 }),
                                 style: const TextStyle(
                                   fontSize: FontSizes.small,
@@ -703,7 +702,8 @@ class _ListWorkspaceScreenState extends State<ListWorkspaceScreen> {
                                   horizontal: 16,
                                   vertical: 8,
                                 ),
-                                itemCount: (state is WorkspaceLoaded &&
+                                itemCount:
+                                    (state is WorkspaceLoaded &&
                                         !state.hasReachedMax)
                                     ? workspaces.length + 1
                                     : workspaces.length,
@@ -712,8 +712,9 @@ class _ListWorkspaceScreenState extends State<ListWorkspaceScreen> {
                                 itemBuilder: (context, index) {
                                   if (index >= workspaces.length) {
                                     return const Padding(
-                                      padding:
-                                          EdgeInsets.symmetric(vertical: 16),
+                                      padding: EdgeInsets.symmetric(
+                                        vertical: 16,
+                                      ),
                                       child: Center(
                                         child: SizedBox(
                                           width: 24,
