@@ -24,10 +24,10 @@ const WORKSPACE_SEARCH_FIELDS = [
 ];
 
 const WORKSPACE_FILTER_SCHEMA: FilterSchema<WorkspaceQueryDto> = {
-  type: { field: "workspace.type", operator: "eq" },
-  status: { field: "workspace.status", operator: "eq" },
-  provinceId: { field: "workspace.provinceId", operator: "eq" },
-  wardId: { field: "workspace.wardId", operator: "eq" },
+  type: { operator: "eq", field: "workspace.type" },
+  status: { operator: "eq", field: "workspace.status" },
+  provinceId: { operator: "eq", field: "workspace.provinceId" },
+  wardId: { operator: "eq", field: "workspace.wardId" },
 };
 
 const WORKSPACE_SORT_MAP: Record<string, string> = {
@@ -69,20 +69,14 @@ export class WorkspaceService {
     QueryHelper.applySearch(qb, query.search, WORKSPACE_SEARCH_FIELDS);
     QueryHelper.applyFilters(qb, query, WORKSPACE_FILTER_SCHEMA);
 
-    const sortList = [];
-    if (query.sortByScale) {
-      sortList.push({
-        field: query.sortByScale,
-        order: query.sortOrderScale,
-      });
-    }
-    if (query.sortBy) {
-      sortList.push({ field: query.sortBy, order: query.sortOrder });
-    }
-
     QueryHelper.applySorting(
       qb,
-      sortList.length > 0 ? sortList : undefined,
+      QueryHelper.parseSort(
+        query.sort,
+        query.sortBy
+          ? [{ field: query.sortBy, order: query.sortOrder }]
+          : undefined,
+      ),
       WORKSPACE_SORT_MAP,
       {},
       { field: "workspace.createdAt", order: "DESC" },

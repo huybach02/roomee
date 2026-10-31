@@ -29,25 +29,34 @@ class _ListWorkspaceScreenState extends State<ListWorkspaceScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final ScrollController _scrollController = ScrollController();
   String _searchKeyword = '';
-  Map<String, dynamic> _filters = {'sortBy': 'createdAt_desc'};
+  late Map<String, dynamic> _filters;
   bool _isFilterOpen = false;
+
+  Map<String, dynamic> _getDefaultFilters() {
+    final defaults = <String, dynamic>{};
+    for (final config in _getFilterConfigs()) {
+      if (config.defaultValue != null) {
+        defaults[config.key] = config.defaultValue;
+      }
+    }
+    return defaults;
+  }
 
   int get _activeFilterCount {
     int count = 0;
-    _filters.forEach((key, val) {
-      if (val != null) {
-        if (key == 'sortBy' && val == 'createdAt_desc') {
-          return;
-        }
+    for (final config in _getFilterConfigs()) {
+      final val = _filters[config.key];
+      if (val != null && val != config.defaultValue) {
         count++;
       }
-    });
+    }
     return count;
   }
 
   @override
   void initState() {
     super.initState();
+    _filters = _getDefaultFilters();
     _scrollController.addListener(_onScroll);
     _loadWorkspaces();
   }
@@ -73,25 +82,25 @@ class _ListWorkspaceScreenState extends State<ListWorkspaceScreen> {
     if (_searchKeyword.isNotEmpty) {
       queryParams['search'] = _searchKeyword;
     }
-    _filters.forEach((key, val) {
-      if (val != null) {
-        if (key == 'sortBy') {
-          final parts = (val as String).split('_');
-          if (parts.length == 2) {
-            queryParams['sortBy'] = parts[0];
-            queryParams['sortOrder'] = parts[1];
-          }
-        } else if (key == 'sortByScale') {
-          final parts = (val as String).split('_');
-          if (parts.length == 2) {
-            queryParams['sortByScale'] = parts[0];
-            queryParams['sortOrderScale'] = parts[1];
-          }
-        } else {
-          queryParams[key] = val;
-        }
+
+    final configs = _getFilterConfigs();
+    final sortList = <String>[];
+
+    for (final config in configs) {
+      final val = _filters[config.key];
+      if (val == null || (val is String && val.isEmpty)) continue;
+
+      if (config.isSort) {
+        sortList.add(val.toString());
+      } else {
+        queryParams[config.key] = val;
       }
-    });
+    }
+
+    if (sortList.isNotEmpty) {
+      queryParams['sort'] = sortList.join(',');
+    }
+
     return queryParams;
   }
 
@@ -113,24 +122,26 @@ class _ListWorkspaceScreenState extends State<ListWorkspaceScreen> {
   List<FilterFieldConfig> _getFilterConfigs() {
     return [
       FilterFieldConfig.chips(
-        key: 'sortBy',
-        title: t('sortBy'),
-        defaultValue: 'createdAt_desc',
+        key: 'sortByScale',
+        title: t('sortByScale'),
+        isSort: true,
         options: [
-          FilterOption(label: t('sortNewest'), value: 'createdAt_desc'),
-          FilterOption(label: t('sortOldest'), value: 'createdAt_asc'),
-          FilterOption(label: t('sortNameAZ'), value: 'name_asc'),
-          FilterOption(label: t('sortNameZA'), value: 'name_desc'),
+          FilterOption(label: t('sortAreaAsc'), value: 'area:asc'),
+          FilterOption(label: t('sortAreaDesc'), value: 'area:desc'),
+          FilterOption(label: t('sortRoomsAsc'), value: 'numberOfRooms:asc'),
+          FilterOption(label: t('sortRoomsDesc'), value: 'numberOfRooms:desc'),
         ],
       ),
       FilterFieldConfig.chips(
-        key: 'sortByScale',
-        title: t('sortByScale'),
+        key: 'sortBy',
+        title: t('sortBy'),
+        defaultValue: 'createdAt:desc',
+        isSort: true,
         options: [
-          FilterOption(label: t('sortAreaAsc'), value: 'area_asc'),
-          FilterOption(label: t('sortAreaDesc'), value: 'area_desc'),
-          FilterOption(label: t('sortRoomsAsc'), value: 'numberOfRooms_asc'),
-          FilterOption(label: t('sortRoomsDesc'), value: 'numberOfRooms_desc'),
+          FilterOption(label: t('sortNewest'), value: 'createdAt:desc'),
+          FilterOption(label: t('sortOldest'), value: 'createdAt:asc'),
+          FilterOption(label: t('sortNameAZ'), value: 'name:asc'),
+          FilterOption(label: t('sortNameZA'), value: 'name:desc'),
         ],
       ),
       FilterFieldConfig.chips(
@@ -742,7 +753,7 @@ class _ListWorkspaceScreenState extends State<ListWorkspaceScreen> {
               },
               onReset: () {
                 setState(() {
-                  _filters = {'sortBy': 'createdAt_desc'};
+                  _filters = _getDefaultFilters();
                 });
                 _loadWorkspaces();
               },

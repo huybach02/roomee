@@ -60,11 +60,15 @@ class FilterFieldConfig {
   final String? maxKey;
   final String? unit;
 
+  /// Đánh dấu cấu hình này là trường sắp xếp (tự động gom vào query param 'sort')
+  final bool isSort;
+
   const FilterFieldConfig.chips({
     required this.key,
     required this.title,
     required this.options,
     this.defaultValue,
+    this.isSort = false,
   })  : type = FilterType.chips,
         loadOptionsAsync = null,
         minKey = null,
@@ -76,6 +80,7 @@ class FilterFieldConfig {
     required this.title,
     required this.options,
     this.defaultValue,
+    this.isSort = false,
   })  : type = FilterType.multiChips,
         loadOptionsAsync = null,
         minKey = null,
@@ -91,7 +96,8 @@ class FilterFieldConfig {
         options = null,
         minKey = null,
         maxKey = null,
-        unit = null;
+        unit = null,
+        isSort = false;
 
   const FilterFieldConfig.range({
     required this.title,
@@ -102,5 +108,6 @@ class FilterFieldConfig {
   })  : key = '',
         type = FilterType.range,
         options = null,
-        loadOptionsAsync = null;
+        loadOptionsAsync = null,
+        isSort = false;
 }

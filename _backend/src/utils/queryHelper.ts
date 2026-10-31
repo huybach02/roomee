@@ -5,6 +5,7 @@ export const baseQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
   search: z.string().trim().optional(),
+  sort: z.union([z.string(), z.array(z.string())]).optional(),
   sortBy: z.string().trim().optional(),
   sortOrder: z.enum(["asc", "desc", "ASC", "DESC"]).optional(),
   all: z
@@ -167,11 +168,61 @@ export class QueryHelper {
   }
 
   /**
-   * 3. Sắp xếp an toàn (Tránh SQL Injection bằng Whitelist, hỗ trợ sắp xếp đa tiêu chí)
+   * 3. Parse chuỗi sắp xếp theo chuẩn RESTful
+   * Hỗ trợ: "field:desc,field:asc", "-field,field", mảng string hoặc SortItem[]
+   */
+  public static parseSort(
+    sortInput?: string | string[] | SortItem | SortItem[],
+    fallbackSorts?: SortItem | SortItem[],
+  ): SortItem[] {
+    const fallbacks = fallbackSorts
+      ? Array.isArray(fallbackSorts)
+        ? fallbackSorts
+        : [fallbackSorts]
+      : [];
+
+    if (!sortInput) return fallbacks;
+
+    // Nếu đã là object SortItem hoặc SortItem[]
+    if (typeof sortInput === "object") {
+      if (!Array.isArray(sortInput)) return [sortInput];
+      if (sortInput.length === 0) return fallbacks;
+      if (typeof sortInput[0] === "object") return sortInput as SortItem[];
+    }
+
+    // Chuẩn hóa mọi dạng chuỗi về danh sách tokens
+    const rawTokens = (Array.isArray(sortInput) ? sortInput : [sortInput])
+      .flatMap((item) => (typeof item === "string" ? item.split(",") : []))
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const parsed: SortItem[] = rawTokens
+      .map((token) => {
+        if (token.includes(":")) {
+          const [field, order] = token.split(":");
+          return {
+            field: field.trim(),
+            order: order.trim().toUpperCase() === "ASC" ? "ASC" : "DESC",
+          };
+        }
+        const isDesc = token.startsWith("-");
+        const isAsc = token.startsWith("+");
+        return {
+          field: isDesc || isAsc ? token.slice(1).trim() : token,
+          order: isDesc ? "DESC" : "ASC",
+        };
+      })
+      .filter((item) => item.field.length > 0);
+
+    return parsed.length > 0 ? parsed : fallbacks;
+  }
+
+  /**
+   * 4. Sắp xếp an toàn (Tránh SQL Injection bằng Whitelist, hỗ trợ sắp xếp đa tiêu chí)
    */
   public static applySorting<T extends ObjectLiteral>(
     qb: SelectQueryBuilder<T>,
-    sorts?: string | SortItem | SortItem[],
+    sorts?: string | string[] | SortItem | SortItem[],
     sortOrderOrAllowed?: string | Record<string, string>,
     allowedSortFieldsInput: Record<string, string> = {},
     defaultSort: { field: string; order: "ASC" | "DESC" } = {
@@ -179,32 +230,15 @@ export class QueryHelper {
       order: "DESC",
     },
   ): SelectQueryBuilder<T> {
-    let sortItems: SortItem[] = [];
     let allowed: Record<string, string> = {};
 
-    if (Array.isArray(sorts)) {
-      sortItems = sorts;
-      allowed = (sortOrderOrAllowed as Record<string, string>) || {};
-    } else if (typeof sorts === "string") {
-      sortItems = [
-        {
-          field: sorts,
-          order:
-            typeof sortOrderOrAllowed === "string"
-              ? sortOrderOrAllowed
-              : "DESC",
-        },
-      ];
-      allowed = allowedSortFieldsInput;
-    } else if (sorts && typeof sorts === "object") {
-      sortItems = [sorts];
-      allowed = (sortOrderOrAllowed as Record<string, string>) || {};
+    if (typeof sortOrderOrAllowed === "object" && sortOrderOrAllowed !== null) {
+      allowed = sortOrderOrAllowed;
     } else {
-      allowed =
-        (sortOrderOrAllowed as Record<string, string>) ||
-        allowedSortFieldsInput;
+      allowed = allowedSortFieldsInput;
     }
 
+    const sortItems: SortItem[] = QueryHelper.parseSort(sorts);
     const validSorts = sortItems.filter((s) => s.field && allowed[s.field]);
 
     if (validSorts.length === 0) {
