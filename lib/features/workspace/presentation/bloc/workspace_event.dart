@@ -7,8 +7,9 @@ abstract class WorkspaceEvent {
 
 class WorkspaceLoadEvent extends WorkspaceEvent {
   final Map<String, dynamic>? queryParameters;
+  final Completer<void>? completer;
 
-  const WorkspaceLoadEvent({this.queryParameters});
+  const WorkspaceLoadEvent({this.queryParameters, this.completer});
 }
 
 class WorkspaceLoadMoreEvent extends WorkspaceEvent {
@@ -41,4 +42,8 @@ class WorkspaceToggleStatusEvent extends WorkspaceEvent {
   final int status;
 
   const WorkspaceToggleStatusEvent({required this.id, required this.status});
+}
+
+class WorkspaceResetEvent extends WorkspaceEvent {
+  const WorkspaceResetEvent();
 }

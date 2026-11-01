@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -6,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:roomee/core/bloc/locale/locale_cubit.dart';
 import 'package:roomee/core/localization/app_localizations.dart';
 import 'package:roomee/core/models/models.dart';
+import 'package:roomee/core/offline/query/offline_page.dart';
 import 'package:roomee/core/router/app_router.dart';
 import 'package:roomee/core/screens/landlord_screen.dart';
 import 'package:roomee/core/widgets/filter/app_search_app_bar.dart';
@@ -81,17 +83,28 @@ class _FakeWorkspaceRepo implements IWorkspaceRepository {
   _FakeWorkspaceRepo({this.workspaces = const [], this.pages});
 
   @override
-  Future<PaginationModel<WorkspaceModel>> getWorkspaces({Map<String, dynamic>? queryParameters}) async {
+  Future<OfflinePage<WorkspaceModel>> getWorkspaces({Map<String, dynamic>? queryParameters}) async {
     final page = queryParameters?['page'] as int? ?? 1;
     if (pages != null && pages!.containsKey(page)) {
-      return pages![page]!;
+      final p = pages![page]!;
+      return OfflinePage(
+        data: p.data,
+        total: p.total,
+        page: p.page,
+        limit: p.limit,
+        totalPages: p.totalPages,
+        isComplete: true,
+        source: DataSourceKind.remote,
+      );
     }
-    return PaginationModel(
+    return OfflinePage(
       data: workspaces,
       total: workspaces.length,
       page: 1,
       limit: 20,
       totalPages: 1,
+      isComplete: true,
+      source: DataSourceKind.remote,
     );
   }
 
@@ -121,6 +134,59 @@ class _FakeWorkspaceRepo implements IWorkspaceRepository {
 
   @override
   Future<void> deleteWorkspace(String id) async {}
+}
+
+class _FakeLocalSourceWorkspaceRepo extends _FakeWorkspaceRepo {
+  _FakeLocalSourceWorkspaceRepo({super.workspaces});
+
+  @override
+  Future<OfflinePage<WorkspaceModel>> getWorkspaces({Map<String, dynamic>? queryParameters}) async {
+    return OfflinePage(
+      data: workspaces,
+      total: workspaces.length,
+      page: 1,
+      limit: 20,
+      totalPages: 1,
+      isComplete: true,
+      source: DataSourceKind.local,
+      lastFetchedAt: DateTime(2026, 11, 1, 10, 30),
+    );
+  }
+}
+
+class _FakeSwitchingSourceWorkspaceRepo extends _FakeWorkspaceRepo {
+  final List<WorkspaceModel> initialOnlineWorkspaces;
+  final List<WorkspaceModel> fallbackLocalWorkspaces;
+  bool switchToLocal = false;
+
+  _FakeSwitchingSourceWorkspaceRepo({
+    required this.initialOnlineWorkspaces,
+    required this.fallbackLocalWorkspaces,
+  }) : super(workspaces: initialOnlineWorkspaces);
+
+  @override
+  Future<OfflinePage<WorkspaceModel>> getWorkspaces({Map<String, dynamic>? queryParameters}) async {
+    if (switchToLocal) {
+      return OfflinePage(
+        data: fallbackLocalWorkspaces,
+        total: fallbackLocalWorkspaces.length,
+        page: 2,
+        limit: 20,
+        totalPages: 2,
+        isComplete: true,
+        source: DataSourceKind.local,
+      );
+    }
+    return OfflinePage(
+      data: initialOnlineWorkspaces,
+      total: 30,
+      page: 1,
+      limit: 20,
+      totalPages: 2,
+      isComplete: false,
+      source: DataSourceKind.remote,
+    );
+  }
 }
 
 Widget _buildTestApp({
@@ -167,6 +233,212 @@ void main() {
   });
 
   group('WorkspaceScreen & ListWorkspaceScreen', () {
+    test('WorkspaceBloc emits isOffline true when repository returns local source', () async {
+      const sample = WorkspaceModel(
+        id: 'ws-1',
+        userId: 'user-1',
+        name: 'Nhà trọ Offline',
+        area: 100.0,
+        provinceId: 1,
+        wardId: 1,
+        address: 'Đường A',
+        contactName: 'A',
+        contactPhone: '0901',
+      );
+      final localRepo = _FakeLocalSourceWorkspaceRepo(workspaces: [sample]);
+      final bloc = WorkspaceBloc(repository: localRepo);
+
+      bloc.add(const WorkspaceLoadEvent());
+      await expectLater(
+        bloc.stream,
+        emitsInOrder([
+          const WorkspaceLoading(),
+          isA<WorkspaceLoaded>().having((s) => s.isOffline, 'isOffline', isTrue),
+        ]),
+      );
+      await bloc.close();
+    });
+
+    test('WorkspaceResetEvent resets state from WorkspaceLoaded to WorkspaceInitial', () async {
+      const sample = WorkspaceModel(
+        id: 'ws-1',
+        userId: 'user-1',
+        name: 'Nhà trọ 1',
+        area: 100.0,
+        provinceId: 1,
+        wardId: 1,
+        address: 'Đường A',
+        contactName: 'A',
+        contactPhone: '0901',
+      );
+      final repo = _FakeWorkspaceRepo(workspaces: [sample]);
+      final bloc = WorkspaceBloc(repository: repo);
+
+      bloc.add(const WorkspaceLoadEvent());
+      await expectLater(
+        bloc.stream,
+        emitsInOrder([
+          const WorkspaceLoading(),
+          isA<WorkspaceLoaded>(),
+        ]),
+      );
+
+      bloc.add(const WorkspaceResetEvent());
+      await expectLater(
+        bloc.stream,
+        emits(isA<WorkspaceInitial>()),
+      );
+      await bloc.close();
+    });
+
+    test('WorkspaceBloc smooth refresh preserves workspaces and sets isRefreshing without WorkspaceLoading', () async {
+      const sample = WorkspaceModel(
+        id: 'ws-1',
+        userId: 'user-1',
+        name: 'Nhà trọ 1',
+        area: 100.0,
+        provinceId: 1,
+        wardId: 1,
+        address: 'Đường A',
+        contactName: 'A',
+        contactPhone: '0901',
+      );
+      final repo = _FakeWorkspaceRepo(workspaces: [sample]);
+      final bloc = WorkspaceBloc(repository: repo);
+
+      // First load
+      bloc.add(const WorkspaceLoadEvent());
+      await expectLater(
+        bloc.stream,
+        emitsInOrder([
+          const WorkspaceLoading(),
+          isA<WorkspaceLoaded>().having((s) => s.workspaces.length, 'length', 1),
+        ]),
+      );
+
+      // Second load (pull to refresh) -> emits isRefreshing: true, then isRefreshing: false, NO WorkspaceLoading!
+      final completer = Completer<void>();
+      bloc.add(WorkspaceLoadEvent(completer: completer));
+
+      await expectLater(
+        bloc.stream,
+        emitsInOrder([
+          isA<WorkspaceLoaded>().having((s) => s.isRefreshing, 'isRefreshing', isTrue),
+          isA<WorkspaceLoaded>().having((s) => s.isRefreshing, 'isRefreshing', isFalse),
+        ]),
+      );
+      expect(completer.isCompleted, isTrue);
+      await bloc.close();
+    });
+
+    test('WorkspaceBloc source guard on load more does not append local data to online list', () async {
+      const sampleOnline = WorkspaceModel(
+        id: 'ws-online',
+        userId: 'user-1',
+        name: 'Nhà trọ Online',
+        area: 100.0,
+        provinceId: 1,
+        wardId: 1,
+        address: 'Đường A',
+        contactName: 'A',
+        contactPhone: '0901',
+      );
+      final repo = _FakeSwitchingSourceWorkspaceRepo(
+        initialOnlineWorkspaces: [sampleOnline],
+        fallbackLocalWorkspaces: [
+          const WorkspaceModel(
+            id: 'ws-local',
+            userId: 'user-1',
+            name: 'Nhà trọ Local',
+            area: 100.0,
+            provinceId: 1,
+            wardId: 1,
+            address: 'Đường B',
+            contactName: 'B',
+            contactPhone: '0902',
+          ),
+        ],
+      );
+      final bloc = WorkspaceBloc(repository: repo);
+
+      // Page 1 is online
+      bloc.add(const WorkspaceLoadEvent());
+      await expectLater(
+        bloc.stream,
+        emitsInOrder([
+          const WorkspaceLoading(),
+          isA<WorkspaceLoaded>().having((s) => s.isOffline, 'isOffline', isFalse),
+        ]),
+      );
+
+      // Now load more, but repository switches to local
+      repo.switchToLocal = true;
+      bloc.add(const WorkspaceLoadMoreEvent());
+
+      await expectLater(
+        bloc.stream,
+        emitsInOrder([
+          isA<WorkspaceLoaded>().having((s) => s.isLoadingMore, 'isLoadingMore', isTrue),
+          isA<WorkspaceLoaded>()
+              .having((s) => s.isLoadingMore, 'isLoadingMore', isFalse)
+              .having((s) => s.workspaces.length, 'workspaces length', 1)
+              .having((s) => s.errorMessage, 'errorMessage', isNotNull),
+        ]),
+      );
+      await bloc.close();
+    });
+
+    testWidgets('renders offline banner when isOffline is true', (tester) async {
+      const sample = WorkspaceModel(
+        id: 'ws-1',
+        userId: 'user-1',
+        name: 'Nhà trọ Offline',
+        area: 100.0,
+        provinceId: 1,
+        wardId: 1,
+        address: 'Đường A',
+        contactName: 'A',
+        contactPhone: '0901',
+      );
+      final localRepo = _FakeLocalSourceWorkspaceRepo(workspaces: [sample]);
+      final bloc = WorkspaceBloc(repository: localRepo);
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          child: const WorkspaceScreen(),
+          workspaceBloc: bloc,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.wifi_off_rounded), findsOneWidget);
+      expect(find.textContaining(t('common.offlineModeNotice')), findsOneWidget);
+    });
+
+    testWidgets('renders empty search state with search_off icon when searching with no match',
+        (tester) async {
+      final fakeRepo = _FakeWorkspaceRepo(workspaces: []);
+      final workspaceBloc = WorkspaceBloc(repository: fakeRepo);
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          child: const WorkspaceScreen(),
+          workspaceBloc: workspaceBloc,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.search_rounded));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField), 'KhongCoKetQua');
+      await tester.pumpAndSettle(const Duration(milliseconds: 600));
+
+      expect(find.byIcon(Icons.search_off_rounded), findsOneWidget);
+      expect(find.text(t('noSearchResults')), findsOneWidget);
+      expect(find.text(t('tryDifferentKeywords')), findsOneWidget);
+    });
+
     testWidgets('renders ListWorkspaceScreen with search bar, empty state, and FAB when no workspaces',
         (tester) async {
       final fakeRepo = _FakeWorkspaceRepo(workspaces: []);

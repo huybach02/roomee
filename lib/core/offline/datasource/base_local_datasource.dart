@@ -147,8 +147,16 @@ abstract class BaseLocalDataSource<T, ID>
     await metadataBox.put(_metadataKey(accountId), newMetadata.toJson());
   }
 
+  Future<void> _checkFormatVersion(String accountId) async {
+    final metadata = getMetadata(accountId);
+    if (metadata != null && metadata.cacheFormatVersion < cacheFormatVersion) {
+      await clearAccount(accountId: accountId);
+    }
+  }
+
   @override
   Future<T?> getById({required String accountId, required ID id}) async {
+    await _checkFormatVersion(accountId);
     final item = await entityStore.getById(accountId: accountId, id: id);
     if (item == null) return null;
 
@@ -163,6 +171,7 @@ abstract class BaseLocalDataSource<T, ID>
     required String accountId,
     required Map<String, dynamic> queryParameters,
   }) async {
+    await _checkFormatVersion(accountId);
     final allItems = await entityStore.getAll(accountId: accountId);
     final metadata = getMetadata(accountId);
 

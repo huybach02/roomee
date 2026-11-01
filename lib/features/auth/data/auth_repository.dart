@@ -1,6 +1,7 @@
 import 'package:roomee/core/localization/app_localizations.dart';
 import 'package:roomee/core/models/models.dart';
 import 'package:roomee/core/network/api_exceptions.dart';
+import 'package:roomee/core/offline/hive/cache_boxes.dart';
 import 'package:roomee/features/auth/data/auth_dto.dart';
 import 'package:roomee/features/auth/data/auth_local_datasource.dart';
 import 'package:roomee/features/auth/data/auth_remote_datasource.dart';
@@ -32,10 +33,12 @@ abstract class IAuthRepository {
 class AuthRepository implements IAuthRepository {
   final AuthRemoteDataSource _remoteDataSource;
   final AuthLocalDataSource _localDataSource;
+  final CacheBoxes? cacheBoxes;
 
   AuthRepository({
     AuthRemoteDataSource? remoteDataSource,
     AuthLocalDataSource? localDataSource,
+    this.cacheBoxes,
   })  : _remoteDataSource = remoteDataSource ?? AuthRemoteDataSource(),
         _localDataSource = localDataSource ?? AuthLocalDataSource();
 
@@ -193,6 +196,11 @@ class AuthRepository implements IAuthRepository {
   @override
   Future<void> logout() async {
     try {
+      final user = await _localDataSource.getUser();
+      final boxes = cacheBoxes;
+      if (user != null && boxes != null) {
+        await boxes.clearAccountData(user.id);
+      }
       await _remoteDataSource.logout();
     } catch (_) {
       // Bỏ qua lỗi mạng (ví dụ khi thiết bị offline) để luôn đảm bảo xóa session cục bộ

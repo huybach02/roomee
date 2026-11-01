@@ -62,11 +62,13 @@ class _FakeWorkspaceRemote implements RemoteCrudDataSource<WorkspaceModel, Strin
     Map<String, dynamic> data,
   ) async {
     if (errorToThrow != null) throw errorToThrow!;
+    final existing = workspaces.where((w) => w.id == id).firstOrNull;
     final ws = WorkspaceModel(
       id: id,
       userId: 'user-1',
-      name: data['name'] as String,
-      area: 100.0,
+      name: data['name'] as String? ?? existing?.name ?? 'Default',
+      area: (data['area'] as num?)?.toDouble() ?? existing?.area ?? 100.0,
+      status: (data['status'] as num?)?.toInt() ?? existing?.status ?? 1,
       provinceId: 92,
       wardId: 310,
       address: 'Đường sửa',
@@ -218,5 +220,27 @@ void main() {
     await repository.deleteWorkspace('ws-1');
 
     expect(local.cached.isEmpty, isTrue);
+  });
+
+  test('toggle status success updates local cache with authoritative status', () async {
+    local.cached = [sampleWs];
+
+    final updated = await repository.updateWorkspace('ws-1', {'status': 0});
+
+    expect(updated.status, 0);
+    expect(local.cached.first.status, 0);
+  });
+
+  test('toggle status failure leaves local cache untouched with original status', () async {
+    local.cached = [sampleWs];
+    remote.errorToThrow = const ServerException(statusCode: 500);
+
+    expect(
+      () => repository.updateWorkspace('ws-1', {'status': 0}),
+      throwsA(isA<ServerException>()),
+    );
+
+    // Local cache still retains status 1 (not corrupted with status 0!)
+    expect(local.cached.first.status, 1);
   });
 }

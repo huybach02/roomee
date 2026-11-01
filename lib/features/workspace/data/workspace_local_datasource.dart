@@ -63,19 +63,19 @@ class WorkspaceLocalDataSource
 
   factory WorkspaceLocalDataSource.fromBoxes(CacheBoxes boxes) {
     final workspaceStore = HiveEntityStore<WorkspaceModel, String>(
-      box: boxes.workspaces,
+      box: boxes[HiveBoxNames.workspaces],
       codec: const WorkspaceModelCodec(),
     );
     final provinceStore = HiveEntityStore<ProvinceModel, int>(
-      box: boxes.provinces,
+      box: boxes[HiveBoxNames.provinces],
       codec: const ProvinceModelCodec(),
     );
     final wardStore = HiveEntityStore<WardModel, int>(
-      box: boxes.wards,
+      box: boxes[HiveBoxNames.wards],
       codec: const WardModelCodec(),
     );
     final userStore = HiveEntityStore<UserModel, String>(
-      box: boxes.users,
+      box: boxes[HiveBoxNames.users],
       codec: const UserModelCodec(),
     );
 
@@ -87,7 +87,7 @@ class WorkspaceLocalDataSource
 
     return WorkspaceLocalDataSource(
       entityStore: workspaceStore,
-      metadataBox: boxes.metadata,
+      metadataBox: boxes[HiveBoxNames.metadata],
       relationAdapter: adapter,
     );
   }

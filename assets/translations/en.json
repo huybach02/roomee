@@ -73,7 +73,8 @@
     "noInternetTitle": "No Internet Connection",
     "noInternetMessage": "Cannot connect to server. Please check your WiFi or mobile data connection.",
     "stillNoInternet": "Still cannot connect to server. Please check your network!",
-    "connectionRestored": "Internet connection restored successfully!"
+    "connectionRestored": "Internet connection restored successfully!",
+    "cannotLoadMoreOffline": "No internet connection, cannot load more data."
   },
   "common": {
     "createButton": "Create",
@@ -84,7 +85,9 @@
     "deleteButton": "Delete",
     "deleteSuccess": "Deleted successfully!",
     "totalRecords": "Total: {count} records",
-    "showOf": "Showing {count} / {total} records"
+    "showOf": "Showing {count} / {total} records",
+    "offlineModeNotice": "Viewing offline data",
+    "lastUpdated": "Updated: {time}"
   },
   "welcomeTitle": "Welcome to Roomee",
   "welcomeSubtitle": "A convenient and effective solution for finding and managing rental housing",
@@ -198,5 +201,7 @@
   "sortRoomsAsc": "Rooms: Low to High",
   "sortRoomsDesc": "Rooms: High to Low",
   "filterActiveCount": "{count} filters",
-  "searchHintGeneric": "Search..."
+  "searchHintGeneric": "Search...",
+  "noSearchResults": "No matching results found",
+  "tryDifferentKeywords": "Try searching with different keywords or adjust your filters."
 }

@@ -20,6 +20,11 @@ class WorkspaceLoaded extends WorkspaceState {
   final int totalPages;
   final bool hasReachedMax;
   final bool isLoadingMore;
+  final bool isRefreshing;
+  final bool isOffline;
+  final bool cacheIsComplete;
+  final DateTime? lastFetchedAt;
+  final String? errorMessage;
 
   const WorkspaceLoaded({
     this.workspaces = const [],
@@ -28,6 +33,11 @@ class WorkspaceLoaded extends WorkspaceState {
     this.totalPages = 1,
     this.hasReachedMax = false,
     this.isLoadingMore = false,
+    this.isRefreshing = false,
+    this.isOffline = false,
+    this.cacheIsComplete = false,
+    this.lastFetchedAt,
+    this.errorMessage,
   });
 
   WorkspaceLoaded copyWith({
@@ -37,6 +47,11 @@ class WorkspaceLoaded extends WorkspaceState {
     int? totalPages,
     bool? hasReachedMax,
     bool? isLoadingMore,
+    bool? isRefreshing,
+    bool? isOffline,
+    bool? cacheIsComplete,
+    DateTime? lastFetchedAt,
+    String? errorMessage,
   }) {
     return WorkspaceLoaded(
       workspaces: workspaces ?? this.workspaces,
@@ -45,6 +60,11 @@ class WorkspaceLoaded extends WorkspaceState {
       totalPages: totalPages ?? this.totalPages,
       hasReachedMax: hasReachedMax ?? this.hasReachedMax,
       isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      isRefreshing: isRefreshing ?? this.isRefreshing,
+      isOffline: isOffline ?? this.isOffline,
+      cacheIsComplete: cacheIsComplete ?? this.cacheIsComplete,
+      lastFetchedAt: lastFetchedAt ?? this.lastFetchedAt,
+      errorMessage: errorMessage,
     );
   }
 }

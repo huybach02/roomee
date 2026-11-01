@@ -45,11 +45,9 @@ void main() {
   });
 
   tearDown(() async {
-    await boxes.metadata.close();
-    await boxes.workspaces.close();
-    await boxes.users.close();
-    await boxes.provinces.close();
-    await boxes.wards.close();
+    for (final box in boxes.all) {
+      await box.close();
+    }
     await Hive.deleteFromDisk();
     await directory.delete(recursive: true);
   });

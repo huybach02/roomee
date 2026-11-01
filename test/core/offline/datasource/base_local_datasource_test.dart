@@ -83,6 +83,7 @@ class _TestLocalDataSource extends BaseLocalDataSource<_FakeItem, String> {
     required super.entityStore,
     required super.metadataBox,
     super.relationAdapter,
+    super.cacheFormatVersion,
   }) : super(
          entityName: 'fake_items',
          queryEngine: const LocalQueryEngine<_FakeItem>(),
@@ -104,21 +105,19 @@ void main() {
     directory = await Directory.systemTemp.createTemp('base_datasource_test');
     Hive.init(directory.path);
     boxes = await CacheBoxes.open();
-    store = HiveEntityStore(box: boxes.workspaces, codec: _FakeCodec());
+    store = HiveEntityStore(box: boxes[HiveBoxNames.workspaces], codec: _FakeCodec());
     adapter = _FakeRelationAdapter();
     dataSource = _TestLocalDataSource(
       entityStore: store,
-      metadataBox: boxes.metadata,
+      metadataBox: boxes[HiveBoxNames.metadata],
       relationAdapter: adapter,
     );
   });
 
   tearDown(() async {
-    await boxes.metadata.close();
-    await boxes.workspaces.close();
-    await boxes.users.close();
-    await boxes.provinces.close();
-    await boxes.wards.close();
+    for (final box in boxes.all) {
+      await box.close();
+    }
     await Hive.deleteFromDisk();
     await directory.delete(recursive: true);
   });
@@ -272,5 +271,32 @@ void main() {
     expect(await store.count(accountId: 'acc-1'), 0);
     expect(adapter.clearRelationsCalls, 1);
     expect(dataSource.getMetadata('acc-1'), isNull);
+  });
+
+  test('automatically invalidates and clears stale cache when cacheFormatVersion is upgraded', () async {
+    // 1. Save item with version 1
+    await dataSource.saveAll(
+      accountId: 'acc-1',
+      items: [const _FakeItem(id: '1', title: 'Old Format Item')],
+    );
+    expect(await store.count(accountId: 'acc-1'), 1);
+    expect(dataSource.getMetadata('acc-1')?.cacheFormatVersion, 1);
+
+    // 2. Create new DataSource instance configured with cacheFormatVersion = 2 (incompatible upgrade)
+    final upgradedDataSource = _TestLocalDataSource(
+      entityStore: store,
+      metadataBox: boxes[HiveBoxNames.metadata],
+      relationAdapter: adapter,
+      cacheFormatVersion: 2,
+    );
+
+    // 3. Querying on upgraded data source detects stale format and invalidates cache
+    final result = await upgradedDataSource.queryPage(
+      accountId: 'acc-1',
+      queryParameters: {},
+    );
+
+    expect(result.data.isEmpty, isTrue);
+    expect(await store.count(accountId: 'acc-1'), 0);
   });
 }

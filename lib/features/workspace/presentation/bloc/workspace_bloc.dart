@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:roomee/core/localization/app_localizations.dart';
 import 'package:roomee/core/models/models.dart';
 import 'package:roomee/core/network/api_exceptions.dart';
+import 'package:roomee/core/offline/query/offline_page.dart';
 import 'package:roomee/features/workspace/data/workspace_repository.dart';
 
 part 'workspace_event.dart';
@@ -19,13 +22,27 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
     on<WorkspaceUpdateEvent>(_onWorkspaceUpdateRequested);
     on<WorkspaceDeleteEvent>(_onWorkspaceDeleteRequested);
     on<WorkspaceToggleStatusEvent>(_onWorkspaceToggleStatusRequested);
+    on<WorkspaceResetEvent>(_onWorkspaceResetRequested);
+  }
+
+  void _onWorkspaceResetRequested(
+    WorkspaceResetEvent event,
+    Emitter<WorkspaceState> emit,
+  ) {
+    emit(const WorkspaceInitial());
   }
 
   Future<void> _onWorkspaceLoadRequested(
     WorkspaceLoadEvent event,
     Emitter<WorkspaceState> emit,
   ) async {
-    emit(const WorkspaceLoading());
+    final currentState = state;
+    if (currentState is WorkspaceLoaded) {
+      emit(currentState.copyWith(isRefreshing: true, errorMessage: null));
+    } else {
+      emit(const WorkspaceLoading());
+    }
+
     try {
       final params = Map<String, dynamic>.from(event.queryParameters ?? {});
       params['page'] = params['page'] ?? 1;
@@ -40,12 +57,33 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
         page: pagination.page,
         totalPages: pagination.totalPages,
         hasReachedMax: pagination.hasReachedMax,
+        isOffline: pagination.source == DataSourceKind.local,
+        cacheIsComplete: pagination.isComplete,
+        lastFetchedAt: pagination.lastFetchedAt,
         isLoadingMore: false,
+        isRefreshing: false,
+        errorMessage: null,
       ));
     } on ApiException catch (e) {
-      emit(WorkspaceFailure(e.message));
+      if (state is WorkspaceLoaded) {
+        emit((state as WorkspaceLoaded).copyWith(
+          isRefreshing: false,
+          errorMessage: e.message,
+        ));
+      } else {
+        emit(WorkspaceFailure(e.message));
+      }
     } catch (e) {
-      emit(WorkspaceFailure(e.toString()));
+      if (state is WorkspaceLoaded) {
+        emit((state as WorkspaceLoaded).copyWith(
+          isRefreshing: false,
+          errorMessage: e.toString(),
+        ));
+      } else {
+        emit(WorkspaceFailure(e.toString()));
+      }
+    } finally {
+      event.completer?.complete();
     }
   }
 
@@ -56,11 +94,12 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
     final currentState = state;
     if (currentState is! WorkspaceLoaded ||
         currentState.hasReachedMax ||
-        currentState.isLoadingMore) {
+        currentState.isLoadingMore ||
+        currentState.isRefreshing) {
       return;
     }
 
-    emit(currentState.copyWith(isLoadingMore: true));
+    emit(currentState.copyWith(isLoadingMore: true, errorMessage: null));
     try {
       final params = Map<String, dynamic>.from(event.queryParameters ?? {});
       params['page'] = currentState.page + 1;
@@ -69,6 +108,17 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
       final pagination = await _workspaceRepository.getWorkspaces(
         queryParameters: params,
       );
+
+      // Source Guard: Không nối dữ liệu local vào danh sách online nếu rớt mạng khi load more
+      if (!currentState.isOffline &&
+          pagination.source == DataSourceKind.local) {
+        emit(currentState.copyWith(
+          isLoadingMore: false,
+          errorMessage: t('errors.cannotLoadMoreOffline'),
+        ));
+        return;
+      }
+
       final updatedList = List<WorkspaceModel>.from(currentState.workspaces)
         ..addAll(pagination.data);
 
@@ -78,7 +128,11 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
         page: pagination.page,
         totalPages: pagination.totalPages,
         hasReachedMax: pagination.hasReachedMax,
+        isOffline: pagination.source == DataSourceKind.local,
+        cacheIsComplete: pagination.isComplete,
+        lastFetchedAt: pagination.lastFetchedAt ?? currentState.lastFetchedAt,
         isLoadingMore: false,
+        errorMessage: null,
       ));
     } catch (_) {
       emit(currentState.copyWith(isLoadingMore: false));
@@ -150,9 +204,16 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
     );
 
     try {
-      await _workspaceRepository.updateWorkspace(event.id, {
+      final updated = await _workspaceRepository.updateWorkspace(event.id, {
         'status': event.status,
       });
+      emit(
+        currentState.copyWith(
+          workspaces: currentWorkspaces.map((ws) {
+            return ws.id == event.id ? updated : ws;
+          }).toList(),
+        ),
+      );
     } on ApiException catch (e) {
       emit(currentState);
       emit(WorkspaceFailure(e.message));

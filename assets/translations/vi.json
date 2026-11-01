@@ -73,7 +73,8 @@
     "noInternetTitle": "Mất kết nối Internet",
     "noInternetMessage": "Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại kết nối WiFi hoặc dữ liệu di động của bạn.",
     "stillNoInternet": "Vẫn chưa thể kết nối đến máy chủ. Vui lòng kiểm tra lại mạng!",
-    "connectionRestored": "Đã khôi phục kết nối Internet thành công!"
+    "connectionRestored": "Đã khôi phục kết nối Internet thành công!",
+    "cannotLoadMoreOffline": "Mất kết nối mạng, không thể tải thêm dữ liệu."
   },
   "common": {
     "createButton": "Tạo mới",
@@ -84,7 +85,9 @@
     "deleteButton": "Xóa",
     "deletedSuccess": "Xóa thành công!",
     "totalRecords": "Tổng cộng: {count} bản ghi",
-    "showOf": "Hiển thị {count} / {total} bản ghi"
+    "showOf": "Hiển thị {count} / {total} bản ghi",
+    "offlineModeNotice": "Đang xem dữ liệu ngoại tuyến",
+    "lastUpdated": "Cập nhật: {time}"
   },
   "welcomeTitle": "Chào mừng bạn đến với Roomee",
   "welcomeSubtitle": "Giải pháp tìm kiếm, quản lý phòng trọ tiện lợi & hiệu quả",
@@ -198,5 +201,7 @@
   "sortRoomsAsc": "Số phòng tăng dần",
   "sortRoomsDesc": "Số phòng giảm dần",
   "filterActiveCount": "{count} bộ lọc",
-  "searchHintGeneric": "Tìm kiếm..."
+  "searchHintGeneric": "Tìm kiếm...",
+  "noSearchResults": "Không tìm thấy kết quả phù hợp",
+  "tryDifferentKeywords": "Thử tìm kiếm với từ khóa khác hoặc điều chỉnh lại bộ lọc."
 }

@@ -11,8 +11,10 @@ import 'package:roomee/core/offline/hive/cache_boxes.dart';
 import 'package:roomee/core/offline/hive/hive_initializer.dart';
 import 'package:roomee/core/router/app_router.dart';
 import 'package:roomee/core/screens/no_internet_screen.dart';
+import 'package:roomee/features/auth/data/auth_repository.dart';
 import 'package:roomee/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:roomee/features/general/presentation/bloc/general_bloc.dart';
+import 'package:roomee/features/workspace/data/workspace_repository.dart';
 import 'package:roomee/features/workspace/presentation/bloc/workspace_bloc.dart';
 
 void main() async {
@@ -27,7 +29,8 @@ void main() async {
     initialLocale = Locale(savedCode!);
   }
 
-  final authBloc = AuthBloc()..add(const AuthCheckEvent());
+  final authRepository = AuthRepository(cacheBoxes: cacheBoxes);
+  final authBloc = AuthBloc(authRepository: authRepository)..add(const AuthCheckEvent());
 
   // Hook tự động đăng xuất khi gặp lỗi 401 Unauthorized từ bất kỳ API nào,
   // và hiển thị màn hình NoInternetScreen khi mất mạng mà không bị đăng xuất
@@ -107,7 +110,15 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           create: (_) => LocaleCubit(initialLocale: widget.initialLocale),
         ),
         BlocProvider(create: (_) => widget.generalBloc ?? GeneralBloc()),
-        BlocProvider(create: (_) => widget.workspaceBloc ?? WorkspaceBloc()),
+        BlocProvider(
+          create: (_) =>
+              widget.workspaceBloc ??
+              WorkspaceBloc(
+                repository: widget.cacheBoxes != null
+                    ? WorkspaceRepository.fromBoxes(widget.cacheBoxes!)
+                    : WorkspaceRepository(),
+              ),
+        ),
         BlocProvider.value(value: _authBloc),
       ],
       child: BlocBuilder<LocaleCubit, Locale>(

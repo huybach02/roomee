@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -9,6 +10,7 @@ import 'package:roomee/core/widgets/app_button.dart';
 import 'package:roomee/core/widgets/app_confirm_dialog.dart';
 import 'package:roomee/core/widgets/app_empty_state.dart';
 import 'package:roomee/core/widgets/app_notification.dart';
+import 'package:roomee/core/widgets/app_offline_banner.dart';
 import 'package:roomee/core/widgets/app_popup_menu.dart';
 import 'package:roomee/core/widgets/filter/app_filter_drawer.dart';
 import 'package:roomee/core/widgets/filter/app_search_app_bar.dart';
@@ -108,9 +110,14 @@ class _ListWorkspaceScreenState extends State<ListWorkspaceScreen> {
     if (_scrollController.hasClients) {
       _scrollController.jumpTo(0);
     }
+    final completer = Completer<void>();
     context.read<WorkspaceBloc>().add(
-      WorkspaceLoadEvent(queryParameters: _buildQueryParams()),
+      WorkspaceLoadEvent(
+        queryParameters: _buildQueryParams(),
+        completer: completer,
+      ),
     );
+    await completer.future;
   }
 
   Future<void> _loadMoreWorkspaces() async {
@@ -318,6 +325,15 @@ class _ListWorkspaceScreenState extends State<ListWorkspaceScreen> {
   }
 
   Widget _buildEmptyState() {
+    final isFiltering =
+        _searchKeyword.trim().isNotEmpty || _activeFilterCount > 0;
+    if (isFiltering) {
+      return AppEmptyState(
+        icon: Icons.search_off_rounded,
+        title: t('noSearchResults'),
+        subtitle: t('tryDifferentKeywords'),
+      );
+    }
     return AppEmptyState(
       icon: Icons.domain_disabled_rounded,
       title: t('workspaceEmpty'),
@@ -632,6 +648,9 @@ class _ListWorkspaceScreenState extends State<ListWorkspaceScreen> {
                   _loadWorkspaces();
                 } else if (state is WorkspaceFailure) {
                   AppNotification.showError(context, state.message);
+                } else if (state is WorkspaceLoaded &&
+                    state.errorMessage != null) {
+                  AppNotification.showError(context, state.errorMessage!);
                 }
               },
               builder: (context, state) {
@@ -732,6 +751,8 @@ class _ListWorkspaceScreenState extends State<ListWorkspaceScreen> {
                                 },
                               ),
                       ),
+                      if (state is WorkspaceLoaded && state.isOffline)
+                        AppOfflineBanner(lastFetchedAt: state.lastFetchedAt),
                     ],
                   ),
                 );

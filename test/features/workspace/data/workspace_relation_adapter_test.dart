@@ -49,15 +49,15 @@ void main() {
     boxes = await CacheBoxes.open();
 
     provinceStore = HiveEntityStore(
-      box: boxes.provinces,
+      box: boxes[HiveBoxNames.provinces],
       codec: const ProvinceModelCodec(),
     );
     wardStore = HiveEntityStore(
-      box: boxes.wards,
+      box: boxes[HiveBoxNames.wards],
       codec: const WardModelCodec(),
     );
     userStore = HiveEntityStore(
-      box: boxes.users,
+      box: boxes[HiveBoxNames.users],
       codec: const UserModelCodec(),
     );
 
@@ -69,11 +69,9 @@ void main() {
   });
 
   tearDown(() async {
-    await boxes.metadata.close();
-    await boxes.workspaces.close();
-    await boxes.users.close();
-    await boxes.provinces.close();
-    await boxes.wards.close();
+    for (final box in boxes.all) {
+      await box.close();
+    }
     await Hive.deleteFromDisk();
     await directory.delete(recursive: true);
   });

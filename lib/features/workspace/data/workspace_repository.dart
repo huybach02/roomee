@@ -1,11 +1,13 @@
 import 'package:roomee/core/models/models.dart';
+import 'package:roomee/core/offline/hive/cache_boxes.dart';
+import 'package:roomee/core/offline/query/offline_page.dart';
 import 'package:roomee/core/offline/repository/offline_crud_repository.dart';
 import 'package:roomee/features/auth/data/auth_local_datasource.dart';
 import 'package:roomee/features/workspace/data/workspace_local_datasource.dart';
 import 'package:roomee/features/workspace/data/workspace_remote_datasource.dart';
 
 abstract class IWorkspaceRepository {
-  Future<PaginationModel<WorkspaceModel>> getWorkspaces({
+  Future<OfflinePage<WorkspaceModel>> getWorkspaces({
     Map<String, dynamic>? queryParameters,
   });
   Future<WorkspaceModel> getWorkspaceById(String id);
@@ -33,8 +35,20 @@ class WorkspaceRepository implements IWorkspaceRepository {
               },
             );
 
+  factory WorkspaceRepository.fromBoxes(
+    CacheBoxes boxes, {
+    WorkspaceRemoteDataSource? remoteDataSource,
+    AuthLocalDataSource? authLocalDataSource,
+  }) {
+    return WorkspaceRepository(
+      remoteDataSource: remoteDataSource,
+      localDataSource: WorkspaceLocalDataSource.fromBoxes(boxes),
+      authLocalDataSource: authLocalDataSource,
+    );
+  }
+
   @override
-  Future<PaginationModel<WorkspaceModel>> getWorkspaces({
+  Future<OfflinePage<WorkspaceModel>> getWorkspaces({
     Map<String, dynamic>? queryParameters,
   }) {
     return _crudRepository.getAll(queryParameters: queryParameters);
