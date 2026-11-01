@@ -1,10 +1,14 @@
+import 'package:roomee/core/contracts/remote_crud_datasource.dart';
 import 'package:roomee/core/models/models.dart';
 import 'package:roomee/core/network/network.dart';
 
-class WorkspaceRemoteDataSource extends BaseService {
+class WorkspaceRemoteDataSource extends BaseService
+    implements RemoteCrudDataSource<WorkspaceModel, String> {
   WorkspaceRemoteDataSource({super.client});
 
-  Future<ApiResponse<PaginationModel<WorkspaceModel>>> getWorkspaces({
+
+  @override
+  Future<ApiResponse<PaginationModel<WorkspaceModel>>> getAll({
     Map<String, dynamic>? queryParameters,
   }) {
     return getDataAll<PaginationModel<WorkspaceModel>>(
@@ -40,7 +44,8 @@ class WorkspaceRemoteDataSource extends BaseService {
     );
   }
 
-  Future<ApiResponse<WorkspaceModel>> getWorkspaceById(String id) {
+  @override
+  Future<ApiResponse<WorkspaceModel>> getById(String id) {
     return getDataById<WorkspaceModel>(
       '/workspaces',
       id,
@@ -48,7 +53,8 @@ class WorkspaceRemoteDataSource extends BaseService {
     );
   }
 
-  Future<ApiResponse<WorkspaceModel>> createWorkspace(
+  @override
+  Future<ApiResponse<WorkspaceModel>> create(
     Map<String, dynamic> data,
   ) {
     return postData<WorkspaceModel>(
@@ -58,7 +64,8 @@ class WorkspaceRemoteDataSource extends BaseService {
     );
   }
 
-  Future<ApiResponse<WorkspaceModel>> updateWorkspace(
+  @override
+  Future<ApiResponse<WorkspaceModel>> update(
     String id,
     Map<String, dynamic> data,
   ) {
@@ -70,7 +77,8 @@ class WorkspaceRemoteDataSource extends BaseService {
     );
   }
 
-  Future<ApiResponse<void>> deleteWorkspace(String id) {
+  @override
+  Future<ApiResponse<void>> deleteById(String id) {
     return deleteData(
       '/workspaces',
       id: id,

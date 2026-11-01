@@ -199,7 +199,7 @@ void main() {
   });
 
   test(
-    'queryPage filters and paginates before calling hydrate on only page items',
+    'queryPage hydrates relations before calling queryEngine so relation fields can be queried',
     () async {
       final items = List.generate(
         10,
@@ -217,12 +217,46 @@ void main() {
       expect(page.totalPages, 4);
       expect(page.source, DataSourceKind.local);
 
-      // Verify that hydrate was called only on the 3 items on the page, not all 10!
-      expect(adapter.lastHydratedIds.length, 3);
-      expect(adapter.lastHydratedIds, ['0', '1', '2']);
+      // Verify that all items were hydrated so search/filter on relation fields works
+      expect(adapter.lastHydratedIds.length, 10);
       expect(page.data.first.relationTitle, 'Hydrated Item 0');
     },
   );
+
+  test('saveOne saves relations, stores single entity, and updates metadata count', () async {
+    const item = _FakeItem(id: 'single-1', title: 'Single Item');
+
+    await dataSource.saveOne(accountId: 'acc-1', item: item);
+
+    expect(adapter.saveRelationsCalls, 1);
+    expect(await store.count(accountId: 'acc-1'), 1);
+
+    final saved = await dataSource.getById(accountId: 'acc-1', id: 'single-1');
+    expect(saved?.title, 'Single Item');
+    expect(saved?.relationTitle, 'Hydrated Single Item');
+
+    final metadata = dataSource.getMetadata('acc-1');
+    expect(metadata?.cachedCount, 1);
+  });
+
+  test('deleteOne deletes entity from store and decrements metadata count', () async {
+    await dataSource.saveAll(
+      accountId: 'acc-1',
+      items: [
+        const _FakeItem(id: '1', title: 'Item 1'),
+        const _FakeItem(id: '2', title: 'Item 2'),
+      ],
+    );
+    expect(await store.count(accountId: 'acc-1'), 2);
+    expect(dataSource.getMetadata('acc-1')?.cachedCount, 2);
+
+    await dataSource.deleteOne(accountId: 'acc-1', id: '1');
+
+    expect(await store.count(accountId: 'acc-1'), 1);
+    expect(await dataSource.getById(accountId: 'acc-1', id: '1'), isNull);
+    expect(await dataSource.getById(accountId: 'acc-1', id: '2'), isNotNull);
+    expect(dataSource.getMetadata('acc-1')?.cachedCount, 1);
+  });
 
   test('clearAccount removes items, cleans relations, and deletes metadata', () async {
     await dataSource.saveAll(

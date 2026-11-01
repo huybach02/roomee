@@ -67,6 +67,55 @@ abstract class BaseLocalDataSource<T, ID> {
     await metadataBox.put(_metadataKey(accountId), newMetadata.toJson());
   }
 
+  Future<void> saveOne({
+    required String accountId,
+    required T item,
+  }) async {
+    if (relationAdapter != null) {
+      await relationAdapter!.saveRelations(accountId, [item]);
+    }
+
+    await entityStore.put(accountId: accountId, entity: item);
+
+    final count = await entityStore.count(accountId: accountId);
+    final prevMetadata = getMetadata(accountId);
+    final now = DateTime.now();
+
+    final newMetadata = CacheMetadata(
+      entityName: entityName,
+      accountId: accountId,
+      cacheFormatVersion: cacheFormatVersion,
+      isComplete: prevMetadata?.isComplete ?? false,
+      cachedCount: count,
+      lastFetchedAt: now,
+      lastFullSyncAt: prevMetadata?.lastFullSyncAt,
+    );
+
+    await metadataBox.put(_metadataKey(accountId), newMetadata.toJson());
+  }
+
+  Future<void> deleteOne({
+    required String accountId,
+    required ID id,
+  }) async {
+    await entityStore.delete(accountId: accountId, id: id);
+
+    final count = await entityStore.count(accountId: accountId);
+    final prevMetadata = getMetadata(accountId);
+
+    final newMetadata = CacheMetadata(
+      entityName: entityName,
+      accountId: accountId,
+      cacheFormatVersion: cacheFormatVersion,
+      isComplete: prevMetadata?.isComplete ?? false,
+      cachedCount: count,
+      lastFetchedAt: prevMetadata?.lastFetchedAt,
+      lastFullSyncAt: prevMetadata?.lastFullSyncAt,
+    );
+
+    await metadataBox.put(_metadataKey(accountId), newMetadata.toJson());
+  }
+
   Future<T?> getById({required String accountId, required ID id}) async {
     final item = await entityStore.getById(accountId: accountId, id: id);
     if (item == null) return null;
@@ -84,22 +133,16 @@ abstract class BaseLocalDataSource<T, ID> {
     final allItems = await entityStore.getAll(accountId: accountId);
     final metadata = getMetadata(accountId);
 
-    final rawPage = queryEngine.query(
-      items: allItems,
+    final itemsToQuery = relationAdapter != null && allItems.isNotEmpty
+        ? await relationAdapter!.hydrate(accountId, allItems)
+        : allItems;
+
+    return queryEngine.query(
+      items: itemsToQuery,
       queryParameters: queryParameters,
       schema: querySchema,
       metadata: metadata,
     );
-
-    if (relationAdapter == null || rawPage.data.isEmpty) {
-      return rawPage;
-    }
-
-    final hydratedData = await relationAdapter!.hydrate(
-      accountId,
-      rawPage.data,
-    );
-    return rawPage.copyWith(data: hydratedData);
   }
 
   Future<void> clearAccount({required String accountId}) async {

@@ -8,6 +8,8 @@ final workspaceQuerySchema = LocalQuerySchema<WorkspaceModel>(
     (ws) => ws.address,
     (ws) => ws.contactName,
     (ws) => ws.contactPhone,
+    (ws) => ws.province?.fullName,
+    (ws) => ws.ward?.fullName,
   ],
   filterFields: {
     'status': LocalFilterField(
@@ -54,6 +56,7 @@ final workspaceQuerySchema = LocalQuerySchema<WorkspaceModel>(
     'area': (ws) => ws.area,
     'createdAt': (ws) => ws.createdAt,
     'status': (ws) => ws.status,
+    'numberOfRooms': (ws) => ws.numberOfRooms,
   },
   uniqueId: (ws) => ws.id,
 );

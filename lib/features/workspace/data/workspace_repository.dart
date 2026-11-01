@@ -23,7 +23,7 @@ class WorkspaceRepository implements IWorkspaceRepository {
   Future<PaginationModel<WorkspaceModel>> getWorkspaces({
     Map<String, dynamic>? queryParameters,
   }) async {
-    final response = await _remoteDataSource.getWorkspaces(
+    final response = await _remoteDataSource.getAll(
       queryParameters: queryParameters,
     );
     final data = response.data;
@@ -35,7 +35,7 @@ class WorkspaceRepository implements IWorkspaceRepository {
 
   @override
   Future<WorkspaceModel> getWorkspaceById(String id) async {
-    final response = await _remoteDataSource.getWorkspaceById(id);
+    final response = await _remoteDataSource.getById(id);
     final data = response.data;
     if (data == null) {
       throw ServerException(message: t('errors.invalidServerResponse'));
@@ -45,7 +45,7 @@ class WorkspaceRepository implements IWorkspaceRepository {
 
   @override
   Future<WorkspaceModel> createWorkspace(Map<String, dynamic> data) async {
-    final response = await _remoteDataSource.createWorkspace(data);
+    final response = await _remoteDataSource.create(data);
     final responseData = response.data;
     if (responseData == null) {
       throw ServerException(message: t('errors.invalidServerResponse'));
@@ -55,7 +55,7 @@ class WorkspaceRepository implements IWorkspaceRepository {
 
   @override
   Future<WorkspaceModel> updateWorkspace(String id, Map<String, dynamic> data) async {
-    final response = await _remoteDataSource.updateWorkspace(id, data);
+    final response = await _remoteDataSource.update(id, data);
     final responseData = response.data;
     if (responseData == null) {
       throw ServerException(message: t('errors.invalidServerResponse'));
@@ -65,6 +65,6 @@ class WorkspaceRepository implements IWorkspaceRepository {
 
   @override
   Future<void> deleteWorkspace(String id) async {
-    await _remoteDataSource.deleteWorkspace(id);
+    await _remoteDataSource.deleteById(id);
   }
 }

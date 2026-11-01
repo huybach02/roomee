@@ -6,12 +6,51 @@ import 'package:roomee/core/offline/datasource/base_local_datasource.dart';
 import 'package:roomee/core/offline/hive/cache_boxes.dart';
 import 'package:roomee/core/offline/hive/hive_entity_store.dart';
 import 'package:roomee/core/offline/query/local_query_engine.dart';
+import 'package:roomee/core/offline/query/offline_page.dart';
 import 'package:roomee/features/workspace/data/codecs/workspace_model_codec.dart';
 import 'package:roomee/features/workspace/data/workspace_query_schema.dart';
 import 'package:roomee/features/workspace/data/workspace_relation_adapter.dart';
 
+abstract interface class IWorkspaceLocalDataSource {
+  Future<void> cacheRemotePage({
+    required String accountId,
+    required List<WorkspaceModel> workspaces,
+    bool isComplete = false,
+  });
+
+  Future<OfflinePage<WorkspaceModel>> getWorkspaces({
+    required String accountId,
+    required Map<String, dynamic> queryParameters,
+  });
+
+  Future<WorkspaceModel?> getWorkspaceById({
+    required String accountId,
+    required String id,
+  });
+
+  Future<void> cacheCreatedWorkspace({
+    required String accountId,
+    required WorkspaceModel workspace,
+  });
+
+  Future<void> cacheUpdatedWorkspace({
+    required String accountId,
+    required WorkspaceModel workspace,
+  });
+
+  Future<void> removeWorkspace({
+    required String accountId,
+    required String id,
+  });
+
+  Future<void> clearAccount({
+    required String accountId,
+  });
+}
+
 class WorkspaceLocalDataSource
-    extends BaseLocalDataSource<WorkspaceModel, String> {
+    extends BaseLocalDataSource<WorkspaceModel, String>
+    implements IWorkspaceLocalDataSource {
   WorkspaceLocalDataSource({
     required super.entityStore,
     required super.metadataBox,
@@ -50,6 +89,74 @@ class WorkspaceLocalDataSource
       entityStore: workspaceStore,
       metadataBox: boxes.metadata,
       relationAdapter: adapter,
+    );
+  }
+
+  @override
+  Future<void> cacheRemotePage({
+    required String accountId,
+    required List<WorkspaceModel> workspaces,
+    bool isComplete = false,
+  }) {
+    return saveAll(
+      accountId: accountId,
+      items: workspaces,
+      isComplete: isComplete,
+    );
+  }
+
+  @override
+  Future<OfflinePage<WorkspaceModel>> getWorkspaces({
+    required String accountId,
+    required Map<String, dynamic> queryParameters,
+  }) {
+    return queryPage(
+      accountId: accountId,
+      queryParameters: queryParameters,
+    );
+  }
+
+  @override
+  Future<WorkspaceModel?> getWorkspaceById({
+    required String accountId,
+    required String id,
+  }) {
+    return getById(
+      accountId: accountId,
+      id: id,
+    );
+  }
+
+  @override
+  Future<void> cacheCreatedWorkspace({
+    required String accountId,
+    required WorkspaceModel workspace,
+  }) {
+    return saveOne(
+      accountId: accountId,
+      item: workspace,
+    );
+  }
+
+  @override
+  Future<void> cacheUpdatedWorkspace({
+    required String accountId,
+    required WorkspaceModel workspace,
+  }) {
+    return saveOne(
+      accountId: accountId,
+      item: workspace,
+    );
+  }
+
+  @override
+  Future<void> removeWorkspace({
+    required String accountId,
+    required String id,
+  }) {
+    return deleteOne(
+      accountId: accountId,
+      id: id,
     );
   }
 }
