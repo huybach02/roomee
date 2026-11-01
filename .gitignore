@@ -53,3 +53,6 @@ _backend/.env
 .commandcode
 
 .claude
+
+/docs/superpowers/
+/.superpowers/

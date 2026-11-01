@@ -59,6 +59,18 @@ class HiveEntityStore<T, ID> implements EntityStore<T, ID> {
   }
 
   @override
+  Future<int> count({required String accountId}) async {
+    final prefix = 'account:$accountId:';
+    var count = 0;
+    for (final key in box.keys) {
+      if (key is String && key.startsWith(prefix)) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  @override
   Future<void> delete({required String accountId, required ID id}) async {
     await box.delete(_key(accountId, id));
   }

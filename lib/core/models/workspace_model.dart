@@ -1,10 +1,12 @@
 import 'package:roomee/core/models/province_model.dart';
+import 'package:roomee/core/models/user_model.dart';
 import 'package:roomee/core/models/ward_model.dart';
 import 'package:roomee/utils/constanst.dart';
 
 class WorkspaceModel {
   final String id;
   final String userId;
+  final UserModel? user;
   final WorkspaceType type;
   final String name;
   final double area;
@@ -29,6 +31,7 @@ class WorkspaceModel {
   const WorkspaceModel({
     required this.id,
     required this.userId,
+    this.user,
     this.type = WorkspaceType.rentedRoom,
     required this.name,
     required this.area,
@@ -57,6 +60,9 @@ class WorkspaceModel {
     return WorkspaceModel(
       id: json['id']?.toString() ?? '',
       userId: json['userId']?.toString() ?? '',
+      user: json['user'] != null && json['user'] is Map<String, dynamic>
+          ? UserModel.fromJson(json['user'] as Map<String, dynamic>)
+          : null,
       type: WorkspaceType.fromValue(json['type'] as String?),
       name: json['name'] as String? ?? '',
       area: (json['area'] as num?)?.toDouble() ?? 0.0,
@@ -94,6 +100,7 @@ class WorkspaceModel {
     return {
       'id': id,
       'userId': userId,
+      if (user != null) 'user': user!.toJson(),
       'type': type.value,
       'name': name,
       'area': area,
@@ -120,6 +127,7 @@ class WorkspaceModel {
   WorkspaceModel copyWith({
     String? id,
     String? userId,
+    UserModel? user,
     WorkspaceType? type,
     String? name,
     double? area,
@@ -144,6 +152,7 @@ class WorkspaceModel {
     return WorkspaceModel(
       id: id ?? this.id,
       userId: userId ?? this.userId,
+      user: user ?? this.user,
       type: type ?? this.type,
       name: name ?? this.name,
       area: area ?? this.area,

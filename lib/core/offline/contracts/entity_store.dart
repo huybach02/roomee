@@ -7,6 +7,8 @@ abstract interface class EntityStore<T, ID> {
 
   Future<List<T>> getAll({required String accountId});
 
+  Future<int> count({required String accountId});
+
   Future<void> delete({required String accountId, required ID id});
 
   Future<void> clearAccount({required String accountId});

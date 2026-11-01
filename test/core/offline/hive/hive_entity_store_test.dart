@@ -126,4 +126,21 @@ void main() {
       throwsA(isA<TypeError>()),
     );
   });
+
+  test('count returns the correct number of entities for an account', () async {
+    expect(await store.count(accountId: 'account-a'), 0);
+
+    await store.putMany(
+      accountId: 'account-a',
+      entities: const [_Record('1', 'One'), _Record('2', 'Two')],
+    );
+    await store.put(
+      accountId: 'account-b',
+      entity: const _Record('3', 'Three'),
+    );
+
+    expect(await store.count(accountId: 'account-a'), 2);
+    expect(await store.count(accountId: 'account-b'), 1);
+    expect(await store.count(accountId: 'account-c'), 0);
+  });
 }
