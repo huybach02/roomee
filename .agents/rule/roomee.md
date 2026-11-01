@@ -253,15 +253,27 @@ lib/
       app_theme.dart             # DefaultColors, FontSizes, AppTheme
     localization/
       app_localizations.dart     # Engine dịch, preload cache JSON, hàm toàn cục t() và context.tr()
+    contracts/                   # Hợp đồng trừu tượng dùng chung (RemoteCrudDataSource, LocalCrudDataSource)
+      remote_crud_datasource.dart
+      local_crud_datasource.dart
     models/                      # Models chuyển đổi dữ liệu (user_model.dart kèm hasContract, province, ward)
       models.dart
       user_model.dart
       province_model.dart
       ward_model.dart
+      workspace_model.dart
     network/                     # Cấu hình mạng Dio, interceptors (auth, logging), exceptions, ApiResponse
       api_client.dart
       api_exceptions.dart
       api_response.dart
+    offline/                     # Hạ tầng Offline Mode dùng chung
+      codecs/                    # Codec thực thể lõi (province, ward, user)
+      contracts/                 # entity_codec, entity_store, relation_adapter
+      datasource/                # base_local_datasource.dart
+      hive/                      # cache_boxes, hive_cipher_manager, hive_initializer, hive_entity_store
+      policy/                    # offline_error_policy.dart (lọc lỗi mạng cho phép fallback)
+      query/                     # local_query_engine, local_query_schema, offline_page, search_normalizer
+      repository/                # offline_crud_repository.dart (điều phối Remote + Local + Policy)
     router/
       app_router.dart            # Định nghĩa AppRoutes, hàm createAppRouter() (initialLocation: AppRoutes.wrapper)
     screens/                     # Màn hình gốc & điều phối luồng người dùng
@@ -283,6 +295,7 @@ lib/
       app_date_picker_field.dart # AppDatePickerField (chọn ngày tháng hiển thị theo định dạng)
       app_dropdown_field.dart    # AppDropdownField (chọn danh mục bottom sheet có search)
       app_notification.dart      # AppNotification (thông báo SnackBar chuẩn Design System)
+      app_offline_banner.dart    # AppOfflineBanner (thanh thông báo ngoại tuyến trên Bottom Bar)
       app_segmented_select.dart  # AppSegmentedSelect (chọn nút gạt đơn hoặc .multiple)
   features/<feature>/            # Feature-first module (ví dụ: auth)
     data/                        # datasource, model, repository implementation
@@ -381,6 +394,42 @@ test/
   - Mọi màn hình form/input (Screen/Widget) **bắt buộc ưu tiên dùng `FieldRules`** thay vì tự viết logic validate inline.
   - Với các trường chọn lựa đơn giản (dropdown, date picker, v.v.): dùng `Validators.required()`.
   - Mọi message lỗi bắt buộc khai báo trong `validateErrors.*` của cả `assets/translations/vi.json` và `en.json`.
+
+### 4.6 Kiến trúc Offline Mode & Quy chuẩn cấu hình Module mới (Bắt buộc)
+Hệ thống sử dụng kiến trúc **Generic Offline-First Boilerplate** để toàn bộ module (Workspace, Room, Contract,...) dùng chung hạ tầng mà không cần viết lại logic điều phối.
+
+#### 1. Các thành phần cốt lõi của Kiến trúc:
+- **Tầng Network Contract:** `RemoteCrudDataSource<T, ID>` (`lib/core/contracts/remote_crud_datasource.dart`) — chuẩn hóa 5 hàm API CRUD (`getAll`, `getById`, `create`, `update`, `deleteById`) trả về `ApiResponse<T>`.
+- **Tầng Local Contract:** `LocalCrudDataSource<T, ID>` (`lib/core/contracts/local_crud_datasource.dart`) — chuẩn hóa các thao tác cache (`cacheRemotePage`, `queryPage`, `getById`, `cacheCreated`, `cacheUpdated`, `remove`, `clearAccount`).
+- **Lớp Base DataSource Dùng chung:** `BaseLocalDataSource<T, ID>` (`lib/core/offline/datasource/base_local_datasource.dart`) — implements `LocalCrudDataSource`, tự động quản lý metadata, dọn dẹp cache cũ khi nâng cấp version (`_checkFormatVersion`), lưu quan hệ con trước khi lưu cha.
+- **Tầng Điều phối Trung tâm:** `OfflineCrudRepository<T, ID>` (`lib/core/offline/repository/offline_crud_repository.dart`) — ưu tiên gọi API online; lưu tích lũy vào local cache trong background (lỗi cache không làm fail request); fallback sang local khi gặp lỗi mạng phù hợp; đồng bộ ngay vào local sau khi CRUD online thành công.
+- **Tầng Bộ máy Truy vấn Trong Bộ Nhớ:** `LocalQueryEngine<T>` (`lib/core/offline/query/local_query_engine.dart`) — tìm kiếm gần đúng không dấu tiếng Việt (`diacritic`), lọc whitelist toán tử (`LocalFilterOperator`), sắp xếp đa tiêu chí và phân trang độc lập.
+- **Kết quả Truy vấn:** `OfflinePage<T>` (`lib/core/offline/query/offline_page.dart`) — **kế thừa `PaginationModel<T>`**, bổ sung `source` (`DataSourceKind.remote` hoặc `local`), `isComplete`, `lastFetchedAt`.
+- **Chính sách Lọc Lỗi Ngoại tuyến:** `DefaultOfflineErrorPolicy` (`lib/core/offline/policy/offline_error_policy.dart`):
+  - **Cho phép fallback:** `NoInternetException`, `TimeoutException`, `ServerException` (mã 502, 503, 504).
+  - **Tuyệt đối KHÔNG fallback:** `UnauthorizedException` (401), `ForbiddenException` (403), `ClientException` (400, 422), `NotFoundException` (404), lỗi JSON parsing $\rightarrow$ rethrow lập tức.
+  - **Bảo vệ Empty Cache:** Khi mất mạng mà local cache hoàn toàn rỗng $\rightarrow$ rethrow lỗi mạng ban đầu để UI hiển thị màn hình báo mất mạng, tránh hiển thị nhầm "Chưa có dữ liệu".
+- **Bảo mật & Mã hóa:** `CacheBoxes` (`lib/core/offline/hive/cache_boxes.dart`) tự động mở các Box dữ liệu cá nhân (`workspaces`, `users`) với mã hóa AES-256 (`HiveAesCipher`), khóa 256-bit sinh ngẫu nhiên và lưu an toàn trong `FlutterSecureStorage` qua `HiveCipherManager`. Các Box danh mục chung (`provinces`, `wards`) không mã hóa để tối ưu tốc độ.
+- **Đăng xuất (Logout Cache Clear):** Khi người dùng đăng xuất, `AuthRepository.logout()` tự động gọi `CacheBoxes.clearAccountData(userId)` quét toàn bộ các Box và xóa sạch các key có tiền tố `account:$accountId:` và `$accountId:`, đồng thời phát `WorkspaceResetEvent` để đưa state trong RAM về `WorkspaceInitial()`. Tuyệt đối không xóa danh mục dùng chung `provinces`/`wards`.
+- **Trải nghiệm Người dùng (UX):**
+  - Khi kéo làm mới (Refresh) trên danh sách đã có dữ liệu: giữ nguyên danh sách cũ, bật cờ `isRefreshing: true` trong `WorkspaceLoaded`, không emit `WorkspaceLoading()` làm trắng màn hình.
+  - Sử dụng `Completer<void>` trong `WorkspaceLoadEvent` để đồng bộ chính xác vòng xoay của `RefreshIndicator`.
+  - Hiển thị thanh thông báo ngoại tuyến `AppOfflineBanner` (`lib/core/widgets/app_offline_banner.dart`) phía trên Bottom Bar khi `state.isOffline == true`.
+  - **Source Guard khi Tải thêm (Load More):** Đang xem trang online mà cuộn tải thêm bị rớt mạng $\rightarrow$ chặn không nối dữ liệu local vào online để tránh nhảy cóc/trùng lặp ID.
+
+#### 2. Quy trình 5 bước chuẩn khi cấu hình Offline Mode cho 1 Module mới (ví dụ: `Room`):
+1. **Bước 1 — Khai báo tên và cấu hình Box (Chỉ 1 dòng duy nhất):**
+   - Thêm `static const rooms = 'cache_rooms';` trong `HiveBoxNames` (`lib/core/offline/hive/hive_box_names.dart`).
+   - Thêm `HiveBoxNames.rooms: true` vào `CacheBoxes.configs` (`lib/core/offline/hive/cache_boxes.dart`).
+2. **Bước 2 — Viết Codec chuyển đổi (`lib/features/<module>/data/codecs/<module>_model_codec.dart`):**
+   - Implements `EntityCodec<Model, ID>`: định nghĩa `getId`, `toJson` (làm phẳng, bóc tách các object con lồng nhau), và `fromJson`.
+3. **Bước 3 — Khai báo Query Schema (`lib/features/<module>/data/<module>_query_schema.dart`):**
+   - Định nghĩa `LocalQuerySchema<Model>` whitelist các trường `searchFields`, `filterFields`, `sortFields` và `uniqueId`.
+4. **Bước 4 — Tạo LocalDataSource kế thừa `BaseLocalDataSource` (~25 dòng code):**
+   - Tạo `class RoomLocalDataSource extends BaseLocalDataSource<RoomModel, String>` chỉ cần gọi `super` với `entityName: 'rooms'`, `queryEngine`, `querySchema`, và factory `.fromBoxes(boxes)`.
+   - Nếu module có quan hệ cha-con (ví dụ: Room thuộc Workspace), tạo thêm `RoomRelationAdapter` kế thừa `RelationAdapter<RoomModel>` để xử lý tách và ghép quan hệ.
+5. **Bước 5 — Bọc `OfflineCrudRepository` trong Repository:**
+   - Trong `RoomRepository`, inject `OfflineCrudRepository<RoomModel, String>` kết hợp `RoomRemoteDataSource` (implements `RemoteCrudDataSource`) và `RoomLocalDataSource`.
 
 ## 5. Workflow & Definition of Done
 
