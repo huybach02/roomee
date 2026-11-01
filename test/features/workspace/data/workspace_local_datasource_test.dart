@@ -185,7 +185,7 @@ void main() {
     // cacheRemotePage
     await ds.cacheRemotePage(
       accountId: 'account-1',
-      workspaces: workspaces,
+      items: workspaces,
       isComplete: true,
     );
 

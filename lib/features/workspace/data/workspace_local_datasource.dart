@@ -14,7 +14,7 @@ import 'package:roomee/features/workspace/data/workspace_relation_adapter.dart';
 abstract interface class IWorkspaceLocalDataSource {
   Future<void> cacheRemotePage({
     required String accountId,
-    required List<WorkspaceModel> workspaces,
+    required List<WorkspaceModel> items,
     bool isComplete = false,
   });
 
@@ -95,12 +95,12 @@ class WorkspaceLocalDataSource
   @override
   Future<void> cacheRemotePage({
     required String accountId,
-    required List<WorkspaceModel> workspaces,
+    required List<WorkspaceModel> items,
     bool isComplete = false,
   }) {
     return saveAll(
       accountId: accountId,
-      items: workspaces,
+      items: items,
       isComplete: isComplete,
     );
   }

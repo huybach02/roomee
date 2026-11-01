@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:roomee/core/models/models.dart';
 import 'package:roomee/core/offline/query/offline_page.dart';
 
 void main() {
@@ -56,5 +57,24 @@ void main() {
     expect(updated.isComplete, isTrue);
     expect(updated.source, DataSourceKind.local);
     expect(updated.lastFetchedAt, fetchedAt);
+  });
+
+  test('is a PaginationModel and fromPaginationModel creates remote page', () {
+    const pagination = PaginationModel<String>(
+      data: ['ws-1', 'ws-2'],
+      total: 2,
+      page: 1,
+      limit: 20,
+      totalPages: 1,
+    );
+
+    final page = OfflinePage.fromPaginationModel(pagination);
+
+    expect(page, isA<PaginationModel<String>>());
+    expect(page.source, DataSourceKind.remote);
+    expect(page.isComplete, isTrue);
+    expect(page.data, ['ws-1', 'ws-2']);
+    expect(page.total, 2);
+    expect(page.lastFetchedAt, isNotNull);
   });
 }

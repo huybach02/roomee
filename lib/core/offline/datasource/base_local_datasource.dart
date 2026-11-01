@@ -1,4 +1,5 @@
 import 'package:hive_ce_flutter/hive_flutter.dart';
+import 'package:roomee/core/contracts/local_crud_datasource.dart';
 import 'package:roomee/core/offline/contracts/entity_store.dart';
 import 'package:roomee/core/offline/contracts/relation_adapter.dart';
 import 'package:roomee/core/offline/hive/cache_key_builder.dart';
@@ -7,7 +8,8 @@ import 'package:roomee/core/offline/query/local_query_engine.dart';
 import 'package:roomee/core/offline/query/local_query_schema.dart';
 import 'package:roomee/core/offline/query/offline_page.dart';
 
-abstract class BaseLocalDataSource<T, ID> {
+abstract class BaseLocalDataSource<T, ID>
+    implements LocalCrudDataSource<T, ID> {
   final EntityStore<T, ID> entityStore;
   final Box<Map> metadataBox;
   final String entityName;
@@ -34,6 +36,35 @@ abstract class BaseLocalDataSource<T, ID> {
     if (raw == null) return null;
     return CacheMetadata.fromJson(Map<String, dynamic>.from(raw));
   }
+
+  @override
+  Future<void> cacheRemotePage({
+    required String accountId,
+    required List<T> items,
+    bool isComplete = false,
+  }) =>
+      saveAll(accountId: accountId, items: items, isComplete: isComplete);
+
+  @override
+  Future<void> cacheCreated({
+    required String accountId,
+    required T item,
+  }) =>
+      saveOne(accountId: accountId, item: item);
+
+  @override
+  Future<void> cacheUpdated({
+    required String accountId,
+    required T item,
+  }) =>
+      saveOne(accountId: accountId, item: item);
+
+  @override
+  Future<void> remove({
+    required String accountId,
+    required ID id,
+  }) =>
+      deleteOne(accountId: accountId, id: id);
 
   Future<void> saveAll({
     required String accountId,
@@ -116,6 +147,7 @@ abstract class BaseLocalDataSource<T, ID> {
     await metadataBox.put(_metadataKey(accountId), newMetadata.toJson());
   }
 
+  @override
   Future<T?> getById({required String accountId, required ID id}) async {
     final item = await entityStore.getById(accountId: accountId, id: id);
     if (item == null) return null;
@@ -126,6 +158,7 @@ abstract class BaseLocalDataSource<T, ID> {
     return hydrated.isEmpty ? item : hydrated.first;
   }
 
+  @override
   Future<OfflinePage<T>> queryPage({
     required String accountId,
     required Map<String, dynamic> queryParameters,
@@ -145,6 +178,7 @@ abstract class BaseLocalDataSource<T, ID> {
     );
   }
 
+  @override
   Future<void> clearAccount({required String accountId}) async {
     await entityStore.clearAccount(accountId: accountId);
     if (relationAdapter != null) {

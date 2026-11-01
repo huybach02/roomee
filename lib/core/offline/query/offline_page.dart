@@ -1,26 +1,38 @@
-class OfflinePage<T> {
-  final List<T> data;
-  final int total;
-  final int page;
-  final int limit;
-  final int totalPages;
+import 'package:roomee/core/models/pagination_model.dart';
+
+class OfflinePage<T> extends PaginationModel<T> {
   final bool isComplete;
   final DataSourceKind source;
   final DateTime? lastFetchedAt;
 
   const OfflinePage({
-    required this.data,
-    required this.total,
-    required this.page,
-    required this.limit,
-    required this.totalPages,
+    required super.data,
+    required super.total,
+    required super.page,
+    required super.limit,
+    required super.totalPages,
     required this.isComplete,
     required this.source,
     this.lastFetchedAt,
   });
 
-  bool get hasReachedMax => page >= totalPages;
+  factory OfflinePage.fromPaginationModel(
+    PaginationModel<T> pagination, {
+    DateTime? fetchedAt,
+  }) {
+    return OfflinePage<T>(
+      data: pagination.data,
+      total: pagination.total,
+      page: pagination.page,
+      limit: pagination.limit,
+      totalPages: pagination.totalPages,
+      isComplete: pagination.page >= pagination.totalPages,
+      source: DataSourceKind.remote,
+      lastFetchedAt: fetchedAt ?? DateTime.now(),
+    );
+  }
 
+  @override
   OfflinePage<T> copyWith({
     List<T>? data,
     int? total,

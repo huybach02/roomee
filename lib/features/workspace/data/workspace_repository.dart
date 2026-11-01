@@ -1,6 +1,7 @@
-import 'package:roomee/core/localization/app_localizations.dart';
 import 'package:roomee/core/models/models.dart';
-import 'package:roomee/core/network/api_exceptions.dart';
+import 'package:roomee/core/offline/repository/offline_crud_repository.dart';
+import 'package:roomee/features/auth/data/auth_local_datasource.dart';
+import 'package:roomee/features/workspace/data/workspace_local_datasource.dart';
 import 'package:roomee/features/workspace/data/workspace_remote_datasource.dart';
 
 abstract class IWorkspaceRepository {
@@ -14,57 +15,48 @@ abstract class IWorkspaceRepository {
 }
 
 class WorkspaceRepository implements IWorkspaceRepository {
-  final WorkspaceRemoteDataSource _remoteDataSource;
+  final OfflineCrudRepository<WorkspaceModel, String> _crudRepository;
 
-  WorkspaceRepository({WorkspaceRemoteDataSource? remoteDataSource})
-      : _remoteDataSource = remoteDataSource ?? WorkspaceRemoteDataSource();
+  WorkspaceRepository({
+    WorkspaceRemoteDataSource? remoteDataSource,
+    WorkspaceLocalDataSource? localDataSource,
+    AuthLocalDataSource? authLocalDataSource,
+    OfflineCrudRepository<WorkspaceModel, String>? crudRepository,
+  }) : _crudRepository = crudRepository ??
+            OfflineCrudRepository<WorkspaceModel, String>(
+              remote: remoteDataSource ?? WorkspaceRemoteDataSource(),
+              local: localDataSource,
+              getAccountId: () async {
+                final auth = authLocalDataSource ?? AuthLocalDataSource();
+                final user = await auth.getUser();
+                return user?.id;
+              },
+            );
 
   @override
   Future<PaginationModel<WorkspaceModel>> getWorkspaces({
     Map<String, dynamic>? queryParameters,
-  }) async {
-    final response = await _remoteDataSource.getAll(
-      queryParameters: queryParameters,
-    );
-    final data = response.data;
-    if (data == null) {
-      throw ServerException(message: t('errors.invalidServerResponse'));
-    }
-    return data;
+  }) {
+    return _crudRepository.getAll(queryParameters: queryParameters);
   }
 
   @override
-  Future<WorkspaceModel> getWorkspaceById(String id) async {
-    final response = await _remoteDataSource.getById(id);
-    final data = response.data;
-    if (data == null) {
-      throw ServerException(message: t('errors.invalidServerResponse'));
-    }
-    return data;
+  Future<WorkspaceModel> getWorkspaceById(String id) {
+    return _crudRepository.getById(id);
   }
 
   @override
-  Future<WorkspaceModel> createWorkspace(Map<String, dynamic> data) async {
-    final response = await _remoteDataSource.create(data);
-    final responseData = response.data;
-    if (responseData == null) {
-      throw ServerException(message: t('errors.invalidServerResponse'));
-    }
-    return responseData;
+  Future<WorkspaceModel> createWorkspace(Map<String, dynamic> data) {
+    return _crudRepository.create(data);
   }
 
   @override
-  Future<WorkspaceModel> updateWorkspace(String id, Map<String, dynamic> data) async {
-    final response = await _remoteDataSource.update(id, data);
-    final responseData = response.data;
-    if (responseData == null) {
-      throw ServerException(message: t('errors.invalidServerResponse'));
-    }
-    return responseData;
+  Future<WorkspaceModel> updateWorkspace(String id, Map<String, dynamic> data) {
+    return _crudRepository.update(id, data);
   }
 
   @override
-  Future<void> deleteWorkspace(String id) async {
-    await _remoteDataSource.deleteById(id);
+  Future<void> deleteWorkspace(String id) {
+    return _crudRepository.deleteById(id);
   }
 }
