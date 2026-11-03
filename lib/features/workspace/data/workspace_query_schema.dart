@@ -1,6 +1,7 @@
 import 'package:roomee/core/models/workspace_model.dart';
 import 'package:roomee/core/offline/query/local_filter_rule.dart';
 import 'package:roomee/core/offline/query/local_query_schema.dart';
+import 'package:roomee/utils/constanst.dart';
 
 final workspaceQuerySchema = LocalQuerySchema<WorkspaceModel>(
   searchFields: [
@@ -19,6 +20,7 @@ final workspaceQuerySchema = LocalQuerySchema<WorkspaceModel>(
         LocalFilterOperator.notEquals,
         LocalFilterOperator.inList,
       },
+      accepts: (v) => v is int,
     ),
     'type': LocalFilterField(
       valueOf: (ws) => ws.type.value,
@@ -26,6 +28,8 @@ final workspaceQuerySchema = LocalQuerySchema<WorkspaceModel>(
         LocalFilterOperator.equals,
         LocalFilterOperator.inList,
       },
+      accepts: (v) =>
+          v is String && WorkspaceType.values.any((t) => t.value == v),
     ),
     'provinceId': LocalFilterField(
       valueOf: (ws) => ws.provinceId,
@@ -33,6 +37,7 @@ final workspaceQuerySchema = LocalQuerySchema<WorkspaceModel>(
         LocalFilterOperator.equals,
         LocalFilterOperator.inList,
       },
+      accepts: (v) => v is int,
     ),
     'wardId': LocalFilterField(
       valueOf: (ws) => ws.wardId,
@@ -40,15 +45,19 @@ final workspaceQuerySchema = LocalQuerySchema<WorkspaceModel>(
         LocalFilterOperator.equals,
         LocalFilterOperator.inList,
       },
+      accepts: (v) => v is int,
     ),
     'area': LocalFilterField(
       valueOf: (ws) => ws.area,
       operators: const {
         LocalFilterOperator.equals,
         LocalFilterOperator.greaterThan,
+        LocalFilterOperator.greaterThanOrEquals,
         LocalFilterOperator.lessThan,
+        LocalFilterOperator.lessThanOrEquals,
         LocalFilterOperator.between,
       },
+      accepts: (v) => v is num,
     ),
   },
   sortFields: {

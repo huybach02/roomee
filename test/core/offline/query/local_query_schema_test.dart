@@ -18,6 +18,7 @@ void main() {
         'area': LocalFilterField(
           valueOf: (item) => item.area,
           operators: {LocalFilterOperator.between},
+          accepts: (v) => v is num,
         ),
       },
       sortFields: {'name': (item) => item.name},
@@ -27,6 +28,8 @@ void main() {
     const item = _Item('item-1', 'One', 10);
     expect(schema.searchFields.single(item), 'One');
     expect(schema.filterFields['area']!.valueOf(item), 10);
+    expect(schema.filterFields['area']!.accepts(10), isTrue);
+    expect(schema.filterFields['area']!.accepts('abc'), isFalse);
     expect(schema.sortFields['name']!(item), 'One');
     expect(schema.uniqueId!(item), 'item-1');
   });

@@ -299,4 +299,85 @@ void main() {
     expect(result.data.isEmpty, isTrue);
     expect(await store.count(accountId: 'acc-1'), 0);
   });
+
+  test('saveAll invalidates stale cache when cacheFormatVersion is upgraded before saving new items', () async {
+    // 1. Save items with version 1
+    await dataSource.saveAll(
+      accountId: 'acc-1',
+      items: [
+        const _FakeItem(id: 'old-1', title: 'Old 1'),
+        const _FakeItem(id: 'old-2', title: 'Old 2'),
+      ],
+      isComplete: false,
+    );
+    expect(await store.count(accountId: 'acc-1'), 2);
+
+    // 2. Upgraded data source
+    final upgradedDataSource = _TestLocalDataSource(
+      entityStore: store,
+      metadataBox: boxes[HiveBoxNames.metadata],
+      relationAdapter: adapter,
+      cacheFormatVersion: 2,
+    );
+
+    // 3. Online fetch saves page 1 (isComplete: false)
+    await upgradedDataSource.saveAll(
+      accountId: 'acc-1',
+      items: [const _FakeItem(id: 'new-1', title: 'New 1')],
+      isComplete: false,
+    );
+
+    // Old items should be cleared, only new item remains
+    expect(await store.count(accountId: 'acc-1'), 1);
+    expect(await upgradedDataSource.getById(accountId: 'acc-1', id: 'new-1'), isNotNull);
+    expect(await store.getById(accountId: 'acc-1', id: 'old-1'), isNull);
+    expect(await store.getById(accountId: 'acc-1', id: 'old-2'), isNull);
+    expect(upgradedDataSource.getMetadata('acc-1')?.cacheFormatVersion, 2);
+  });
+
+  test('saveOne invalidates stale cache when cacheFormatVersion is upgraded', () async {
+    await dataSource.saveAll(
+      accountId: 'acc-1',
+      items: [const _FakeItem(id: 'old-1', title: 'Old 1')],
+    );
+
+    final upgradedDataSource = _TestLocalDataSource(
+      entityStore: store,
+      metadataBox: boxes[HiveBoxNames.metadata],
+      relationAdapter: adapter,
+      cacheFormatVersion: 2,
+    );
+
+    await upgradedDataSource.saveOne(
+      accountId: 'acc-1',
+      item: const _FakeItem(id: 'new-1', title: 'New 1'),
+    );
+
+    expect(await store.count(accountId: 'acc-1'), 1);
+    expect(await store.getById(accountId: 'acc-1', id: 'old-1'), isNull);
+    expect(await store.getById(accountId: 'acc-1', id: 'new-1'), isNotNull);
+    expect(upgradedDataSource.getMetadata('acc-1')?.cacheFormatVersion, 2);
+  });
+
+  test('deleteOne invalidates stale cache when cacheFormatVersion is upgraded', () async {
+    await dataSource.saveAll(
+      accountId: 'acc-1',
+      items: [
+        const _FakeItem(id: 'old-1', title: 'Old 1'),
+        const _FakeItem(id: 'old-2', title: 'Old 2'),
+      ],
+    );
+
+    final upgradedDataSource = _TestLocalDataSource(
+      entityStore: store,
+      metadataBox: boxes[HiveBoxNames.metadata],
+      relationAdapter: adapter,
+      cacheFormatVersion: 2,
+    );
+
+    await upgradedDataSource.deleteOne(accountId: 'acc-1', id: 'old-1');
+
+    expect(await store.count(accountId: 'acc-1'), 0);
+    expect(await store.getById(accountId: 'acc-1', id: 'old-2'), isNull);
+  });
 }

@@ -425,6 +425,7 @@ Hệ thống sử dụng kiến trúc **Generic Offline-First Boilerplate** đ�
    - Implements `EntityCodec<Model, ID>`: định nghĩa `getId`, `toJson` (làm phẳng, bóc tách các object con lồng nhau), và `fromJson`.
 3. **Bước 3 — Khai báo Query Schema (`lib/features/<module>/data/<module>_query_schema.dart`):**
    - Định nghĩa `LocalQuerySchema<Model>` whitelist các trường `searchFields`, `filterFields`, `sortFields` và `uniqueId`.
+   - Mỗi `LocalFilterField` bắt buộc khai báo `accepts: (v) => ...` kiểm tra đúng kiểu dữ liệu (hoặc enum whitelist) tương ứng với giá trị client truyền xuống.
 4. **Bước 4 — Tạo LocalDataSource kế thừa `BaseLocalDataSource` (~25 dòng code):**
    - Tạo `class RoomLocalDataSource extends BaseLocalDataSource<RoomModel, String>` chỉ cần gọi `super` với `entityName: 'rooms'`, `queryEngine`, `querySchema`, và factory `.fromBoxes(boxes)`.
    - Nếu module có quan hệ cha-con (ví dụ: Room thuộc Workspace), tạo thêm `RoomRelationAdapter` kế thừa `RelationAdapter<RoomModel>` để xử lý tách và ghép quan hệ.

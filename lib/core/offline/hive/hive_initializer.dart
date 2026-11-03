@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hive_ce_flutter/hive_flutter.dart';
 import 'package:roomee/core/offline/hive/hive_cipher_manager.dart';
@@ -16,7 +17,9 @@ class HiveInitializer {
       try {
         final cipherManager = HiveCipherManager(storage: secureStorage);
         cipher = await cipherManager.getOrCreateCipher();
-      } catch (_) {}
+      } catch (e, s) {
+        debugPrint('[HiveInitializer] Failed to obtain encryption cipher: $e\n$s');
+      }
     }
 
     return CacheBoxes.open(encryptionCipher: cipher);

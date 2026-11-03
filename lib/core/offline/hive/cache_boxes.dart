@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:hive_ce_flutter/hive_flutter.dart';
 
 import 'hive_box_names.dart';
@@ -29,12 +30,26 @@ class CacheBoxes {
   static Future<CacheBoxes> open({HiveCipher? encryptionCipher}) async {
     final opened = <String, Box<Map>>{};
 
-    await Future.wait(configs.entries.map((entry) async {
-      opened[entry.key] = await Hive.openBox<Map>(
-        entry.key,
-        encryptionCipher: entry.value ? encryptionCipher : null,
-      );
-    }));
+    await Future.wait(
+      configs.entries.map((entry) async {
+        final cipher = entry.value ? encryptionCipher : null;
+        try {
+          opened[entry.key] = await Hive.openBox<Map>(
+            entry.key,
+            encryptionCipher: cipher,
+          );
+        } catch (e, s) {
+          debugPrint('[CacheBoxes] Error opening box "${entry.key}": $e\n$s');
+          // Tự động phục hồi khi box bị hỏng hoặc sai encryption key (do đổi key/reinstall):
+          // Xóa file box cũ trên đĩa và tạo lại box sạch mới, tránh làm sập khởi động app.
+          await Hive.deleteBoxFromDisk(entry.key);
+          opened[entry.key] = await Hive.openBox<Map>(
+            entry.key,
+            encryptionCipher: cipher,
+          );
+        }
+      }),
+    );
 
     return CacheBoxes(opened);
   }
@@ -44,16 +59,20 @@ class CacheBoxes {
     final accountPrefix = 'account:$accountId:';
     final metaPrefix = '$accountId:';
 
-    await Future.wait(all.map((box) async {
-      final keysToDelete = box.keys
-          .where((k) =>
-              k is String &&
-              (k.startsWith(accountPrefix) || k.startsWith(metaPrefix)))
-          .toList();
+    await Future.wait(
+      all.map((box) async {
+        final keysToDelete = box.keys
+            .where(
+              (k) =>
+                  k is String &&
+                  (k.startsWith(accountPrefix) || k.startsWith(metaPrefix)),
+            )
+            .toList();
 
-      if (keysToDelete.isNotEmpty) {
-        await box.deleteAll(keysToDelete);
-      }
-    }));
+        if (keysToDelete.isNotEmpty) {
+          await box.deleteAll(keysToDelete);
+        }
+      }),
+    );
   }
 }

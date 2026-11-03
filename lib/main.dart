@@ -30,7 +30,8 @@ void main() async {
   }
 
   final authRepository = AuthRepository(cacheBoxes: cacheBoxes);
-  final authBloc = AuthBloc(authRepository: authRepository)..add(const AuthCheckEvent());
+  final authBloc = AuthBloc(authRepository: authRepository)
+    ..add(const AuthCheckEvent());
 
   // Hook tự động đăng xuất khi gặp lỗi 401 Unauthorized từ bất kỳ API nào,
   // và hiển thị màn hình NoInternetScreen khi mất mạng mà không bị đăng xuất
@@ -109,32 +110,57 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         BlocProvider(
           create: (_) => LocaleCubit(initialLocale: widget.initialLocale),
         ),
-        BlocProvider(create: (_) => widget.generalBloc ?? GeneralBloc()),
-        BlocProvider(
-          create: (_) =>
-              widget.workspaceBloc ??
-              WorkspaceBloc(
-                repository: widget.cacheBoxes != null
-                    ? WorkspaceRepository.fromBoxes(widget.cacheBoxes!)
-                    : WorkspaceRepository(),
-              ),
-        ),
+        if (widget.generalBloc != null)
+          BlocProvider.value(value: widget.generalBloc!)
+        else
+          BlocProvider(create: (_) => GeneralBloc()),
         BlocProvider.value(value: _authBloc),
       ],
-      child: BlocBuilder<LocaleCubit, Locale>(
-        builder: (context, locale) {
-          return MaterialApp.router(
-            debugShowCheckedModeBanner: false,
-            theme: AppTheme.mainTheme,
-            locale: locale,
-            localizationsDelegates: const [
-              AppLocalizations.delegate,
-              GlobalMaterialLocalizations.delegate,
-              GlobalWidgetsLocalizations.delegate,
-              GlobalCupertinoLocalizations.delegate,
+      child: BlocBuilder<AuthBloc, AuthState>(
+        buildWhen: (prev, curr) {
+          final prevUserId = prev is Authenticated ? prev.user?.id : null;
+          final currUserId = curr is Authenticated ? curr.user?.id : null;
+          return prevUserId != currUserId;
+        },
+        builder: (context, authState) {
+          final sessionKey = authState is Authenticated
+              ? (authState.user?.id ?? 'authenticated')
+              : 'guest';
+
+          return MultiBlocProvider(
+            key: ValueKey(sessionKey),
+            providers: [
+              if (widget.workspaceBloc != null)
+                BlocProvider.value(value: widget.workspaceBloc!)
+              else
+                BlocProvider(
+                  create: (_) => WorkspaceBloc(
+                    repository: widget.cacheBoxes != null
+                        ? WorkspaceRepository.fromBoxes(widget.cacheBoxes!)
+                        : WorkspaceRepository(),
+                  ),
+                ),
+              // Sau này có thêm module mới (Room, Contract, Invoice...), chỉ cần thêm 1 dòng ở đây:
+              // BlocProvider(create: (_) => RoomBloc(...)),
+              // BlocProvider(create: (_) => ContractBloc(...)),
             ],
-            supportedLocales: AppLocalizations.supportedLocales,
-            routerConfig: widget.router ?? appRouter,
+            child: BlocBuilder<LocaleCubit, Locale>(
+              builder: (context, locale) {
+                return MaterialApp.router(
+                  debugShowCheckedModeBanner: false,
+                  theme: AppTheme.mainTheme,
+                  locale: locale,
+                  localizationsDelegates: const [
+                    AppLocalizations.delegate,
+                    GlobalMaterialLocalizations.delegate,
+                    GlobalWidgetsLocalizations.delegate,
+                    GlobalCupertinoLocalizations.delegate,
+                  ],
+                  supportedLocales: AppLocalizations.supportedLocales,
+                  routerConfig: widget.router ?? appRouter,
+                );
+              },
+            ),
           );
         },
       ),

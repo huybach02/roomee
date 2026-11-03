@@ -10,6 +10,7 @@ import 'package:roomee/core/router/app_router.dart';
 import 'package:roomee/features/general/data/general_repository.dart';
 import 'package:roomee/features/general/presentation/bloc/general_bloc.dart';
 import 'package:roomee/core/screens/welcome_screen.dart';
+import 'package:roomee/core/screens/home_screen.dart';
 import 'package:roomee/core/widgets/app_button.dart';
 import 'package:roomee/core/widgets/app_card_select.dart';
 import 'package:roomee/core/widgets/app_date_picker_field.dart';
@@ -18,8 +19,26 @@ import 'package:roomee/core/widgets/app_segmented_select.dart';
 import 'package:roomee/core/widgets/app_text_field.dart';
 import 'package:roomee/features/auth/presentation/screens/login_screen.dart';
 import 'package:roomee/features/auth/presentation/screens/register_screen.dart';
+import 'package:roomee/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:roomee/features/auth/data/auth_repository.dart';
+import 'package:roomee/features/workspace/presentation/bloc/workspace_bloc.dart';
 import 'package:roomee/main.dart';
 import 'package:roomee/utils/constanst.dart';
+
+class _FakeLogoutAuthRepo extends Fake implements IAuthRepository {
+  @override
+  Future<bool> isLoggedIn() async => true;
+  @override
+  Future<UserModel?> getCurrentUser() async => const UserModel(id: 'u1', email: 'test@roomee.vn');
+  @override
+  Future<String?> getToken() async => 'tok';
+  @override
+  Future<String?> getRefreshToken() async => 'ref';
+  @override
+  Future<UserModel?> syncUserProfile() async => null;
+  @override
+  Future<void> logout() async {}
+}
 
 class _FakeGeneralRepository implements IGeneralRepository {
   @override
@@ -59,6 +78,47 @@ void main() {
 
     // Verify that MyApp builds successfully.
     expect(find.byType(MyApp), findsOneWidget);
+  });
+
+  testWidgets('MyApp recreates account-scoped blocs with clean state when session changes', (
+    WidgetTester tester,
+  ) async {
+    final authBloc = AuthBloc(authRepository: _FakeLogoutAuthRepo());
+    final generalBloc = GeneralBloc(repository: _FakeGeneralRepository());
+
+    // 1. Login User A
+    authBloc.emit(
+      const Authenticated(
+        user: UserModel(
+          id: 'user-a',
+          email: 'user_a@roomee.vn',
+          role: UserRole.tenant,
+          hasContract: false,
+        ),
+        token: 'token-a',
+      ),
+    );
+
+    await tester.pumpWidget(
+      MyApp(
+        authBloc: authBloc,
+        generalBloc: generalBloc,
+        router: createAppRouter(initialLocation: AppRoutes.home),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final blocA = tester.element(find.byType(HomeScreen)).read<WorkspaceBloc>();
+    expect(blocA, isNotNull);
+    expect(blocA.state, isA<WorkspaceInitial>());
+
+    // 2. Logout -> sessionKey changes from 'user-a' to 'guest'
+    authBloc.add(const AuthLogoutEvent());
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    // ValueKey changed -> Flutter automatically disposes blocA!
+    expect(blocA.isClosed, isTrue);
   });
 
   testWidgets('WelcomeScreen displays logo and action buttons', (

@@ -71,6 +71,8 @@ abstract class BaseLocalDataSource<T, ID>
     required List<T> items,
     bool isComplete = false,
   }) async {
+    await _checkFormatVersion(accountId);
+
     if (relationAdapter != null) {
       await relationAdapter!.saveRelations(accountId, items);
     }
@@ -102,6 +104,8 @@ abstract class BaseLocalDataSource<T, ID>
     required String accountId,
     required T item,
   }) async {
+    await _checkFormatVersion(accountId);
+
     if (relationAdapter != null) {
       await relationAdapter!.saveRelations(accountId, [item]);
     }
@@ -129,6 +133,8 @@ abstract class BaseLocalDataSource<T, ID>
     required String accountId,
     required ID id,
   }) async {
+    await _checkFormatVersion(accountId);
+
     await entityStore.delete(accountId: accountId, id: id);
 
     final count = await entityStore.count(accountId: accountId);

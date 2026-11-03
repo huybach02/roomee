@@ -167,13 +167,16 @@ class _ListWorkspaceScreenState extends State<ListWorkspaceScreen> {
           FilterOption(label: t('filterAll'), value: null),
           FilterOption(
             label: t('workspaceTypeRentedRoom'),
-            value: 'rented_room',
+            value: WorkspaceType.rentedRoom.value,
           ),
           FilterOption(
             label: t('workspaceTypeApartment'),
             value: WorkspaceType.apartmentMiniHouse.value,
           ),
-          FilterOption(label: t('workspaceTypeDormitory'), value: 'dormitory'),
+          FilterOption(
+            label: t('workspaceTypeDormitory'),
+            value: WorkspaceType.dormitory.value,
+          ),
         ],
       ),
       FilterFieldConfig.dropdown(
@@ -673,6 +676,12 @@ class _ListWorkspaceScreenState extends State<ListWorkspaceScreen> {
                   color: DefaultColors.primary,
                   child: Column(
                     children: [
+                      if (state is WorkspaceLoaded && state.isRefreshing)
+                        const LinearProgressIndicator(
+                          minHeight: 2,
+                          color: DefaultColors.primary,
+                          backgroundColor: Colors.transparent,
+                        ),
                       if (workspaces.isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),

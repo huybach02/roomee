@@ -39,7 +39,7 @@ class LocalQueryEngine<T> {
       if (rule == null ||
           !field.operators.contains(rule.operator) ||
           !_hasValidValueShape(rule) ||
-          !_isCompatibleFilter(field, rule, items)) {
+          !_acceptsRule(field, rule)) {
         continue;
       }
 
@@ -117,39 +117,24 @@ class LocalQueryEngine<T> {
     return _FilterRule(LocalFilterOperator.equals, raw);
   }
 
-  bool _isCompatibleFilter(
-    LocalFilterField<T> field,
-    _FilterRule rule,
-    List<T> items,
-  ) {
-    final values = items
-        .map(field.valueOf)
-        .where((value) => value != null)
-        .toList();
-    if (values.isEmpty) return true;
-
-    bool matchesFieldType(Object value) => values.every((actual) {
-      return actual!.runtimeType == value.runtimeType ||
-          (actual is num && value is num);
-    });
-
+  bool _acceptsRule(LocalFilterField<T> field, _FilterRule rule) {
+    final value = rule.value;
     switch (rule.operator) {
-      case LocalFilterOperator.equals:
-      case LocalFilterOperator.notEquals:
-        return rule.value == null || matchesFieldType(rule.value as Object);
-      case LocalFilterOperator.contains:
-        return values.every((value) => value is String) && rule.value is String;
-      case LocalFilterOperator.inList:
-        return (rule.value as List).every(
-          (value) => value == null || matchesFieldType(value),
-        );
-      case LocalFilterOperator.greaterThan:
-      case LocalFilterOperator.lessThan:
-        return values.every((value) => value is num) && rule.value is num;
-      case LocalFilterOperator.between:
-        return values.every((value) => value is num);
       case LocalFilterOperator.isNull:
         return true;
+      case LocalFilterOperator.equals:
+      case LocalFilterOperator.notEquals:
+        return value == null || field.accepts(value);
+      case LocalFilterOperator.inList:
+        return (value as List).every((v) => v == null || field.accepts(v));
+      case LocalFilterOperator.between:
+        return (value as List).every((v) => v != null && field.accepts(v));
+      case LocalFilterOperator.greaterThan:
+      case LocalFilterOperator.greaterThanOrEquals:
+      case LocalFilterOperator.lessThan:
+      case LocalFilterOperator.lessThanOrEquals:
+      case LocalFilterOperator.contains:
+        return value != null && field.accepts(value);
     }
   }
 
@@ -163,7 +148,9 @@ class LocalQueryEngine<T> {
       case LocalFilterOperator.inList:
         return rule.value is List;
       case LocalFilterOperator.greaterThan:
+      case LocalFilterOperator.greaterThanOrEquals:
       case LocalFilterOperator.lessThan:
+      case LocalFilterOperator.lessThanOrEquals:
         return rule.value is num;
       case LocalFilterOperator.between:
         final range = rule.value;
@@ -192,9 +179,15 @@ class LocalQueryEngine<T> {
       case LocalFilterOperator.greaterThan:
         if (actual is! num || rule.value is! num) return false;
         return actual > (rule.value as num);
+      case LocalFilterOperator.greaterThanOrEquals:
+        if (actual is! num || rule.value is! num) return false;
+        return actual >= (rule.value as num);
       case LocalFilterOperator.lessThan:
         if (actual is! num || rule.value is! num) return false;
         return actual < (rule.value as num);
+      case LocalFilterOperator.lessThanOrEquals:
+        if (actual is! num || rule.value is! num) return false;
+        return actual <= (rule.value as num);
       case LocalFilterOperator.between:
         final range = rule.value;
         if (actual is! num || range is! List || range.length != 2) return false;
