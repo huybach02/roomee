@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -38,6 +39,19 @@ void main() {
     // Subsequent call returns cipher with the same key from storage
     final cipher2 = await manager.getOrCreateCipher();
     expect(cipher2, isA<HiveCipher>());
+  });
+
+  test('regenerates key when stored key is corrupted or has invalid length', () async {
+    // Write invalid/corrupted key to storage
+    await storage.write(key: HiveCipherManager.secureKeyStorageKey, value: 'corrupted-base64!!!');
+
+    final cipher = await manager.getOrCreateCipher();
+    expect(cipher, isA<HiveCipher>());
+
+    // Verify a valid 32-byte key was regenerated and stored
+    final newSavedKey = await storage.read(key: HiveCipherManager.secureKeyStorageKey);
+    expect(newSavedKey, isNotNull);
+    expect(base64Decode(newSavedKey!).length, 32);
   });
 
   test('CacheBoxes opens workspaces and users with encryption cipher', () async {

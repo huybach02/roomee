@@ -38,19 +38,24 @@ final _schema = LocalQuerySchema<_Workspace>(
         LocalFilterOperator.notEquals,
         LocalFilterOperator.inList,
       },
+      accepts: (v) => v is int || (v is num && v == v.round()),
     ),
     'provinceId': LocalFilterField(
       valueOf: (workspace) => workspace.provinceId,
       operators: {LocalFilterOperator.equals},
+      accepts: (v) => v is int,
     ),
     'area': LocalFilterField(
       valueOf: (workspace) => workspace.area,
       operators: {
         LocalFilterOperator.equals,
         LocalFilterOperator.greaterThan,
+        LocalFilterOperator.greaterThanOrEquals,
         LocalFilterOperator.lessThan,
+        LocalFilterOperator.lessThanOrEquals,
         LocalFilterOperator.between,
       },
+      accepts: (v) => v is num,
     ),
     'name': LocalFilterField(
       valueOf: (workspace) => workspace.name,
@@ -59,6 +64,7 @@ final _schema = LocalQuerySchema<_Workspace>(
         LocalFilterOperator.equals,
         LocalFilterOperator.notEquals,
       },
+      accepts: (v) => v is String,
     ),
     'address': LocalFilterField(
       valueOf: (workspace) => workspace.address,
@@ -67,6 +73,7 @@ final _schema = LocalQuerySchema<_Workspace>(
         LocalFilterOperator.equals,
         LocalFilterOperator.contains,
       },
+      accepts: (v) => v is String,
     ),
   },
   sortFields: {
@@ -184,6 +191,31 @@ void main() {
       schema: _schema,
     );
     expect(less.data.map((workspace) => workspace.id).toSet(), {'w3', 'w4'});
+
+    final greaterOrEqual = engine.query(
+      items: _workspaces,
+      queryParameters: {
+        'area': {'operator': 'greaterThanOrEquals', 'value': 50},
+      },
+      schema: _schema,
+    );
+    expect(greaterOrEqual.data.map((workspace) => workspace.id).toSet(), {
+      'w1',
+      'w2',
+      'w3',
+    });
+
+    final lessOrEqual = engine.query(
+      items: _workspaces,
+      queryParameters: {
+        'area': {'operator': 'lessThanOrEquals', 'value': 50},
+      },
+      schema: _schema,
+    );
+    expect(lessOrEqual.data.map((workspace) => workspace.id).toSet(), {
+      'w3',
+      'w4',
+    });
 
     final isNull = engine.query(
       items: _workspaces,
@@ -388,4 +420,53 @@ void main() {
       expect(withoutMetadata.lastFetchedAt, isNull);
     },
   );
+
+  test('validates filter value types using accepts callback and ignores incompatible rules', () {
+    // 1. inList with one invalid element type is ignored
+    final invalidInList = engine.query(
+      items: _workspaces,
+      queryParameters: {
+        'status': {
+          'operator': 'inList',
+          'value': [1, 'invalid_type'],
+        },
+      },
+      schema: _schema,
+    );
+    expect(invalidInList.total, _workspaces.length);
+
+    // 2. inList with valid elements is applied
+    final validInList = engine.query(
+      items: _workspaces,
+      queryParameters: {
+        'status': {
+          'operator': 'inList',
+          'value': [1],
+        },
+      },
+      schema: _schema,
+    );
+    expect(validInList.total, 2);
+
+    // 3. between with non-accepted value is ignored
+    final invalidBetween = engine.query(
+      items: _workspaces,
+      queryParameters: {
+        'area': {
+          'operator': 'between',
+          'value': [20, '100'],
+        },
+      },
+      schema: _schema,
+    );
+    expect(invalidBetween.total, _workspaces.length);
+
+    // 4. Empty cache does not bypass type check: wrong type is rejected even on empty list
+    final emptyCacheResult = engine.query(
+      items: <_Workspace>[],
+      queryParameters: {'provinceId': 'wrong-string-type'},
+      schema: _schema,
+    );
+    expect(emptyCacheResult.data, isEmpty);
+  });
 }

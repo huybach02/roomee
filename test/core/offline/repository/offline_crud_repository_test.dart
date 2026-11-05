@@ -3,8 +3,10 @@ import 'package:roomee/core/contracts/local_crud_datasource.dart';
 import 'package:roomee/core/contracts/remote_crud_datasource.dart';
 import 'package:roomee/core/models/models.dart';
 import 'package:roomee/core/network/network.dart';
+import 'package:roomee/core/offline/contracts/sync_dtos.dart';
 import 'package:roomee/core/offline/query/offline_page.dart';
 import 'package:roomee/core/offline/repository/offline_crud_repository.dart';
+import 'package:roomee/features/general/data/general_remote_datasource.dart';
 
 class _FakeItem {
   final String id;
@@ -77,6 +79,9 @@ class _FakeRemote implements RemoteCrudDataSource<_FakeItem, String> {
 }
 
 class _FakeLocal implements LocalCrudDataSource<_FakeItem, String> {
+  @override
+  String get entityName => 'fake_items';
+
   bool throwOnCache = false;
   List<_FakeItem> cached = [];
   final Map<String, _FakeItem> itemsById = {};
@@ -145,10 +150,55 @@ class _FakeLocal implements LocalCrudDataSource<_FakeItem, String> {
     itemsById.remove(id);
   }
 
+  List<SyncItemDto> syncItemsToReturn = [];
+  SyncResultDto? appliedSyncResult;
+
   @override
   Future<void> clearAccount({required String accountId}) async {
     cached.clear();
     itemsById.clear();
+  }
+
+  @override
+  Future<List<SyncItemDto>> getSyncItems({required String accountId}) async =>
+      syncItemsToReturn;
+
+  @override
+  Future<Map<String, List<SyncItemDto>>> getRelationSyncItems({
+    required String accountId,
+  }) async =>
+      const {};
+
+  @override
+  Future<void> applySyncResult({
+    required String accountId,
+    required SyncResultDto result,
+  }) async {
+    appliedSyncResult = result;
+    for (final id in result.needDelete) {
+      itemsById.remove(id);
+      cached.removeWhere((i) => i.id == id);
+    }
+  }
+
+  @override
+  Future<void> applyRelationSync({
+    required String accountId,
+    required Map<String, SyncResultDto> relationResults,
+  }) async {}
+}
+
+class _FakeGeneralRemote extends GeneralRemoteDataSource {
+  Map<String, List<SyncItemDto>>? lastSyncEntities;
+  ApiResponse<Map<String, SyncResultDto>> syncResponse =
+      const ApiResponse(success: true, message: 'OK', data: {});
+
+  @override
+  Future<ApiResponse<Map<String, SyncResultDto>>> sync(
+    Map<String, List<SyncItemDto>> entities,
+  ) async {
+    lastSyncEntities = entities;
+    return syncResponse;
   }
 }
 
@@ -186,6 +236,43 @@ void main() {
 
       expect(page.source, DataSourceKind.remote);
       expect(page.data.first.name, 'Online Item');
+    });
+
+    test('online success triggers background reconciliation and applies result', () async {
+      final fakeGeneral = _FakeGeneralRemote();
+      fakeGeneral.syncResponse = const ApiResponse(
+        success: true,
+        message: 'OK',
+        data: {
+          'fake_items': SyncResultDto(
+            needDelete: ['old-zombie-id'],
+          ),
+        },
+      );
+
+      final repo = OfflineCrudRepository(
+        remote: remote,
+        local: local,
+        getAccountId: () => 'acc-1',
+        generalRemote: fakeGeneral,
+      );
+
+      local.itemsById['old-zombie-id'] =
+          const _FakeItem('old-zombie-id', 'Zombie');
+      local.syncItemsToReturn = [const SyncItemDto(id: 'old-zombie-id')];
+
+      remote.items = [const _FakeItem('1', 'Online Item')];
+
+      await repo.getAll();
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      expect(fakeGeneral.lastSyncEntities, isNotNull);
+      expect(
+        fakeGeneral.lastSyncEntities!['fake_items']?.first.id,
+        'old-zombie-id',
+      );
+      expect(local.appliedSyncResult?.needDelete, contains('old-zombie-id'));
+      expect(local.itemsById.containsKey('old-zombie-id'), isFalse);
     });
 
     test('offline with NoInternetException fallbacks to local when cache has data', () async {

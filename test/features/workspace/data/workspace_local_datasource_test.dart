@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_ce_flutter/hive_flutter.dart';
+import 'package:roomee/core/contracts/local_crud_datasource.dart';
 import 'package:roomee/core/models/models.dart';
 import 'package:roomee/core/offline/hive/cache_boxes.dart';
 import 'package:roomee/core/offline/query/offline_page.dart';
@@ -142,8 +143,8 @@ void main() {
     expect(single?.user?.fullName, 'Chủ Trọ A');
   });
 
-  test('IWorkspaceLocalDataSource methods and search by province/ward name', () async {
-    final IWorkspaceLocalDataSource ds = localDataSource;
+  test('LocalCrudDataSource methods and search by province/ward name', () async {
+    final LocalCrudDataSource<WorkspaceModel, String> ds = localDataSource;
 
     final workspaces = [
       WorkspaceModel(
@@ -188,7 +189,7 @@ void main() {
     );
 
     // Search by province name: 'Cần Thơ' -> matches both
-    final provinceSearch = await ds.getWorkspaces(
+    final provinceSearch = await ds.queryPage(
       accountId: 'account-1',
       queryParameters: {'search': 'cần thơ', 'sort': 'numberOfRooms:desc'},
     );
@@ -197,18 +198,18 @@ void main() {
     expect(provinceSearch.data.first.province?.fullName, 'Thành phố Cần Thơ');
 
     // Search by ward name: 'ninh kiều' -> matches both
-    final wardSearch = await ds.getWorkspaces(
+    final wardSearch = await ds.queryPage(
       accountId: 'account-1',
       queryParameters: {'search': 'ninh kieu'},
     );
     expect(wardSearch.data.length, 2);
 
-    // getWorkspaceById
-    final item = await ds.getWorkspaceById(accountId: 'account-1', id: 'ws-1');
+    // getById
+    final item = await ds.getById(accountId: 'account-1', id: 'ws-1');
     expect(item?.name, 'Nhà trọ Hoa Sen');
     expect(item?.user?.fullName, 'Chủ Trọ A');
 
-    // cacheCreatedWorkspace
+    // cacheCreated
     final newWs = WorkspaceModel(
       id: 'ws-new',
       userId: 'user-1',
@@ -224,21 +225,21 @@ void main() {
       ward: testWard,
       user: testUser,
     );
-    await ds.cacheCreatedWorkspace(accountId: 'account-1', workspace: newWs);
+    await ds.cacheCreated(accountId: 'account-1', item: newWs);
 
-    final retrievedNew = await ds.getWorkspaceById(accountId: 'account-1', id: 'ws-new');
+    final retrievedNew = await ds.getById(accountId: 'account-1', id: 'ws-new');
     expect(retrievedNew?.name, 'Khu trọ Mới');
     expect(retrievedNew?.province?.fullName, 'Thành phố Cần Thơ');
 
-    // cacheUpdatedWorkspace
+    // cacheUpdated
     final updatedWs = newWs.copyWith(name: 'Khu trọ Đã Sửa');
-    await ds.cacheUpdatedWorkspace(accountId: 'account-1', workspace: updatedWs);
+    await ds.cacheUpdated(accountId: 'account-1', item: updatedWs);
 
-    final retrievedUpdated = await ds.getWorkspaceById(accountId: 'account-1', id: 'ws-new');
+    final retrievedUpdated = await ds.getById(accountId: 'account-1', id: 'ws-new');
     expect(retrievedUpdated?.name, 'Khu trọ Đã Sửa');
 
-    // removeWorkspace
-    await ds.removeWorkspace(accountId: 'account-1', id: 'ws-new');
-    expect(await ds.getWorkspaceById(accountId: 'account-1', id: 'ws-new'), isNull);
+    // remove
+    await ds.remove(accountId: 'account-1', id: 'ws-new');
+    expect(await ds.getById(accountId: 'account-1', id: 'ws-new'), isNull);
   });
 }

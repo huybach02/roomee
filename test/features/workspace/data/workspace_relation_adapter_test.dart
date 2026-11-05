@@ -6,6 +6,7 @@ import 'package:roomee/core/models/models.dart';
 import 'package:roomee/core/offline/codecs/province_model_codec.dart';
 import 'package:roomee/core/offline/codecs/user_model_codec.dart';
 import 'package:roomee/core/offline/codecs/ward_model_codec.dart';
+import 'package:roomee/core/offline/contracts/sync_dtos.dart';
 import 'package:roomee/core/offline/hive/cache_boxes.dart';
 import 'package:roomee/core/offline/hive/hive_entity_store.dart';
 import 'package:roomee/features/workspace/data/codecs/workspace_model_codec.dart';
@@ -247,5 +248,50 @@ void main() {
       expect(await provinceStore.getById(accountId: 'global', id: 92), isNotNull);
       expect(await wardStore.getById(accountId: 'global', id: 310), isNotNull);
     });
+
+    test('getRelationSyncItems collects users from userStore', () async {
+      await userStore.put(accountId: 'account-1', entity: testUser);
+
+      final syncItems = await adapter.getRelationSyncItems('account-1');
+
+      expect(syncItems.containsKey('user'), isTrue);
+      expect(syncItems['user']!.length, 1);
+      expect(syncItems['user']!.first.id, 'user-1');
+    });
+
+    test('applyRelationSync updates and deletes users in userStore', () async {
+      await userStore.put(accountId: 'account-1', entity: testUser);
+
+      const updatedUserJson = {
+        'id': 'user-1',
+        'email': 'landlord_updated@roomee.vn',
+        'fullName': 'Chủ Trọ Mới',
+        'role': 'landlord',
+      };
+
+      await adapter.applyRelationSync('account-1', {
+        'user': const SyncResultDto(
+          needUpdate: [updatedUserJson],
+          needDelete: ['user-to-delete'],
+        ),
+      });
+
+      final updated =
+          await userStore.getById(accountId: 'account-1', id: 'user-1');
+      expect(updated?.fullName, 'Chủ Trọ Mới');
+      expect(updated?.email, 'landlord_updated@roomee.vn');
+
+      await adapter.applyRelationSync('account-1', {
+        'user': const SyncResultDto(
+          needDelete: ['user-1'],
+        ),
+      });
+
+      expect(
+        await userStore.getById(accountId: 'account-1', id: 'user-1'),
+        isNull,
+      );
+    });
   });
 }
+

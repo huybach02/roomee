@@ -189,6 +189,61 @@ class _FakeSwitchingSourceWorkspaceRepo extends _FakeWorkspaceRepo {
   }
 }
 
+class _FakeDelayedWorkspaceRepo extends _FakeWorkspaceRepo {
+  Completer<OfflinePage<WorkspaceModel>>? loadMoreCompleter;
+  Completer<OfflinePage<WorkspaceModel>>? loadCompleter;
+  final int initialTotalPages;
+
+  _FakeDelayedWorkspaceRepo({
+    super.workspaces,
+    this.initialTotalPages = 1,
+  });
+
+  @override
+  Future<OfflinePage<WorkspaceModel>> getWorkspaces({Map<String, dynamic>? queryParameters}) async {
+    if (loadCompleter != null) {
+      return loadCompleter!.future;
+    }
+    final page = queryParameters?['page'] as int? ?? 1;
+    if (page > 1 && loadMoreCompleter != null) {
+      return loadMoreCompleter!.future;
+    }
+    final search = queryParameters?['search'] as String?;
+    if (search != null) {
+      return const OfflinePage(
+        data: [
+          WorkspaceModel(
+            id: 'ws-search',
+            userId: 'user-1',
+            name: 'Hoa Sen',
+            area: 80.0,
+            provinceId: 1,
+            wardId: 1,
+            address: 'Đường S',
+            contactName: 'S',
+            contactPhone: '0902',
+          ),
+        ],
+        total: 1,
+        page: 1,
+        limit: 20,
+        totalPages: 1,
+        isComplete: true,
+        source: DataSourceKind.remote,
+      );
+    }
+    return OfflinePage(
+      data: workspaces,
+      total: initialTotalPages > 1 ? 30 : workspaces.length,
+      page: 1,
+      limit: 20,
+      totalPages: initialTotalPages,
+      isComplete: initialTotalPages == 1,
+      source: DataSourceKind.remote,
+    );
+  }
+}
+
 Widget _buildTestApp({
   required Widget child,
   AuthBloc? authBloc,
@@ -386,6 +441,126 @@ void main() {
         ]),
       );
       await bloc.close();
+    });
+
+    test('WorkspaceBloc load more does not overwrite subsequent load/search when load more completes later', () async {
+      const sample1 = WorkspaceModel(
+        id: 'ws-1',
+        userId: 'user-1',
+        name: 'Khu trọ 1',
+        area: 100.0,
+        provinceId: 1,
+        wardId: 1,
+        address: 'Đường 1',
+        contactName: 'A',
+        contactPhone: '0901',
+      );
+      final repo = _FakeDelayedWorkspaceRepo(workspaces: [sample1], initialTotalPages: 2);
+      final bloc = WorkspaceBloc(repository: repo);
+
+      // Initial load page 1
+      bloc.add(const WorkspaceLoadEvent());
+      await expectLater(
+        bloc.stream,
+        emitsInOrder([
+          const WorkspaceLoading(),
+          isA<WorkspaceLoaded>().having((s) => s.workspaces.single.id, 'id', 'ws-1'),
+        ]),
+      );
+
+      // Prepare delayed load more
+      final loadMoreCompleter = Completer<OfflinePage<WorkspaceModel>>();
+      repo.loadMoreCompleter = loadMoreCompleter;
+
+      // Trigger load more
+      bloc.add(const WorkspaceLoadMoreEvent());
+      await pumpEventQueue();
+
+      // Trigger search before load more finishes
+      bloc.add(const WorkspaceLoadEvent(queryParameters: {'search': 'Hoa Sen'}));
+      await pumpEventQueue();
+
+      // Complete the delayed load more
+      loadMoreCompleter.complete(
+        const OfflinePage(
+          data: [
+            WorkspaceModel(
+              id: 'ws-page2',
+              userId: 'user-1',
+              name: 'Khu trọ 2',
+              area: 100.0,
+              provinceId: 1,
+              wardId: 1,
+              address: 'Đường 2',
+              contactName: 'B',
+              contactPhone: '0903',
+            ),
+          ],
+          total: 2,
+          page: 2,
+          limit: 20,
+          totalPages: 2,
+          isComplete: true,
+          source: DataSourceKind.remote,
+        ),
+      );
+      await pumpEventQueue();
+
+      // The final state should be the search result ('ws-search'), NOT overwritten by page 2 items!
+      final currentState = bloc.state as WorkspaceLoaded;
+      expect(currentState.workspaces.map((w) => w.id).toList(), ['ws-search']);
+      await bloc.close();
+    });
+
+    testWidgets('renders LinearProgressIndicator when state isRefreshing is true', (tester) async {
+      final fakeRepo = _FakeDelayedWorkspaceRepo(
+        workspaces: const [
+          WorkspaceModel(
+            id: 'ws-1',
+            userId: 'user-1',
+            name: 'Nhà trọ 1',
+            area: 100.0,
+            provinceId: 1,
+            wardId: 1,
+            address: 'Đường 1',
+            contactName: 'A',
+            contactPhone: '0901',
+          ),
+        ],
+      );
+      final bloc = WorkspaceBloc(repository: fakeRepo);
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          child: const WorkspaceScreen(),
+          workspaceBloc: bloc,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Delay the next load
+      final completer = Completer<OfflinePage<WorkspaceModel>>();
+      fakeRepo.loadCompleter = completer;
+
+      // Second load triggers isRefreshing: true
+      bloc.add(const WorkspaceLoadEvent());
+      await tester.pump(const Duration(milliseconds: 10));
+
+      expect(find.byType(LinearProgressIndicator), findsOneWidget);
+
+      completer.complete(
+        const OfflinePage(
+          data: [],
+          total: 0,
+          page: 1,
+          limit: 20,
+          totalPages: 1,
+          isComplete: true,
+          source: DataSourceKind.remote,
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 10));
+      expect(find.byType(LinearProgressIndicator), findsNothing);
     });
 
     testWidgets('renders offline banner when isOffline is true', (tester) async {

@@ -4,21 +4,25 @@ import 'package:roomee/core/contracts/local_crud_datasource.dart';
 import 'package:roomee/core/contracts/remote_crud_datasource.dart';
 import 'package:roomee/core/localization/app_localizations.dart';
 import 'package:roomee/core/network/api_exceptions.dart';
+import 'package:roomee/core/offline/contracts/sync_dtos.dart';
 import 'package:roomee/core/offline/policy/offline_error_policy.dart';
 import 'package:roomee/core/offline/query/offline_page.dart';
+import 'package:roomee/features/general/data/general_remote_datasource.dart';
 
 class OfflineCrudRepository<T, ID> {
   final RemoteCrudDataSource<T, ID> remote;
   final LocalCrudDataSource<T, ID>? local;
   final OfflineErrorPolicy errorPolicy;
   final FutureOr<String?> Function()? getAccountId;
+  final GeneralRemoteDataSource generalRemote;
 
   OfflineCrudRepository({
     required this.remote,
     this.local,
     this.errorPolicy = const DefaultOfflineErrorPolicy(),
     this.getAccountId,
-  });
+    GeneralRemoteDataSource? generalRemote,
+  }) : generalRemote = generalRemote ?? GeneralRemoteDataSource();
 
   Future<OfflinePage<T>> getAll({
     Map<String, dynamic>? queryParameters,
@@ -41,6 +45,9 @@ class OfflineCrudRepository<T, ID> {
               items: data.data,
               isComplete: false,
             );
+
+            // Tự động đối soát ngầm (Reconcile / Sync) không block UI
+            unawaited(_reconcile(accountId));
           }
         } catch (_) {
           // Fault-tolerant caching: log and do not fail online API request
@@ -168,4 +175,42 @@ class OfflineCrudRepository<T, ID> {
       } catch (_) {}
     }
   }
+
+  Future<void> _reconcile(String accountId) async {
+    if (local == null) return;
+    try {
+      final mainItems = await local!.getSyncItems(accountId: accountId);
+      final relationItems =
+          await local!.getRelationSyncItems(accountId: accountId);
+
+      if (mainItems.isEmpty && relationItems.isEmpty) return;
+
+      final payload = <String, List<SyncItemDto>>{
+        if (mainItems.isNotEmpty) local!.entityName: mainItems,
+        ...relationItems,
+      };
+
+      final response = await generalRemote.sync(payload);
+      if (response.success && response.data != null) {
+        final results = response.data!;
+
+        final mainResult =
+            results[local!.entityName] ?? results['${local!.entityName}s'];
+        if (mainResult != null) {
+          await local!.applySyncResult(
+            accountId: accountId,
+            result: mainResult,
+          );
+        }
+
+        await local!.applyRelationSync(
+          accountId: accountId,
+          relationResults: results,
+        );
+      }
+    } catch (_) {
+      // Reconciliation chạy nền, không gây ảnh hưởng đến luồng chính
+    }
+  }
 }
+

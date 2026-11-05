@@ -1,6 +1,9 @@
 import { Router } from "express";
 import { injectable } from "tsyringe";
 import { GeneralController } from "./generalController.js";
+import { authMiddleware } from "../../middlewares/authMiddleware.js";
+import { validate } from "../../middlewares/validateMiddleware.js";
+import { syncRequestSchema } from "./generalSchema.js";
 
 @injectable()
 export class GeneralRoutes {
@@ -17,7 +20,14 @@ export class GeneralRoutes {
       "/provinces/:provinceId/wards",
       this.generalController.getWardsByProvince,
     );
+    this.router.post(
+      "/sync",
+      authMiddleware,
+      validate(syncRequestSchema),
+      this.generalController.sync,
+    );
   }
 }
 
 export default GeneralRoutes;
+

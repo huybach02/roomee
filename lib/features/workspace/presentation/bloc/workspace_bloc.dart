@@ -99,7 +99,11 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
       return;
     }
 
-    emit(currentState.copyWith(isLoadingMore: true, errorMessage: null));
+    final loadingMoreState = currentState.copyWith(
+      isLoadingMore: true,
+      errorMessage: null,
+    );
+    emit(loadingMoreState);
     try {
       final params = Map<String, dynamic>.from(event.queryParameters ?? {});
       params['page'] = currentState.page + 1;
@@ -108,6 +112,8 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
       final pagination = await _workspaceRepository.getWorkspaces(
         queryParameters: params,
       );
+
+      if (!identical(state, loadingMoreState)) return;
 
       // Source Guard: Không nối dữ liệu local vào danh sách online nếu rớt mạng khi load more
       if (!currentState.isOffline &&
@@ -135,7 +141,9 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
         errorMessage: null,
       ));
     } catch (_) {
-      emit(currentState.copyWith(isLoadingMore: false));
+      if (identical(state, loadingMoreState)) {
+        emit(currentState.copyWith(isLoadingMore: false));
+      }
     }
   }
 

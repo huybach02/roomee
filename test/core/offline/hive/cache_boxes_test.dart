@@ -66,4 +66,30 @@ void main() {
     expect(boxes[HiveBoxNames.workspaces], equals(boxes.box(HiveBoxNames.workspaces)));
     expect(boxes.all.length, CacheBoxes.configs.length);
   });
+
+  test('CacheBoxes.open recovers gracefully when box has mismatched cipher or is corrupted', () async {
+    // 1. Close existing boxes
+    for (final box in boxes.all) {
+      await box.close();
+    }
+
+    // 2. Open workspaces box with cipherA, write data and close
+    final cipherA = HiveAesCipher(Hive.generateSecureKey());
+    final oldBox = await Hive.openBox<Map>(HiveBoxNames.workspaces, encryptionCipher: cipherA);
+    await oldBox.put('some_key', {'data': 123});
+    await oldBox.close();
+
+    // 3. Open with different cipherB
+    final cipherB = HiveAesCipher(Hive.generateSecureKey());
+    final newBoxes = await CacheBoxes.open(encryptionCipher: cipherB);
+
+    // Should successfully open box without throwing HiveError
+    expect(newBoxes[HiveBoxNames.workspaces].isOpen, isTrue);
+    expect(newBoxes[HiveBoxNames.workspaces].isEmpty, isTrue);
+
+    // Clean up
+    for (final box in newBoxes.all) {
+      await box.close();
+    }
+  });
 }
