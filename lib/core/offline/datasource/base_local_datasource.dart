@@ -2,6 +2,7 @@ import 'package:hive_ce_flutter/hive_flutter.dart';
 import 'package:roomee/core/contracts/local_crud_datasource.dart';
 import 'package:roomee/core/offline/contracts/entity_store.dart';
 import 'package:roomee/core/offline/contracts/relation_adapter.dart';
+import 'package:roomee/core/offline/contracts/sync_dtos.dart';
 import 'package:roomee/core/offline/hive/cache_key_builder.dart';
 import 'package:roomee/core/offline/hive/cache_metadata.dart';
 import 'package:roomee/core/offline/query/local_query_engine.dart';
@@ -12,6 +13,7 @@ abstract class BaseLocalDataSource<T, ID>
     implements LocalCrudDataSource<T, ID> {
   final EntityStore<T, ID> entityStore;
   final Box<Map> metadataBox;
+  @override
   final String entityName;
   final LocalQueryEngine<T> queryEngine;
   final LocalQuerySchema<T> querySchema;
@@ -200,5 +202,38 @@ abstract class BaseLocalDataSource<T, ID>
       await relationAdapter!.clearRelations(accountId);
     }
     await metadataBox.delete(_metadataKey(accountId));
+  }
+
+  @override
+  Future<List<SyncItemDto>> getSyncItems({required String accountId}) =>
+      entityStore.getSyncItems(accountId: accountId);
+
+  @override
+  Future<Map<String, List<SyncItemDto>>> getRelationSyncItems({
+    required String accountId,
+  }) =>
+      relationAdapter?.getRelationSyncItems(accountId) ??
+      Future.value(const {});
+
+  @override
+  Future<void> applySyncResult({
+    required String accountId,
+    required SyncResultDto result,
+  }) async {
+    final updatedEntities =
+        await entityStore.applySync(accountId: accountId, result: result);
+    if (relationAdapter != null && updatedEntities.isNotEmpty) {
+      await relationAdapter!.saveRelations(accountId, updatedEntities);
+    }
+  }
+
+  @override
+  Future<void> applyRelationSync({
+    required String accountId,
+    required Map<String, SyncResultDto> relationResults,
+  }) async {
+    if (relationAdapter != null) {
+      await relationAdapter!.applyRelationSync(accountId, relationResults);
+    }
   }
 }

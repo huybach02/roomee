@@ -3,6 +3,7 @@ import 'package:roomee/core/contracts/local_crud_datasource.dart';
 import 'package:roomee/core/contracts/remote_crud_datasource.dart';
 import 'package:roomee/core/models/models.dart';
 import 'package:roomee/core/network/network.dart';
+import 'package:roomee/core/offline/contracts/sync_dtos.dart';
 import 'package:roomee/core/offline/query/offline_page.dart';
 import 'package:roomee/core/offline/repository/offline_crud_repository.dart';
 import 'package:roomee/features/workspace/data/workspace_repository.dart';
@@ -86,6 +87,9 @@ class _FakeWorkspaceRemote implements RemoteCrudDataSource<WorkspaceModel, Strin
 }
 
 class _FakeWorkspaceLocal implements LocalCrudDataSource<WorkspaceModel, String> {
+  @override
+  String get entityName => 'workspaces';
+
   List<WorkspaceModel> cached = [];
 
   @override
@@ -148,6 +152,28 @@ class _FakeWorkspaceLocal implements LocalCrudDataSource<WorkspaceModel, String>
   Future<void> clearAccount({required String accountId}) async {
     cached.clear();
   }
+
+  @override
+  Future<List<SyncItemDto>> getSyncItems({required String accountId}) async =>
+      const [];
+
+  @override
+  Future<Map<String, List<SyncItemDto>>> getRelationSyncItems({
+    required String accountId,
+  }) async =>
+      const {};
+
+  @override
+  Future<void> applySyncResult({
+    required String accountId,
+    required SyncResultDto result,
+  }) async {}
+
+  @override
+  Future<void> applyRelationSync({
+    required String accountId,
+    required Map<String, SyncResultDto> relationResults,
+  }) async {}
 }
 
 void main() {

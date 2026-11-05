@@ -4,6 +4,7 @@ import { User } from "../../entities/user.js";
 import { RefreshToken } from "../../entities/refreshToken.js";
 import { UserRepository } from "../../repositories/userRepository.js";
 import { RegisterDto } from "./authSchema.js";
+import { syncable, type SyncableService } from "../../utils/syncableService.js";
 import argon2 from "argon2";
 import jwt from "jsonwebtoken";
 import {
@@ -28,8 +29,12 @@ import { RefreshTokenRepository } from "../../repositories/refreshTokenRepositor
 import { AppError } from "../../utils/appError.js";
 import { redis } from "../../config/redis.js";
 
+@syncable()
 @injectable()
-export class AuthService {
+export class AuthService implements SyncableService<User> {
+  public readonly syncModuleName = "user";
+  public readonly syncEntity = User;
+
   private readonly jwtSecret: string;
 
   constructor(

@@ -1,8 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:roomee/core/contracts/local_crud_datasource.dart';
+import 'package:roomee/core/offline/contracts/sync_dtos.dart';
 import 'package:roomee/core/offline/query/offline_page.dart';
 
 class _FakeLocalCrudDataSource implements LocalCrudDataSource<String, String> {
+  @override
+  String get entityName => 'fakes';
+
   @override
   Future<void> cacheRemotePage({
     required String accountId,
@@ -54,7 +58,30 @@ class _FakeLocalCrudDataSource implements LocalCrudDataSource<String, String> {
   Future<void> clearAccount({
     required String accountId,
   }) async {}
+
+  @override
+  Future<List<SyncItemDto>> getSyncItems({required String accountId}) async =>
+      const [];
+
+  @override
+  Future<Map<String, List<SyncItemDto>>> getRelationSyncItems({
+    required String accountId,
+  }) async =>
+      const {};
+
+  @override
+  Future<void> applySyncResult({
+    required String accountId,
+    required SyncResultDto result,
+  }) async {}
+
+  @override
+  Future<void> applyRelationSync({
+    required String accountId,
+    required Map<String, SyncResultDto> relationResults,
+  }) async {}
 }
+
 
 void main() {
   test('LocalCrudDataSource defines standard local CRUD contract', () async {

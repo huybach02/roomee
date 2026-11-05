@@ -1,6 +1,9 @@
+import 'package:roomee/core/offline/contracts/sync_dtos.dart';
 import 'package:roomee/core/offline/query/offline_page.dart';
 
 abstract interface class LocalCrudDataSource<T, ID> {
+  String get entityName;
+
   Future<void> cacheRemotePage({
     required String accountId,
     required List<T> items,
@@ -35,4 +38,23 @@ abstract interface class LocalCrudDataSource<T, ID> {
   Future<void> clearAccount({
     required String accountId,
   });
+
+  Future<List<SyncItemDto>> getSyncItems({
+    required String accountId,
+  });
+
+  Future<Map<String, List<SyncItemDto>>> getRelationSyncItems({
+    required String accountId,
+  });
+
+  Future<void> applySyncResult({
+    required String accountId,
+    required SyncResultDto result,
+  });
+
+  Future<void> applyRelationSync({
+    required String accountId,
+    required Map<String, SyncResultDto> relationResults,
+  });
 }
+

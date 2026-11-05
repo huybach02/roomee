@@ -2,10 +2,12 @@ import 'package:hive_ce_flutter/hive_flutter.dart';
 
 import '../contracts/entity_codec.dart';
 import '../contracts/entity_store.dart';
+import '../contracts/sync_dtos.dart';
 import 'cache_key_builder.dart';
 
 class HiveEntityStore<T, ID> implements EntityStore<T, ID> {
   final Box<Map> box;
+  @override
   final EntityCodec<T, ID> codec;
 
   HiveEntityStore({required this.box, required this.codec});
@@ -83,5 +85,54 @@ class HiveEntityStore<T, ID> implements EntityStore<T, ID> {
         .toList();
 
     await box.deleteAll(keys);
+  }
+
+  @override
+  Future<List<SyncItemDto>> getSyncItems({required String accountId}) async {
+    final prefix = 'account:$accountId:';
+    final result = <SyncItemDto>[];
+
+    for (final key in box.keys) {
+      if (key is! String || !key.startsWith(prefix)) continue;
+
+      final json = box.get(key);
+      if (json != null) {
+        final id = json['id']?.toString();
+        final updatedAt =
+            json['updatedAt']?.toString() ?? json['updated_at']?.toString();
+        if (id != null && id.isNotEmpty) {
+          result.add(SyncItemDto(id: id, updatedAt: updatedAt));
+        }
+      }
+    }
+
+    return result;
+  }
+
+  @override
+  Future<List<T>> applySync({
+    required String accountId,
+    required SyncResultDto result,
+  }) async {
+    if (result.needDelete.isNotEmpty) {
+      final keysToDelete = result.needDelete
+          .map((id) => CacheKeyBuilder.entity(accountId, id))
+          .toList();
+      await box.deleteAll(keysToDelete);
+    }
+
+    final updatedEntities = <T>[];
+    if (result.needUpdate.isNotEmpty) {
+      for (final json in result.needUpdate) {
+        try {
+          updatedEntities.add(codec.fromJson(json));
+        } catch (_) {}
+      }
+      if (updatedEntities.isNotEmpty) {
+        await putMany(accountId: accountId, entities: updatedEntities);
+      }
+    }
+
+    return updatedEntities;
   }
 }

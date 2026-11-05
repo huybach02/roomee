@@ -1,8 +1,9 @@
 import { Request, Response, NextFunction } from "express";
 import { injectable } from "tsyringe";
 import { GeneralService } from "./generalService.js";
-import { provinceIdParamSchema } from "./generalSchema.js";
+import { provinceIdParamSchema, type SyncRequestDto } from "./generalSchema.js";
 import { CustomResponse } from "../../utils/customResponse.js";
+import { t } from "../../utils/i18n.js";
 
 @injectable()
 export class GeneralController {
@@ -46,4 +47,21 @@ export class GeneralController {
       next(error);
     }
   };
+
+  public sync = async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const { entities } = req.body as SyncRequestDto;
+      const userId = req.user?.sub;
+      const userRole = req.user?.role;
+      const result = await this.generalService.sync(entities, userId, userRole);
+      CustomResponse.success(res, result, t("common.success"));
+    } catch (error) {
+      next(error);
+    }
+  };
 }
+

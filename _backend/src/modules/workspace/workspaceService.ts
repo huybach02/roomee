@@ -13,6 +13,8 @@ import {
   UpdateWorkspaceDto,
   WorkspaceQueryDto,
 } from "./workspaceSchema.js";
+import { syncable, type SyncableService } from "../../utils/syncableService.js";
+import { SelectQueryBuilder } from "typeorm";
 
 const WORKSPACE_SEARCH_FIELDS = [
   "workspace.name",
@@ -37,14 +39,37 @@ const WORKSPACE_SORT_MAP: Record<string, string> = {
   numberOfRooms: "workspace.numberOfRooms",
 };
 
+@syncable()
 @injectable()
-export class WorkspaceService {
+export class WorkspaceService implements SyncableService<Workspace> {
   constructor(
     private workspaceRepository: WorkspaceRepository,
     private userRepository: UserRepository,
     private provinceRepository: ProvinceRepository,
     private wardRepository: WardRepository,
   ) {}
+
+  public readonly syncModuleName = "workspace";
+  public readonly syncEntity = Workspace;
+
+  public syncScope(
+    qb: SelectQueryBuilder<Workspace>,
+    userId: string,
+    userRole: string,
+  ): void {
+    if (userRole !== UserRole.ADMIN) {
+      qb.andWhere("workspace.userId = :userId", { userId });
+    }
+  }
+
+  public relationJoin(
+    qb: SelectQueryBuilder<Workspace>,
+  ): SelectQueryBuilder<Workspace> {
+    return qb
+      .leftJoinAndSelect("workspace.user", "user")
+      .leftJoinAndSelect("workspace.province", "province")
+      .leftJoinAndSelect("workspace.ward", "ward");
+  }
 
   public async getWorkspaces(
     userId: string,
@@ -57,11 +82,9 @@ export class WorkspaceService {
     limit: number;
     totalPages: number;
   }> {
-    const qb = this.workspaceRepository
-      .createQueryBuilder("workspace")
-      .leftJoinAndSelect("workspace.user", "user")
-      .leftJoinAndSelect("workspace.province", "province")
-      .leftJoinAndSelect("workspace.ward", "ward");
+    const qb = this.relationJoin(
+      this.workspaceRepository.createQueryBuilder("workspace"),
+    );
 
     if (userRole !== UserRole.ADMIN) {
       qb.andWhere("workspace.userId = :userId", { userId });

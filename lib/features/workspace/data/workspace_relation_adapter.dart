@@ -16,6 +16,9 @@ class WorkspaceRelationAdapter extends RelationAdapter<WorkspaceModel> {
   });
 
   @override
+  Map<String, EntityStore> get syncableStores => {'user': userStore};
+
+  @override
   Future<void> saveRelations(
     String accountId,
     List<WorkspaceModel> entities,
@@ -79,9 +82,7 @@ class WorkspaceRelationAdapter extends RelationAdapter<WorkspaceModel> {
         ),
       ),
       Future.wait(
-        userIds.map(
-          (id) => userStore.getById(accountId: accountId, id: id),
-        ),
+        userIds.map((id) => userStore.getById(accountId: accountId, id: id)),
       ),
     ]);
 
