@@ -29,7 +29,8 @@
 **Mobile (`lib/`):**
 - **Framework:** Flutter + Dart (SDK `^3.13.5`)
 - **State management:** `flutter_bloc` (`^9.1.1`)
-- **Mạng / HTTP Client:** `dio` (`^5.9.1`)
+- **Mạng / HTTP Client:** `dio` (`^5.9.1`), `connectivity_plus` (`^7.3.2` — Lính canh mạng `NetworkSentinel`)
+- **Lưu trữ Offline / Cache:** `hive_ce` (`^2.22.0`), `hive_ce_flutter` (`^2.4.0`), `diacritic` (`^0.1.6`)
 - **Điều hướng:** `go_router` (`^18.1.0`)
 - **Lưu trữ bảo mật:** `flutter_secure_storage` (`^11.2.0`)
 - **Định dạng / Đa ngôn ngữ:** `intl` (`^0.20.3`) + `flutter_localizations` (SDK) + JSON dictionaries (`assets/translations/vi.json`, `en.json`)
@@ -248,6 +249,13 @@ _backend/
 - **Đồng bộ Alias QueryBuilder trong Service:**
   - Trong Service có hỗ trợ sync, QueryBuilder alias của bảng chính (trong `getWorkspaces`, `syncScope`, `relationJoin`, `WORKSPACE_SEARCH_FIELDS`, `WORKSPACE_FILTER_SCHEMA`, `WORKSPACE_SORT_MAP`) **bắt buộc dùng đúng danh xưng số nhiều này** (ví dụ: `workspaces.userId`, `workspaces.createdAt`, `workspaces.user`).
   - `GeneralService.sync()` tạo QueryBuilder theo đúng `handler.syncModuleName`, bảo đảm tính đồng nhất tuyệt đối giữa logic query thông thường và logic query đồng bộ.
+- **Tái sử dụng trực tiếp hàm CRUD có sẵn trong Service khi Sync 2 chiều (Pluggable):**
+  - Trong các Service `@syncable()`: Khai báo 3 alias trỏ trực tiếp vào hàm nghiệp vụ sẵn có (`create = this.createWorkspace.bind(this)`, `update = this.updateWorkspace.bind(this)`, `delete = this.deleteWorkspace.bind(this)`).
+  - Tận dụng 100% logic phân quyền (`userRole`), validate quan hệ (tỉnh/phường), không viết thêm hàm thừa thãi.
+  - Cho phép `createSchema` nhận `id: ruleValidates.uuidRule().optional()` để lưu đúng UUID do Mobile sinh lúc offline.
+  - Endpoint `POST /api/v1/general/sync` nhận `{ mutations: [...], entities: {...} }` và trả về `{ appliedMutationIds: [...], entities: {...} }`:
+    - **Pha 1 (Push mutations):** Duyệt các mutation gửi từ client lên (`create`, `update`, `delete`), gọi trực tiếp service tương ứng. Xử lý an toàn tính bất biến (idempotency): nếu gặp lỗi trùng ID (code `23505`) hoặc record không còn (code `404`) do client retry thì vẫn ghi nhận vào `appliedMutationIds` để client dọn dẹp hàng đợi.
+    - **Pha 2 (Pull reconcile):** So sánh `updatedAt` để phát hiện dữ liệu cần cập nhật (`needUpdate`) hoặc cần xóa (`needDelete`).
 
 ## 4. Flutter (root `lib/`)
 
@@ -271,18 +279,19 @@ lib/
       province_model.dart
       ward_model.dart
       workspace_model.dart
-    network/                     # Cấu hình mạng Dio, interceptors (auth, logging), exceptions, ApiResponse
+    network/                     # Cấu hình mạng Dio, interceptors (auth, logging), exceptions, ApiResponse, NetworkSentinel
       api_client.dart
       api_exceptions.dart
       api_response.dart
-    offline/                     # Hạ tầng Offline Mode dùng chung
+      network_sentinel.dart      # Lính canh mạng trung tâm: connectivity_plus thời gian thực, auto 2-way sync
+    offline/                     # Hạ tầng Offline Mode & 2-Way Sync dùng chung
       codecs/                    # Codec thực thể lõi (province, ward, user)
-      contracts/                 # entity_codec, entity_store, relation_adapter
+      contracts/                 # app_uuid, entity_codec, entity_store, relation_adapter, sync_dtos
       datasource/                # base_local_datasource.dart
-      hive/                      # cache_boxes, hive_cipher_manager, hive_initializer, hive_entity_store
+      hive/                      # cache_boxes, hive_cipher_manager, hive_initializer, hive_entity_store, sync_mutation_store
       policy/                    # offline_error_policy.dart (lọc lỗi mạng cho phép fallback)
       query/                     # local_query_engine, local_query_schema, offline_page, search_normalizer
-      repository/                # offline_crud_repository.dart (điều phối Remote + Local + Policy)
+      repository/                # offline_crud_repository.dart (điều phối Remote + Local + Policy + 2-Way Sync)
     router/
       app_router.dart            # Định nghĩa AppRoutes, hàm createAppRouter() (initialLocation: AppRoutes.wrapper)
     screens/                     # Màn hình gốc & điều phối luồng người dùng
@@ -304,7 +313,7 @@ lib/
       app_date_picker_field.dart # AppDatePickerField (chọn ngày tháng hiển thị theo định dạng)
       app_dropdown_field.dart    # AppDropdownField (chọn danh mục bottom sheet có search)
       app_notification.dart      # AppNotification (thông báo SnackBar chuẩn Design System)
-      app_offline_banner.dart    # AppOfflineBanner (thanh thông báo ngoại tuyến trên Bottom Bar)
+      app_mini_banner.dart       # AppMiniBanner (banner nhỏ đa năng: info, warning, success, error, syncing, offline, syncStatus)
       app_segmented_select.dart  # AppSegmentedSelect (chọn nút gạt đơn hoặc .multiple)
   features/<feature>/            # Feature-first module (ví dụ: auth)
     data/                        # datasource, model, repository implementation
@@ -345,6 +354,7 @@ test/
   - Chọn danh mục/dropdown: `AppDropdownField`
   - Lựa chọn phân đoạn/segmented: `AppSegmentedSelect`
   - Thông báo nổi: `AppNotification` (`.showSuccess`, `.showError`, `.showWarning`, `.showInfo`)
+  - Banner nhỏ thông báo đa năng: `AppMiniBanner` (`.info`, `.warning`, `.success`, `.error`, `.syncing`, `.offline` và `AppMiniBanner.syncStatus`)
   - Loading Overlay: `LoadingScreen` (imperative qua `.show(context)` / `context.showLoading()`, `.hide(context)`) và `LoadingOverlay(isLoading: ..., child: ...)` (declarative wrapper).
 - **Bottom Navigation Bar:**
   - Định nghĩa model item: `AppNavItem` (`lib/core/types/app_nav_item.dart`).
@@ -423,8 +433,18 @@ Hệ thống sử dụng kiến trúc **Generic Offline-First Boilerplate** đ�
 - **Trải nghiệm Người dùng (UX):**
   - Khi kéo làm mới (Refresh) trên danh sách đã có dữ liệu: giữ nguyên danh sách cũ, bật cờ `isRefreshing: true` trong `WorkspaceLoaded`, không emit `WorkspaceLoading()` làm trắng màn hình.
   - Sử dụng `Completer<void>` trong `WorkspaceLoadEvent` để đồng bộ chính xác vòng xoay của `RefreshIndicator`.
-  - Hiển thị thanh thông báo ngoại tuyến `AppOfflineBanner` (`lib/core/widgets/app_offline_banner.dart`) phía trên Bottom Bar khi `state.isOffline == true`.
+  - Hiển thị thanh thông báo nhỏ `AppMiniBanner.syncStatus` (`lib/core/widgets/app_mini_banner.dart`) phía trên Bottom Bar, tự động điều phối trạng thái Syncing (xoay nhẹ) -> Thành công (tích xanh 1.5s) -> Ngoại tuyến -> Tự ẩn khi bình thường.
+  - **Lính canh mạng trung tâm (`NetworkSentinel` - `lib/core/network/network_sentinel.dart`):** Sử dụng `connectivity_plus` bắt sự kiện interface mạng (Wifi/4G) theo thời gian thực. Khi mạng hồi phục từ offline -> online: tự động kích hoạt 2-way sync trong `OfflineCrudRepository` (cooldown 5s) và tự động đóng `NoInternetScreen`.
+  - **Bảo vệ xác minh Sync thật (`syncSuccessNotifier`):** `OfflineCrudRepository` theo dõi cờ `syncSuccessNotifier`. Chỉ khi máy chủ trả về `success: true` và hoàn tất đối soát thì mới hiển thị "Đã đồng bộ dữ liệu". Tuyệt đối không hiển thị thành công giả khi sync gặp lỗi kết nối.
   - **Source Guard khi Tải thêm (Load More):** Đang xem trang online mà cuộn tải thêm bị rớt mạng $\rightarrow$ chặn không nối dữ liệu local vào online để tránh nhảy cóc/trùng lặp ID.
+  - **Cơ chế CRUD Offline & Hàng đợi Mutation (`SyncMutationStore`):**
+    - **Sinh UUID Client-side (`AppUuid.v4()`):** Tạo mới lúc offline tự sinh UUID v4 chuẩn RFC 4122 bằng `Random.secure()` thuần Dart, dùng làm khóa chính trực tiếp mà không cần ánh xạ ID tạm.
+    - **Lưu trữ & Tự động Gom thao tác (Mutation Coalescing):** Lưu vào box `cache_sync_mutations` (mã hóa AES-256):
+      - `create` + `update` $\rightarrow$ gộp dữ liệu mới vào `create` ban đầu.
+      - `create` + `delete` $\rightarrow$ tự hủy cả 2 mutation khỏi hàng đợi.
+      - `update` + `update` $\rightarrow$ merge các trường update liên tiếp.
+      - `update` + `delete` $\rightarrow$ thay thế bằng `delete`.
+    - Box `cache_sync_mutations` tự động dọn dẹp theo `accountId` khi đăng xuất (`clearAccountData`).
   - **Bảo toàn Toàn vẹn Dữ liệu Đồng bộ (Data Integrity & Conflict Resolution):**
     - **Version-Aware Upsert & Tombstone Protection:** `HiveEntityStore` so sánh `updatedAt` trước khi ghi (Last-Write-Wins), chặn dữ liệu cũ ghi đè dữ liệu mới. Khi xóa bản ghi (`delete` hoặc sync `needDelete`), hệ thống cắm bia mộ (`tombstone:$id`) để ngăn chặn vĩnh viễn việc hồi sinh bản ghi đã xóa từ các response cũ (Resurrection Bug). Chỉ cho phép tái sinh khi timestamp mới hơn thời điểm cắm bia mộ.
     - **Two-Phase Commit trong `applySync`:** Phải parse và validate 100% dữ liệu `needUpdate` trước khi thực hiện bất kỳ mutation nào xuống store. Nếu có lỗi parse: log chi tiết, ném `FormatException` và giữ nguyên vẹn dữ liệu cũ, tuyệt đối **không nuốt lỗi `catch (_) {}`** làm rách dữ liệu.
@@ -443,7 +463,8 @@ Hệ thống sử dụng kiến trúc **Generic Offline-First Boilerplate** đ�
    - Tạo `class RoomLocalDataSource extends BaseLocalDataSource<RoomModel, String>` chỉ cần gọi `super` với `entityName: 'rooms'` (**bắt buộc dùng danh từ số nhiều** khớp với `syncModuleName` phía BE), `queryEngine`, `querySchema`, và factory `.fromBoxes(boxes)`.
    - Nếu module có quan hệ cha-con (ví dụ: Room thuộc Workspace), tạo thêm `RoomRelationAdapter` kế thừa `RelationAdapter<RoomModel>` để xử lý tách và ghép quan hệ (khai báo `syncableStores` với các key số nhiều: `{'rooms': roomStore}`).
 5. **Bước 5 — Bọc `OfflineCrudRepository` trong Repository:**
-   - Trong `RoomRepository`, inject `OfflineCrudRepository<RoomModel, String>` kết hợp `RoomRemoteDataSource` (implements `RemoteCrudDataSource`) và `RoomLocalDataSource`.
+   - Trong `RoomRepository`, inject `OfflineCrudRepository<RoomModel, String>` kết hợp `RoomRemoteDataSource` (implements `RemoteCrudDataSource`), `RoomLocalDataSource`, `syncMutationStore: HiveSyncMutationStore(box: boxes[HiveBoxNames.syncMutations])` và `networkSentinel: networkSentinel ?? NetworkSentinel.instance`.
+   - Phía Backend: Đặt `@syncable()` trên `RoomService` và khai báo alias 3 hàm nghiệp vụ chuẩn: `create = this.createRoom.bind(this)`, `update = this.updateRoom.bind(this)`, `delete = this.deleteRoom.bind(this)`.
 
 ## 5. Workflow & Definition of Done
 
@@ -472,6 +493,8 @@ Hệ thống sử dụng kiến trúc **Generic Offline-First Boilerplate** đ�
 - [ ] Truy vấn database ưu tiên dùng `createQueryBuilder` (trừ các query cực kỳ đơn giản như `findOneBy`).
 - [ ] Backend response chuẩn theo `CustomResponse.success(res, data, message)` / `CustomResponse.error(res, message, errors)`.
 - [ ] Định danh resource đồng bộ (sync) thống nhất chuẩn số nhiều (`workspaces`, `users`,...) ở cả BE (`syncModuleName`, QueryBuilder alias) và FE (`entityName`, `syncableStores`).
+- [ ] CRUD offline lưu mutation vào `SyncMutationStore` với coalescing, khóa chính UUID v4 sinh phía client (`AppUuid.v4()`).
+- [ ] Banner trạng thái đồng bộ sử dụng `AppMiniBanner.syncStatus`, theo dõi `syncSuccessNotifier` để chỉ báo thành công khi đối soát thực tế không gặp lỗi mạng.
 - [ ] Xử lý sync theo mô hình Two-Phase Commit để bảo toàn dữ liệu, tuyệt đối không nuốt lỗi parse (`catch (_) {}`).
 - [ ] Typecheck (`npm run typecheck`) / analyze (`flutter analyze`) / test (`flutter test`) đều pass.
 - [ ] Có migration nếu đổi schema.

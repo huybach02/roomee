@@ -25,4 +25,18 @@ export interface SyncableService<Entity extends ObjectLiteral>
   relationJoin?(
     queryBuilder: SelectQueryBuilder<Entity>,
   ): SelectQueryBuilder<Entity>;
+
+  /** Phương thức tạo mới thực thể khi sync (tùy chọn) */
+  create?(userId: string, data: any): Promise<any>;
+
+  /** Phương thức cập nhật thực thể khi sync (tùy chọn) */
+  update?(
+    id: string,
+    userId: string,
+    userRole: string,
+    data: any,
+  ): Promise<any>;
+
+  /** Phương thức xóa thực thể khi sync (tùy chọn) */
+  delete?(id: string, userId: string): Promise<any>;
 }

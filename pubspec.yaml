@@ -44,6 +44,7 @@ dependencies:
   hive_ce: ^2.22.0
   hive_ce_flutter: ^2.4.0
   diacritic: ^0.1.6
+  connectivity_plus: ^7.3.2
 
 dev_dependencies:
   flutter_test:

@@ -56,5 +56,8 @@ abstract interface class LocalCrudDataSource<T, ID> {
     required String accountId,
     required Map<String, SyncResultDto> relationResults,
   });
+
+  T itemFromJson(Map<String, dynamic> json);
+  Map<String, dynamic> itemToJson(T item);
 }
 

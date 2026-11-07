@@ -23,10 +23,13 @@ class GeneralRemoteDataSource extends BaseService {
     );
   }
 
-  Future<ApiResponse<Map<String, SyncResultDto>>> sync(
-    Map<String, List<SyncItemDto>> entities,
-  ) {
+  Future<ApiResponse<SyncResponseDto>> sync({
+    List<SyncMutation>? mutations,
+    required Map<String, List<SyncItemDto>> entities,
+  }) {
     final requestBody = {
+      if (mutations != null && mutations.isNotEmpty)
+        'mutations': mutations.map((m) => m.toJson()).toList(),
       'entities': entities.map(
         (key, value) => MapEntry(
           key,
@@ -35,21 +38,13 @@ class GeneralRemoteDataSource extends BaseService {
       ),
     };
 
-    return post<Map<String, SyncResultDto>>(
+    return post<SyncResponseDto>(
       '/general/sync',
       data: requestBody,
       fromJsonT: (json) {
-        if (json is! Map) return {};
-        return json.map(
-          (key, value) => MapEntry(
-            key.toString(),
-            SyncResultDto.fromJson(
-              Map<String, dynamic>.from(value as Map),
-            ),
-          ),
-        );
+        if (json is! Map) return const SyncResponseDto();
+        return SyncResponseDto.fromJson(Map<String, dynamic>.from(json));
       },
     );
   }
 }
-

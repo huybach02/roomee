@@ -4,6 +4,7 @@ import 'package:roomee/core/contracts/remote_crud_datasource.dart';
 import 'package:roomee/core/models/models.dart';
 import 'package:roomee/core/network/network.dart';
 import 'package:roomee/core/offline/contracts/sync_dtos.dart';
+import 'package:roomee/core/offline/hive/sync_mutation_store.dart';
 import 'package:roomee/core/offline/query/offline_page.dart';
 import 'package:roomee/core/offline/repository/offline_crud_repository.dart';
 import 'package:roomee/features/general/data/general_remote_datasource.dart';
@@ -186,20 +187,34 @@ class _FakeLocal implements LocalCrudDataSource<_FakeItem, String> {
     required String accountId,
     required Map<String, SyncResultDto> relationResults,
   }) async {}
+
+  @override
+  _FakeItem itemFromJson(Map<String, dynamic> json) =>
+      _FakeItem(json['id'].toString(), json['name']?.toString() ?? '');
+
+  @override
+  Map<String, dynamic> itemToJson(_FakeItem item) =>
+      {'id': item.id, 'name': item.name};
 }
 
 class _FakeGeneralRemote extends GeneralRemoteDataSource {
   Map<String, List<SyncItemDto>>? lastSyncEntities;
+  List<SyncMutation>? lastMutations;
   int syncCallCount = 0;
   Duration delay = Duration.zero;
-  ApiResponse<Map<String, SyncResultDto>> syncResponse =
-      const ApiResponse(success: true, message: 'OK', data: {});
+  ApiResponse<SyncResponseDto> syncResponse = const ApiResponse(
+    success: true,
+    message: 'OK',
+    data: SyncResponseDto(appliedMutationIds: [], entities: {}),
+  );
 
   @override
-  Future<ApiResponse<Map<String, SyncResultDto>>> sync(
-    Map<String, List<SyncItemDto>> entities,
-  ) async {
+  Future<ApiResponse<SyncResponseDto>> sync({
+    List<SyncMutation>? mutations,
+    required Map<String, List<SyncItemDto>> entities,
+  }) async {
     syncCallCount++;
+    lastMutations = mutations;
     lastSyncEntities = entities;
     if (delay > Duration.zero) {
       await Future<void>.delayed(delay);
@@ -208,18 +223,54 @@ class _FakeGeneralRemote extends GeneralRemoteDataSource {
   }
 }
 
+class _FakeSyncMutationStore implements ISyncMutationStore {
+  final List<SyncMutation> mutations = [];
+
+  @override
+  Future<void> addMutation({
+    required String accountId,
+    required SyncMutation mutation,
+  }) async {
+    mutations.add(mutation);
+  }
+
+  @override
+  Future<List<SyncMutation>> getMutations({
+    required String accountId,
+    String? module,
+  }) async {
+    return List.from(mutations);
+  }
+
+  @override
+  Future<void> removeMutations({
+    required String accountId,
+    required List<String> mutationIds,
+  }) async {
+    mutations.removeWhere((m) => mutationIds.contains(m.id));
+  }
+
+  @override
+  Future<void> clearAccount({required String accountId}) async {
+    mutations.clear();
+  }
+}
+
 void main() {
   late _FakeRemote remote;
   late _FakeLocal local;
+  late _FakeSyncMutationStore mutationStore;
   late OfflineCrudRepository<_FakeItem, String> repository;
 
   setUp(() {
     remote = _FakeRemote();
     local = _FakeLocal();
+    mutationStore = _FakeSyncMutationStore();
     repository = OfflineCrudRepository(
       remote: remote,
       local: local,
       getAccountId: () => 'acc-1',
+      syncMutationStore: mutationStore,
     );
   });
 
@@ -249,11 +300,13 @@ void main() {
       fakeGeneral.syncResponse = const ApiResponse(
         success: true,
         message: 'OK',
-        data: {
-          'fake_items': SyncResultDto(
-            needDelete: ['old-zombie-id'],
-          ),
-        },
+        data: SyncResponseDto(
+          entities: {
+            'fake_items': SyncResultDto(
+              needDelete: ['old-zombie-id'],
+            ),
+          },
+        ),
       );
 
       final repo = OfflineCrudRepository(
@@ -391,6 +444,103 @@ void main() {
 
       await repository.deleteById('new-id');
       expect(local.itemsById.containsKey('new-id'), isFalse);
+    });
+
+    test('offline create fallback stores in local cache and records create mutation',
+        () async {
+      remote.errorToThrow = const NoInternetException();
+
+      final created = await repository.create({'name': 'Offline Created'});
+
+      expect(created.name, 'Offline Created');
+      expect(created.id, isNotEmpty);
+      expect(local.itemsById[created.id]?.name, 'Offline Created');
+      expect(mutationStore.mutations.length, 1);
+      expect(mutationStore.mutations.first.action, SyncMutationAction.create);
+      expect(mutationStore.mutations.first.entityId, created.id);
+    });
+
+    test('offline update fallback updates local cache and records update mutation',
+        () async {
+      // First populate local cache
+      local.itemsById['item-1'] = const _FakeItem('item-1', 'Original Name');
+
+      remote.errorToThrow = const NoInternetException();
+
+      final updated =
+          await repository.update('item-1', {'name': 'Updated Offline'});
+
+      expect(updated.name, 'Updated Offline');
+      expect(local.itemsById['item-1']?.name, 'Updated Offline');
+      expect(mutationStore.mutations.length, 1);
+      expect(mutationStore.mutations.first.action, SyncMutationAction.update);
+      expect(mutationStore.mutations.first.entityId, 'item-1');
+    });
+
+    test('offline delete fallback removes from local cache and records delete mutation',
+        () async {
+      local.itemsById['item-1'] = const _FakeItem('item-1', 'To Delete');
+
+      remote.errorToThrow = const NoInternetException();
+
+      await repository.deleteById('item-1');
+
+      expect(local.itemsById.containsKey('item-1'), isFalse);
+      expect(mutationStore.mutations.length, 1);
+      expect(mutationStore.mutations.first.action, SyncMutationAction.delete);
+      expect(mutationStore.mutations.first.entityId, 'item-1');
+    });
+
+    test('syncNow sends pending mutations and removes applied ones on success',
+        () async {
+      final fakeGeneral = _FakeGeneralRemote();
+      fakeGeneral.syncResponse = const ApiResponse(
+        success: true,
+        message: 'OK',
+        data: SyncResponseDto(
+          appliedMutationIds: ['mut-1'],
+          entities: {
+            'fake_items': SyncResultDto(
+              needDelete: ['deleted-server-id'],
+            ),
+          },
+        ),
+      );
+
+      final repo = OfflineCrudRepository(
+        remote: remote,
+        local: local,
+        getAccountId: () => 'acc-1',
+        generalRemote: fakeGeneral,
+        syncMutationStore: mutationStore,
+      );
+
+      // Thêm 1 mutation chờ sync
+      await mutationStore.addMutation(
+        accountId: 'acc-1',
+        mutation: SyncMutation(
+          id: 'mut-1',
+          module: 'fake_items',
+          action: SyncMutationAction.create,
+          entityId: 'item-offline-1',
+          data: {'name': 'Offline Name'},
+        ),
+      );
+
+      local.itemsById['deleted-server-id'] =
+          const _FakeItem('deleted-server-id', 'Server Deleted');
+      local.syncItemsToReturn = [const SyncItemDto(id: 'deleted-server-id')];
+
+      // Kích hoạt sync
+      await repo.syncNow();
+
+      expect(fakeGeneral.syncCallCount, 1);
+      expect(fakeGeneral.lastMutations?.length, 1);
+      expect(fakeGeneral.lastMutations?.first.id, 'mut-1');
+      // Mutation mut-1 đã được server xác nhận nên bị xóa khỏi store
+      expect(mutationStore.mutations, isEmpty);
+      // Kết quả reconcile needDelete đã xóa item tương ứng ở local
+      expect(local.itemsById.containsKey('deleted-server-id'), isFalse);
     });
   });
 }

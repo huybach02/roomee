@@ -87,7 +87,9 @@
     "totalRecords": "Total: {count} records",
     "showOf": "Showing {count} / {total} records",
     "offlineModeNotice": "Viewing offline data",
-    "lastUpdated": "Updated: {time}"
+    "lastUpdated": "Updated: {time}",
+    "syncingData": "Syncing data...",
+    "syncCompleted": "Data synchronized"
   },
   "welcomeTitle": "Welcome to Roomee",
   "welcomeSubtitle": "A convenient and effective solution for finding and managing rental housing",

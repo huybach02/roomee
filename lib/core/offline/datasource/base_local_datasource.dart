@@ -236,4 +236,10 @@ abstract class BaseLocalDataSource<T, ID>
       await relationAdapter!.applyRelationSync(accountId, relationResults);
     }
   }
+
+  @override
+  T itemFromJson(Map<String, dynamic> json) => entityStore.codec.fromJson(json);
+
+  @override
+  Map<String, dynamic> itemToJson(T item) => entityStore.codec.toJson(item);
 }

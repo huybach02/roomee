@@ -13,6 +13,7 @@ export type WorkspaceParam = z.infer<typeof workspaceParamSchema>;
  * Schema validate body khi tạo mới Workspace
  */
 export const createWorkspaceSchema = z.object({
+  id: ruleValidates.uuidRule().optional(),
   name: ruleValidates.requiredString({ max: 255 }),
   type: z.nativeEnum(WorkspaceType),
   area: ruleValidates.positiveNumber(),

@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:roomee/core/bloc/locale/locale_cubit.dart';
 import 'package:roomee/core/configs/app_theme.dart';
 import 'package:roomee/core/localization/app_localizations.dart';
+import 'package:roomee/core/network/network_sentinel.dart';
 import 'package:roomee/core/network/api_client.dart';
 import 'package:roomee/core/offline/hive/cache_boxes.dart';
 import 'package:roomee/core/offline/hive/hive_initializer.dart';
@@ -46,6 +47,17 @@ void main() async {
       }
     },
   );
+
+  // Khởi động Lính canh mạng (Network Sentinel) lắng nghe trạng thái kết nối thời gian thực
+  final sentinel = NetworkSentinel.instance..initialize();
+  sentinel.statusNotifier.addListener(() {
+    if (sentinel.isOnline && NoInternetScreen.isShowing) {
+      final context = rootNavigatorKey.currentContext;
+      if (context != null) {
+        NoInternetScreen.hide(context);
+      }
+    }
+  });
 
   runApp(
     MyApp(

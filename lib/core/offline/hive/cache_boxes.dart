@@ -13,6 +13,7 @@ class CacheBoxes {
     HiveBoxNames.provinces: false,
     HiveBoxNames.wards: false,
     HiveBoxNames.metadata: false,
+    HiveBoxNames.syncMutations: true,
   };
 
   final Map<String, Box<Map>> _boxes;

@@ -87,7 +87,9 @@
     "totalRecords": "Tổng cộng: {count} bản ghi",
     "showOf": "Hiển thị {count} / {total} bản ghi",
     "offlineModeNotice": "Đang xem dữ liệu ngoại tuyến",
-    "lastUpdated": "Cập nhật: {time}"
+    "lastUpdated": "Cập nhật: {time}",
+    "syncingData": "Đang đồng bộ dữ liệu...",
+    "syncCompleted": "Đã đồng bộ dữ liệu"
   },
   "welcomeTitle": "Chào mừng bạn đến với Roomee",
   "welcomeSubtitle": "Giải pháp tìm kiếm, quản lý phòng trọ tiện lợi & hiệu quả",

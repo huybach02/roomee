@@ -13,6 +13,12 @@ part 'workspace_state.dart';
 class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
   final IWorkspaceRepository _workspaceRepository;
 
+  ValueListenable<bool>? get isSyncingNotifier =>
+      _workspaceRepository.isSyncingNotifier;
+
+  ValueListenable<bool?>? get syncSuccessNotifier =>
+      _workspaceRepository.syncSuccessNotifier;
+
   WorkspaceBloc({IWorkspaceRepository? repository})
     : _workspaceRepository = repository ?? WorkspaceRepository(),
       super(const WorkspaceInitial()) {

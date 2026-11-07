@@ -80,6 +80,12 @@ class _FakeLocalCrudDataSource implements LocalCrudDataSource<String, String> {
     required String accountId,
     required Map<String, SyncResultDto> relationResults,
   }) async {}
+
+  @override
+  String itemFromJson(Map<String, dynamic> json) => json['name']?.toString() ?? '';
+
+  @override
+  Map<String, dynamic> itemToJson(String item) => {'name': item};
 }
 
 

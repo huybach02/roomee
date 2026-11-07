@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -79,6 +80,12 @@ class _FakeAuthRepo implements IAuthRepository {
 class _FakeWorkspaceRepo implements IWorkspaceRepository {
   final List<WorkspaceModel> workspaces;
   final Map<int, PaginationModel<WorkspaceModel>>? pages;
+
+  @override
+  ValueListenable<bool>? get isSyncingNotifier => null;
+
+  @override
+  ValueListenable<bool?>? get syncSuccessNotifier => null;
 
   _FakeWorkspaceRepo({this.workspaces = const [], this.pages});
 

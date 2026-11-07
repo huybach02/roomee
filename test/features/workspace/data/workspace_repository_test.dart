@@ -174,6 +174,13 @@ class _FakeWorkspaceLocal implements LocalCrudDataSource<WorkspaceModel, String>
     required String accountId,
     required Map<String, SyncResultDto> relationResults,
   }) async {}
+
+  @override
+  WorkspaceModel itemFromJson(Map<String, dynamic> json) =>
+      WorkspaceModel.fromJson(json);
+
+  @override
+  Map<String, dynamic> itemToJson(WorkspaceModel item) => item.toJson();
 }
 
 void main() {

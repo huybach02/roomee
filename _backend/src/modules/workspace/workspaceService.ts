@@ -52,6 +52,10 @@ export class WorkspaceService implements SyncableService<Workspace> {
   public readonly syncModuleName = "workspaces";
   public readonly syncEntity = Workspace;
 
+  public create = this.createWorkspace.bind(this);
+  public update = this.updateWorkspace.bind(this);
+  public delete = this.deleteWorkspace.bind(this);
+
   public syncScope(
     qb: SelectQueryBuilder<Workspace>,
     userId: string,
@@ -155,6 +159,7 @@ export class WorkspaceService implements SyncableService<Workspace> {
     }
 
     const workspace = this.workspaceRepository.create({
+      ...(dto.id ? { id: dto.id } : {}),
       userId,
       name: dto.name,
       type: dto.type,

@@ -54,10 +54,14 @@ export class GeneralController {
     next: NextFunction,
   ): Promise<void> => {
     try {
-      const { entities } = req.body as SyncRequestDto;
+      const syncRequest = req.body as SyncRequestDto;
       const userId = req.user?.sub;
       const userRole = req.user?.role;
-      const result = await this.generalService.sync(entities, userId, userRole);
+      const result = await this.generalService.sync(
+        syncRequest,
+        userId,
+        userRole,
+      );
       CustomResponse.success(res, result, t("common.success"));
     } catch (error) {
       next(error);

@@ -9,8 +9,8 @@ import 'package:roomee/core/router/app_router.dart';
 import 'package:roomee/core/widgets/app_button.dart';
 import 'package:roomee/core/widgets/app_confirm_dialog.dart';
 import 'package:roomee/core/widgets/app_empty_state.dart';
+import 'package:roomee/core/widgets/app_mini_banner.dart';
 import 'package:roomee/core/widgets/app_notification.dart';
-import 'package:roomee/core/widgets/app_offline_banner.dart';
 import 'package:roomee/core/widgets/app_popup_menu.dart';
 import 'package:roomee/core/widgets/filter/app_filter_drawer.dart';
 import 'package:roomee/core/widgets/filter/app_search_app_bar.dart';
@@ -760,8 +760,15 @@ class _ListWorkspaceScreenState extends State<ListWorkspaceScreen> {
                                 },
                               ),
                       ),
-                      if (state is WorkspaceLoaded && state.isOffline)
-                        AppOfflineBanner(lastFetchedAt: state.lastFetchedAt),
+                      if (state is WorkspaceLoaded)
+                        AppMiniBanner.syncStatus(
+                          isOffline: state.isOffline,
+                          lastFetchedAt: state.lastFetchedAt,
+                          isSyncingListenable:
+                              context.read<WorkspaceBloc>().isSyncingNotifier,
+                          syncSuccessListenable:
+                              context.read<WorkspaceBloc>().syncSuccessNotifier,
+                        ),
                     ],
                   ),
                 );
