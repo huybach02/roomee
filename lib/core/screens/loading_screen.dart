@@ -2,24 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:roomee/core/configs/app_theme.dart';
 import 'package:roomee/core/localization/app_localizations.dart';
 
-/// Màn hình Loading dạng Overlay chuẩn Design System Roomee.
-///
-/// Hỗ trợ 2 cách sử dụng:
-/// 1. Imperative (gọi hàm trực tiếp):
-///    ```dart
-///    LoadingScreen.show(context, message: 'Đang tải...');
-///    // hoặc: context.showLoading();
-///
-///    LoadingScreen.hide(context);
-///    // hoặc: context.hideLoading();
-///    ```
-/// 2. Declarative (bọc widget):
-///    ```dart
-///    LoadingOverlay(
-///      isLoading: state is AuthLoading,
-///      child: MyScreenContent(),
-///    )
-///    ```
 class LoadingScreen extends StatelessWidget {
   final String? message;
   final Color? backgroundColor;
@@ -42,6 +24,7 @@ class LoadingScreen extends StatelessWidget {
   }) {
     if (_isShowing) return Future.value();
     _isShowing = true;
+    FocusScope.of(context).unfocus();
 
     return showDialog<void>(
       context: context,
@@ -80,6 +63,8 @@ class LoadingScreen extends StatelessWidget {
       child: Material(
         type: MaterialType.transparency,
         child: Container(
+          width: double.infinity,
+          height: double.infinity,
           color: backgroundColor ?? Colors.black.withValues(alpha: 0.5),
           alignment: Alignment.center,
           child: Container(
@@ -130,7 +115,10 @@ class LoadingScreen extends StatelessWidget {
   }
 }
 
-/// Widget bọc (declarative wrapper) cho màn hình có trạng thái loading
+/// Widget bọc (declarative wrapper) cho màn hình có trạng thái loading.
+///
+/// Để hiển thị phủ toàn bộ màn hình (che cả AppBar và chặn tương tác),
+/// hãy bọc `LoadingOverlay` bên ngoài `Scaffold` (ví dụ: `LoadingOverlay(isLoading: ..., child: Scaffold(...))`).
 class LoadingOverlay extends StatelessWidget {
   final bool isLoading;
   final Widget child;

@@ -42,6 +42,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   }
 
   void _submit() {
+    FocusScope.of(context).unfocus();
     if (_formKey.currentState?.validate() ?? false) {
       context.read<AuthBloc>().add(
         AuthResetPasswordEvent(
@@ -58,51 +59,51 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: DefaultColors.white,
-      appBar: AppBar(
-        backgroundColor: DefaultColors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new,
-            color: DefaultColors.primary,
-            size: 20,
-          ),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go(AppRoutes.login);
-            }
-          },
-        ),
-      ),
-      body: BlocConsumer<AuthBloc, AuthState>(
-        listenWhen: (previous, current) => previous is AuthLoading,
-        listener: (context, state) {
-          if (state is Authenticated) {
-            AppNotification.showSuccess(
-              context,
-              t('resetPasswordSuccessMessage'),
-            );
-            context.go(AppRoutes.wrapper);
-          } else if (state is AuthResetPasswordSuccess) {
-            AppNotification.showSuccess(
-              context,
-              t('resetPasswordSuccessMessage'),
-            );
-            context.go(AppRoutes.wrapper);
-          } else if (state is AuthFailure) {
-            AppNotification.showError(context, state.message);
-          }
-        },
-        builder: (context, state) {
-          final isLoading = state is AuthLoading;
+    return BlocConsumer<AuthBloc, AuthState>(
+      listenWhen: (previous, current) => previous is AuthLoading,
+      listener: (context, state) {
+        if (state is Authenticated) {
+          AppNotification.showSuccess(
+            context,
+            t('resetPasswordSuccessMessage'),
+          );
+          context.go(AppRoutes.wrapper);
+        } else if (state is AuthResetPasswordSuccess) {
+          AppNotification.showSuccess(
+            context,
+            t('resetPasswordSuccessMessage'),
+          );
+          context.go(AppRoutes.wrapper);
+        } else if (state is AuthFailure) {
+          AppNotification.showError(context, state.message);
+        }
+      },
+      builder: (context, state) {
+        final isLoading = state is AuthLoading;
 
-          return LoadingOverlay(
-            isLoading: isLoading,
-            child: SafeArea(
+        return LoadingOverlay(
+          isLoading: isLoading,
+          child: Scaffold(
+            backgroundColor: DefaultColors.white,
+            appBar: AppBar(
+              backgroundColor: DefaultColors.white,
+              elevation: 0,
+              leading: IconButton(
+                icon: const Icon(
+                  Icons.arrow_back_ios_new,
+                  color: DefaultColors.primary,
+                  size: 20,
+                ),
+                onPressed: () {
+                  if (context.canPop()) {
+                    context.pop();
+                  } else {
+                    context.go(AppRoutes.login);
+                  }
+                },
+              ),
+            ),
+            body: SafeArea(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 24,
@@ -213,9 +214,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                 ),
               ),
             ),
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 }

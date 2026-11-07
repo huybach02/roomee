@@ -36,6 +36,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _submitLogin() {
+    FocusScope.of(context).unfocus();
     if (_formKey.currentState?.validate() ?? false) {
       context.read<AuthBloc>().add(
         AuthLoginEvent(
@@ -58,49 +59,49 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: DefaultColors.white,
-      appBar: AppBar(
-        backgroundColor: DefaultColors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new,
-            color: DefaultColors.primary,
-            size: 20,
-          ),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go(AppRoutes.welcome);
-            }
-          },
-        ),
-      ),
-      body: BlocConsumer<AuthBloc, AuthState>(
-        listenWhen: (previous, current) => previous is AuthLoading,
-        listener: (context, state) {
-          if (state is Authenticated) {
-            AppNotification.showSuccess(context, t('loginSuccess'));
-            context.go(AppRoutes.wrapper);
-          } else if (state is AuthOtpRequired) {
-            context.push(
-              AppRoutes.otp,
-              extra: {
-                'destination': state.destination,
-                'purpose': state.purpose,
-              },
-            );
-          } else if (state is AuthFailure) {
-            AppNotification.showError(context, state.message);
-          }
-        },
-        builder: (context, state) {
-          final isLoading = state is AuthLoading;
-          return LoadingOverlay(
-            isLoading: isLoading,
-            child: SafeArea(
+    return BlocConsumer<AuthBloc, AuthState>(
+      listenWhen: (previous, current) => previous is AuthLoading,
+      listener: (context, state) {
+        if (state is Authenticated) {
+          AppNotification.showSuccess(context, t('loginSuccess'));
+          context.go(AppRoutes.wrapper);
+        } else if (state is AuthOtpRequired) {
+          context.push(
+            AppRoutes.otp,
+            extra: {
+              'destination': state.destination,
+              'purpose': state.purpose,
+            },
+          );
+        } else if (state is AuthFailure) {
+          AppNotification.showError(context, state.message);
+        }
+      },
+      builder: (context, state) {
+        final isLoading = state is AuthLoading;
+        return LoadingOverlay(
+          isLoading: isLoading,
+          child: Scaffold(
+            backgroundColor: DefaultColors.white,
+            appBar: AppBar(
+              backgroundColor: DefaultColors.white,
+              elevation: 0,
+              leading: IconButton(
+                icon: const Icon(
+                  Icons.arrow_back_ios_new,
+                  color: DefaultColors.primary,
+                  size: 20,
+                ),
+                onPressed: () {
+                  if (context.canPop()) {
+                    context.pop();
+                  } else {
+                    context.go(AppRoutes.welcome);
+                  }
+                },
+              ),
+            ),
+            body: SafeArea(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 24,
@@ -247,9 +248,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
             ),
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 }

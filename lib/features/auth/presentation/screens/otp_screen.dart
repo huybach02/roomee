@@ -153,6 +153,7 @@ class _OtpScreenState extends State<OtpScreen> {
   }
 
   Future<void> _submitOtp() async {
+    FocusScope.of(context).unfocus();
     final otp = _controllers.map((c) => c.text).join();
     if (otp.length < _otpLength) {
       setState(() {
@@ -294,29 +295,29 @@ class _OtpScreenState extends State<OtpScreen> {
         ? t('otpSubtitle', {'target': widget.destination!})
         : t('otpDefaultSubtitle');
 
-    return Scaffold(
-      backgroundColor: DefaultColors.white,
-      appBar: AppBar(
+    return LoadingOverlay(
+      isLoading: isLoading,
+      child: Scaffold(
         backgroundColor: DefaultColors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new,
-            color: DefaultColors.primary,
-            size: 20,
+        appBar: AppBar(
+          backgroundColor: DefaultColors.white,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(
+              Icons.arrow_back_ios_new,
+              color: DefaultColors.primary,
+              size: 20,
+            ),
+            onPressed: () {
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                context.go(AppRoutes.welcome);
+              }
+            },
           ),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go(AppRoutes.welcome);
-            }
-          },
         ),
-      ),
-      body: LoadingOverlay(
-        isLoading: isLoading,
-        child: SafeArea(
+        body: SafeArea(
           child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
           child: Column(

@@ -65,6 +65,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   void _submitForm() {
+    FocusScope.of(context).unfocus();
     if (_formKey.currentState?.validate() ?? false) {
       context.read<AuthBloc>().add(
         AuthRegisterEvent(
@@ -92,62 +93,62 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: DefaultColors.white,
-      appBar: AppBar(
-        backgroundColor: DefaultColors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new,
-            color: DefaultColors.primary,
-            size: 20,
-          ),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go(AppRoutes.welcome);
-            }
-          },
-        ),
-      ),
-      body: BlocListener<GeneralBloc, GeneralState>(
-        listener: (context, generalState) {
-          final message = generalState is GeneralFailure
-              ? generalState.message
-              : generalState is GeneralLoaded
-              ? generalState.error
-              : null;
-          if (message != null) {
-            AppNotification.showError(context, message);
+    return BlocListener<GeneralBloc, GeneralState>(
+      listener: (context, generalState) {
+        final message = generalState is GeneralFailure
+            ? generalState.message
+            : generalState is GeneralLoaded
+            ? generalState.error
+            : null;
+        if (message != null) {
+          AppNotification.showError(context, message);
+        }
+      },
+      child: BlocConsumer<AuthBloc, AuthState>(
+        listenWhen: (previous, current) => previous is AuthLoading,
+        listener: (context, state) {
+          if (state is AuthOtpRequired) {
+            AppNotification.showSuccess(
+              context,
+              t('registerSuccessMessage'),
+            );
+            context.pushReplacement(
+              AppRoutes.otp,
+              extra: {
+                'destination': state.destination,
+                'purpose': state.purpose,
+              },
+            );
+          } else if (state is AuthFailure) {
+            AppNotification.showError(context, state.message);
           }
         },
-        child: BlocConsumer<AuthBloc, AuthState>(
-          listenWhen: (previous, current) => previous is AuthLoading,
-          listener: (context, state) {
-            if (state is AuthOtpRequired) {
-              AppNotification.showSuccess(
-                context,
-                t('registerSuccessMessage'),
-              );
-              context.pushReplacement(
-                AppRoutes.otp,
-                extra: {
-                  'destination': state.destination,
-                  'purpose': state.purpose,
-                },
-              );
-            } else if (state is AuthFailure) {
-              AppNotification.showError(context, state.message);
-            }
-          },
-          builder: (context, state) {
-            final isLoading = state is AuthLoading;
-            return LoadingOverlay(
-              isLoading: isLoading,
-              child: SafeArea(
-              child: SingleChildScrollView(
+        builder: (context, state) {
+          final isLoading = state is AuthLoading;
+          return LoadingOverlay(
+            isLoading: isLoading,
+            child: Scaffold(
+              backgroundColor: DefaultColors.white,
+              appBar: AppBar(
+                backgroundColor: DefaultColors.white,
+                elevation: 0,
+                leading: IconButton(
+                  icon: const Icon(
+                    Icons.arrow_back_ios_new,
+                    color: DefaultColors.primary,
+                    size: 20,
+                  ),
+                  onPressed: () {
+                    if (context.canPop()) {
+                      context.pop();
+                    } else {
+                      context.go(AppRoutes.welcome);
+                    }
+                  },
+                ),
+              ),
+              body: SafeArea(
+                child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 24,
                   vertical: 8,
@@ -493,9 +494,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
               ),
             ),
-          );
-        },
-        ),
+          ),
+        );
+      },
       ),
     );
   }
