@@ -8,7 +8,7 @@ class _Record {
   const _Record(this.id, this.name);
 }
 
-class _RecordCodec implements EntityCodec<_Record, String> {
+class _RecordCodec extends EntityCodec<_Record, String> {
   @override
   String getId(_Record entity) => entity.id;
 
@@ -33,5 +33,15 @@ void main() {
     final decoded = codec.fromJson({'id': 'record-id', 'name': 'Example'});
     expect(decoded.id, 'record-id');
     expect(decoded.name, 'Example');
+    expect(codec.getUpdatedAt(entity), isNull);
+    expect(
+      codec.extractUpdatedAtFromJson({'updatedAt': '2026-11-05T10:00:00Z'}),
+      DateTime.parse('2026-11-05T10:00:00Z'),
+    );
+    expect(
+      codec.extractUpdatedAtFromJson({'updated_at': '2026-11-05T10:00:00Z'}),
+      DateTime.parse('2026-11-05T10:00:00Z'),
+    );
+    expect(codec.extractUpdatedAtFromJson({}), isNull);
   });
 }

@@ -10,11 +10,11 @@ export class WorkspaceRepository extends Repository<Workspace> {
   }
 
   public async findByIdWithRelations(id: string): Promise<Workspace | null> {
-    return this.createQueryBuilder("workspace")
-      .leftJoinAndSelect("workspace.province", "province")
-      .leftJoinAndSelect("workspace.ward", "ward")
-      .leftJoinAndSelect("workspace.user", "user")
-      .where("workspace.id = :id", { id })
+    return this.createQueryBuilder("workspaces")
+      .leftJoinAndSelect("workspaces.province", "province")
+      .leftJoinAndSelect("workspaces.ward", "ward")
+      .leftJoinAndSelect("workspaces.user", "user")
+      .where("workspaces.id = :id", { id })
       .getOne();
   }
 }

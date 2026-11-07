@@ -49,7 +49,7 @@ export class GeneralService {
         continue;
       }
 
-      const alias = moduleKey.endsWith("s") ? moduleKey.slice(0, -1) : moduleKey;
+      const alias = handler.syncModuleName;
       const repo = AppDataSource.getRepository(handler.syncEntity);
       let qb = repo.createQueryBuilder(alias);
 

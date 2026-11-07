@@ -1,7 +1,7 @@
 import 'package:roomee/core/models/ward_model.dart';
 import 'package:roomee/core/offline/contracts/entity_codec.dart';
 
-class WardModelCodec implements EntityCodec<WardModel, int> {
+class WardModelCodec extends EntityCodec<WardModel, int> {
   const WardModelCodec();
 
   @override

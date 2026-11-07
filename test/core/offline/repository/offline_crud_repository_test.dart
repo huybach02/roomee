@@ -190,6 +190,8 @@ class _FakeLocal implements LocalCrudDataSource<_FakeItem, String> {
 
 class _FakeGeneralRemote extends GeneralRemoteDataSource {
   Map<String, List<SyncItemDto>>? lastSyncEntities;
+  int syncCallCount = 0;
+  Duration delay = Duration.zero;
   ApiResponse<Map<String, SyncResultDto>> syncResponse =
       const ApiResponse(success: true, message: 'OK', data: {});
 
@@ -197,7 +199,11 @@ class _FakeGeneralRemote extends GeneralRemoteDataSource {
   Future<ApiResponse<Map<String, SyncResultDto>>> sync(
     Map<String, List<SyncItemDto>> entities,
   ) async {
+    syncCallCount++;
     lastSyncEntities = entities;
+    if (delay > Duration.zero) {
+      await Future<void>.delayed(delay);
+    }
     return syncResponse;
   }
 }
@@ -274,6 +280,63 @@ void main() {
       expect(local.appliedSyncResult?.needDelete, contains('old-zombie-id'));
       expect(local.itemsById.containsKey('old-zombie-id'), isFalse);
     });
+
+    test('cooldown prevents redundant background sync calls on rapid getAll',
+        () async {
+      final fakeGeneral = _FakeGeneralRemote();
+      final repo = OfflineCrudRepository(
+        remote: remote,
+        local: local,
+        getAccountId: () => 'acc-1',
+        generalRemote: fakeGeneral,
+        reconcileCooldown: const Duration(seconds: 30),
+      );
+
+      local.syncItemsToReturn = [const SyncItemDto(id: '1')];
+      remote.items = [const _FakeItem('1', 'Item 1')];
+
+      // Lần 1: kích hoạt sync
+      await repo.getAll();
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      expect(fakeGeneral.syncCallCount, 1);
+
+      // Lần 2 (ngay sau đó, e.g. load more): bị chặn bởi cooldown 30s
+      await repo.getAll();
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      expect(fakeGeneral.syncCallCount, 1);
+    });
+
+    test(
+      'coalesces multiple rapid getAll calls into at most one pending trailing sync',
+      () async {
+        final fakeGeneral = _FakeGeneralRemote();
+        fakeGeneral.delay = const Duration(milliseconds: 40);
+
+        final repo = OfflineCrudRepository(
+          remote: remote,
+          local: local,
+          getAccountId: () => 'acc-1',
+          generalRemote: fakeGeneral,
+          reconcileCooldown: Duration.zero,
+        );
+
+        local.syncItemsToReturn = [const SyncItemDto(id: '1')];
+        remote.items = [const _FakeItem('1', 'Item 1')];
+
+        // Bắn 3 cuộc gọi getAll() đồng thời
+        await Future.wait([
+          repo.getAll(),
+          repo.getAll(),
+          repo.getAll(),
+        ]);
+
+        // Chờ sync đầu tiên (40ms) và sync trailing tiếp theo (40ms) hoàn tất
+        await Future<void>.delayed(const Duration(milliseconds: 120));
+
+        // Dù gọi 3 lần, tổng số lần sync chỉ là 2 (1 in-flight + 1 trailing)!
+        expect(fakeGeneral.syncCallCount, 2);
+      },
+    );
 
     test('offline with NoInternetException fallbacks to local when cache has data', () async {
       local.cached = [const _FakeItem('1', 'Cached Item')];

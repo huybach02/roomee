@@ -32,7 +32,7 @@ import { redis } from "../../config/redis.js";
 @syncable()
 @injectable()
 export class AuthService implements SyncableService<User> {
-  public readonly syncModuleName = "user";
+  public readonly syncModuleName = "users";
   public readonly syncEntity = User;
 
   private readonly jwtSecret: string;

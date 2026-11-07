@@ -254,9 +254,9 @@ void main() {
 
       final syncItems = await adapter.getRelationSyncItems('account-1');
 
-      expect(syncItems.containsKey('user'), isTrue);
-      expect(syncItems['user']!.length, 1);
-      expect(syncItems['user']!.first.id, 'user-1');
+      expect(syncItems.containsKey('users'), isTrue);
+      expect(syncItems['users']!.length, 1);
+      expect(syncItems['users']!.first.id, 'user-1');
     });
 
     test('applyRelationSync updates and deletes users in userStore', () async {
@@ -270,7 +270,7 @@ void main() {
       };
 
       await adapter.applyRelationSync('account-1', {
-        'user': const SyncResultDto(
+        'users': const SyncResultDto(
           needUpdate: [updatedUserJson],
           needDelete: ['user-to-delete'],
         ),
@@ -282,7 +282,7 @@ void main() {
       expect(updated?.email, 'landlord_updated@roomee.vn');
 
       await adapter.applyRelationSync('account-1', {
-        'user': const SyncResultDto(
+        'users': const SyncResultDto(
           needDelete: ['user-1'],
         ),
       });

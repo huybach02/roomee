@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:roomee/core/contracts/local_crud_datasource.dart';
 import 'package:roomee/core/contracts/remote_crud_datasource.dart';
 import 'package:roomee/core/localization/app_localizations.dart';
@@ -15,6 +16,12 @@ class OfflineCrudRepository<T, ID> {
   final OfflineErrorPolicy errorPolicy;
   final FutureOr<String?> Function()? getAccountId;
   final GeneralRemoteDataSource generalRemote;
+  final Duration reconcileCooldown;
+
+  bool _isReconciling = false;
+  bool _hasPendingReconcile = false;
+  DateTime? _lastReconciledAt;
+  String? _activeAccountId;
 
   OfflineCrudRepository({
     required this.remote,
@@ -22,6 +29,7 @@ class OfflineCrudRepository<T, ID> {
     this.errorPolicy = const DefaultOfflineErrorPolicy(),
     this.getAccountId,
     GeneralRemoteDataSource? generalRemote,
+    this.reconcileCooldown = const Duration(seconds: 15),
   }) : generalRemote = generalRemote ?? GeneralRemoteDataSource();
 
   Future<OfflinePage<T>> getAll({
@@ -46,8 +54,8 @@ class OfflineCrudRepository<T, ID> {
               isComplete: false,
             );
 
-            // Tự động đối soát ngầm (Reconcile / Sync) không block UI
-            unawaited(_reconcile(accountId));
+            // Tự động đối soát ngầm (Reconcile / Sync) có coalescing + cooldown
+            _scheduleReconcile(accountId);
           }
         } catch (_) {
           // Fault-tolerant caching: log and do not fail online API request
@@ -176,6 +184,39 @@ class OfflineCrudRepository<T, ID> {
     }
   }
 
+  void _scheduleReconcile(String accountId) {
+    if (local == null) return;
+    _activeAccountId = accountId;
+
+    if (_isReconciling) {
+      _hasPendingReconcile = true;
+      return;
+    }
+
+    final now = DateTime.now();
+    if (_lastReconciledAt != null &&
+        now.difference(_lastReconciledAt!) < reconcileCooldown) {
+      return;
+    }
+
+    unawaited(_runReconcileLoop(accountId));
+  }
+
+  Future<void> _runReconcileLoop(String initialAccountId) async {
+    _isReconciling = true;
+    try {
+      do {
+        _hasPendingReconcile = false;
+        final targetAccountId = _activeAccountId ?? initialAccountId;
+        await _reconcile(targetAccountId);
+        _lastReconciledAt = DateTime.now();
+      } while (_hasPendingReconcile);
+    } finally {
+      _isReconciling = false;
+      _hasPendingReconcile = false;
+    }
+  }
+
   Future<void> _reconcile(String accountId) async {
     if (local == null) return;
     try {
@@ -194,8 +235,7 @@ class OfflineCrudRepository<T, ID> {
       if (response.success && response.data != null) {
         final results = response.data!;
 
-        final mainResult =
-            results[local!.entityName] ?? results['${local!.entityName}s'];
+        final mainResult = results[local!.entityName];
         if (mainResult != null) {
           await local!.applySyncResult(
             accountId: accountId,
@@ -208,8 +248,8 @@ class OfflineCrudRepository<T, ID> {
           relationResults: results,
         );
       }
-    } catch (_) {
-      // Reconciliation chạy nền, không gây ảnh hưởng đến luồng chính
+    } catch (e, s) {
+      debugPrint('[OfflineCrudRepository] Reconciliation error: $e\n$s');
     }
   }
 }

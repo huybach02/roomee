@@ -1,7 +1,7 @@
 import 'package:roomee/core/models/user_model.dart';
 import 'package:roomee/core/offline/contracts/entity_codec.dart';
 
-class UserModelCodec implements EntityCodec<UserModel, String> {
+class UserModelCodec extends EntityCodec<UserModel, String> {
   const UserModelCodec();
 
   @override
@@ -12,4 +12,7 @@ class UserModelCodec implements EntityCodec<UserModel, String> {
 
   @override
   UserModel fromJson(Map<String, dynamic> json) => UserModel.fromJson(json);
+
+  @override
+  DateTime? getUpdatedAt(UserModel entity) => entity.updatedAt;
 }

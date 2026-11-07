@@ -17,26 +17,26 @@ import { syncable, type SyncableService } from "../../utils/syncableService.js";
 import { SelectQueryBuilder } from "typeorm";
 
 const WORKSPACE_SEARCH_FIELDS = [
-  "workspace.name",
-  "workspace.address",
-  "workspace.contactName",
-  "workspace.contactPhone",
+  "workspaces.name",
+  "workspaces.address",
+  "workspaces.contactName",
+  "workspaces.contactPhone",
   "province.fullName",
   "ward.fullName",
 ];
 
 const WORKSPACE_FILTER_SCHEMA: FilterSchema<WorkspaceQueryDto> = {
-  type: { operator: "eq", field: "workspace.type" },
-  status: { operator: "eq", field: "workspace.status" },
-  provinceId: { operator: "eq", field: "workspace.provinceId" },
-  wardId: { operator: "eq", field: "workspace.wardId" },
+  type: { operator: "eq", field: "workspaces.type" },
+  status: { operator: "eq", field: "workspaces.status" },
+  provinceId: { operator: "eq", field: "workspaces.provinceId" },
+  wardId: { operator: "eq", field: "workspaces.wardId" },
 };
 
 const WORKSPACE_SORT_MAP: Record<string, string> = {
-  createdAt: "workspace.createdAt",
-  name: "workspace.name",
-  area: "workspace.area",
-  numberOfRooms: "workspace.numberOfRooms",
+  createdAt: "workspaces.createdAt",
+  name: "workspaces.name",
+  area: "workspaces.area",
+  numberOfRooms: "workspaces.numberOfRooms",
 };
 
 @syncable()
@@ -49,7 +49,7 @@ export class WorkspaceService implements SyncableService<Workspace> {
     private wardRepository: WardRepository,
   ) {}
 
-  public readonly syncModuleName = "workspace";
+  public readonly syncModuleName = "workspaces";
   public readonly syncEntity = Workspace;
 
   public syncScope(
@@ -58,7 +58,7 @@ export class WorkspaceService implements SyncableService<Workspace> {
     userRole: string,
   ): void {
     if (userRole !== UserRole.ADMIN) {
-      qb.andWhere("workspace.userId = :userId", { userId });
+      qb.andWhere("workspaces.userId = :userId", { userId });
     }
   }
 
@@ -66,9 +66,9 @@ export class WorkspaceService implements SyncableService<Workspace> {
     qb: SelectQueryBuilder<Workspace>,
   ): SelectQueryBuilder<Workspace> {
     return qb
-      .leftJoinAndSelect("workspace.user", "user")
-      .leftJoinAndSelect("workspace.province", "province")
-      .leftJoinAndSelect("workspace.ward", "ward");
+      .leftJoinAndSelect("workspaces.user", "user")
+      .leftJoinAndSelect("workspaces.province", "province")
+      .leftJoinAndSelect("workspaces.ward", "ward");
   }
 
   public async getWorkspaces(
@@ -83,11 +83,11 @@ export class WorkspaceService implements SyncableService<Workspace> {
     totalPages: number;
   }> {
     const qb = this.relationJoin(
-      this.workspaceRepository.createQueryBuilder("workspace"),
+      this.workspaceRepository.createQueryBuilder("workspaces"),
     );
 
     if (userRole !== UserRole.ADMIN) {
-      qb.andWhere("workspace.userId = :userId", { userId });
+      qb.andWhere("workspaces.userId = :userId", { userId });
     }
 
     QueryHelper.applySearch(qb, query.search, WORKSPACE_SEARCH_FIELDS);
@@ -103,7 +103,7 @@ export class WorkspaceService implements SyncableService<Workspace> {
       ),
       WORKSPACE_SORT_MAP,
       {},
-      { field: "workspace.createdAt", order: "DESC" },
+      { field: "workspaces.createdAt", order: "DESC" },
     );
 
     return QueryHelper.paginate(qb, query.page, query.limit, query.all);

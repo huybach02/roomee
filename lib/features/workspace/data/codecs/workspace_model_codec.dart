@@ -1,7 +1,7 @@
 import 'package:roomee/core/models/workspace_model.dart';
 import 'package:roomee/core/offline/contracts/entity_codec.dart';
 
-class WorkspaceModelCodec implements EntityCodec<WorkspaceModel, String> {
+class WorkspaceModelCodec extends EntityCodec<WorkspaceModel, String> {
   const WorkspaceModelCodec();
 
   @override
@@ -19,4 +19,7 @@ class WorkspaceModelCodec implements EntityCodec<WorkspaceModel, String> {
   @override
   WorkspaceModel fromJson(Map<String, dynamic> json) =>
       WorkspaceModel.fromJson(json);
+
+  @override
+  DateTime? getUpdatedAt(WorkspaceModel entity) => entity.updatedAt;
 }

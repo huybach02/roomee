@@ -240,6 +240,15 @@ _backend/
     2. `vantoan@roomee.vn` — `tenant` (Người thuê), `hasContract: false` (Tự động vào `HomeScreen`).
     3. `huybach2002ct@gmail.com` — `landlord` (Chủ trọ), `hasContract: false` (Tự động vào `LandlordScreen`).
 
+### 3.11 Chuẩn hóa Resource Đồng bộ (Syncable Service & Naming Convention)
+- **Định danh Resource Đồng bộ (Single Source of Truth):**
+  - Mọi service tham gia đồng bộ qua decorator `@syncable()` bắt buộc khai báo `syncModuleName` theo **danh xưng số nhiều (plural)**: ví dụ `workspaces`, `users`, `rooms`, `contracts`.
+  - Tên này phải trùng khớp 100% với tên Endpoint REST API (`/api/v1/workspaces`), tên Bảng trong PostgreSQL (`workspaces`), tên Box Hive (`cache_workspaces`) và `entityName` phía Mobile.
+  - Tuyệt đối **không dùng logic cắt/nối chuỗi số ít/số nhiều** (`.endsWith("s")`) hay tạo mảng alias trung gian để tránh lỗi bất quy tắc (`categories` $\rightarrow$ `categorie`, `address` $\rightarrow$ `addres`).
+- **Đồng bộ Alias QueryBuilder trong Service:**
+  - Trong Service có hỗ trợ sync, QueryBuilder alias của bảng chính (trong `getWorkspaces`, `syncScope`, `relationJoin`, `WORKSPACE_SEARCH_FIELDS`, `WORKSPACE_FILTER_SCHEMA`, `WORKSPACE_SORT_MAP`) **bắt buộc dùng đúng danh xưng số nhiều này** (ví dụ: `workspaces.userId`, `workspaces.createdAt`, `workspaces.user`).
+  - `GeneralService.sync()` tạo QueryBuilder theo đúng `handler.syncModuleName`, bảo đảm tính đồng nhất tuyệt đối giữa logic query thông thường và logic query đồng bộ.
+
 ## 4. Flutter (root `lib/`)
 
 ### 4.1 Cấu trúc thư mục thực tế
@@ -416,19 +425,23 @@ Hệ thống sử dụng kiến trúc **Generic Offline-First Boilerplate** đ�
   - Sử dụng `Completer<void>` trong `WorkspaceLoadEvent` để đồng bộ chính xác vòng xoay của `RefreshIndicator`.
   - Hiển thị thanh thông báo ngoại tuyến `AppOfflineBanner` (`lib/core/widgets/app_offline_banner.dart`) phía trên Bottom Bar khi `state.isOffline == true`.
   - **Source Guard khi Tải thêm (Load More):** Đang xem trang online mà cuộn tải thêm bị rớt mạng $\rightarrow$ chặn không nối dữ liệu local vào online để tránh nhảy cóc/trùng lặp ID.
+  - **Bảo toàn Toàn vẹn Dữ liệu Đồng bộ (Data Integrity & Conflict Resolution):**
+    - **Version-Aware Upsert & Tombstone Protection:** `HiveEntityStore` so sánh `updatedAt` trước khi ghi (Last-Write-Wins), chặn dữ liệu cũ ghi đè dữ liệu mới. Khi xóa bản ghi (`delete` hoặc sync `needDelete`), hệ thống cắm bia mộ (`tombstone:$id`) để ngăn chặn vĩnh viễn việc hồi sinh bản ghi đã xóa từ các response cũ (Resurrection Bug). Chỉ cho phép tái sinh khi timestamp mới hơn thời điểm cắm bia mộ.
+    - **Two-Phase Commit trong `applySync`:** Phải parse và validate 100% dữ liệu `needUpdate` trước khi thực hiện bất kỳ mutation nào xuống store. Nếu có lỗi parse: log chi tiết, ném `FormatException` và giữ nguyên vẹn dữ liệu cũ, tuyệt đối **không nuốt lỗi `catch (_) {}`** làm rách dữ liệu.
+    - **Trailing-edge Coalescing & Cooldown:** `OfflineCrudRepository` tự động gom các request sync phát sinh dồn dập khi cuộn trang (Infinite Scroll / Load more) thành tối đa 1 lượt sync nối tiếp (trailing run) và áp dụng cooldown (mặc định 15s) nhằm triệt tiêu hoàn toàn nguy cơ bão request (Sync Storm).
 
 #### 2. Quy trình 5 bước chuẩn khi cấu hình Offline Mode cho 1 Module mới (ví dụ: `Room`):
 1. **Bước 1 — Khai báo tên và cấu hình Box (Chỉ 1 dòng duy nhất):**
    - Thêm `static const rooms = 'cache_rooms';` trong `HiveBoxNames` (`lib/core/offline/hive/hive_box_names.dart`).
    - Thêm `HiveBoxNames.rooms: true` vào `CacheBoxes.configs` (`lib/core/offline/hive/cache_boxes.dart`).
 2. **Bước 2 — Viết Codec chuyển đổi (`lib/features/<module>/data/codecs/<module>_model_codec.dart`):**
-   - Implements `EntityCodec<Model, ID>`: định nghĩa `getId`, `toJson` (làm phẳng, bóc tách các object con lồng nhau), và `fromJson`.
+   - Kế thừa `EntityCodec<Model, ID>`: định nghĩa `getId`, `toJson` (làm phẳng, bóc tách các object con lồng nhau), `fromJson`, và override `getUpdatedAt` (nếu entity có audit trail).
 3. **Bước 3 — Khai báo Query Schema (`lib/features/<module>/data/<module>_query_schema.dart`):**
    - Định nghĩa `LocalQuerySchema<Model>` whitelist các trường `searchFields`, `filterFields`, `sortFields` và `uniqueId`.
    - Mỗi `LocalFilterField` bắt buộc khai báo `accepts: (v) => ...` kiểm tra đúng kiểu dữ liệu (hoặc enum whitelist) tương ứng với giá trị client truyền xuống.
 4. **Bước 4 — Tạo LocalDataSource kế thừa `BaseLocalDataSource` (~25 dòng code):**
-   - Tạo `class RoomLocalDataSource extends BaseLocalDataSource<RoomModel, String>` chỉ cần gọi `super` với `entityName: 'rooms'`, `queryEngine`, `querySchema`, và factory `.fromBoxes(boxes)`.
-   - Nếu module có quan hệ cha-con (ví dụ: Room thuộc Workspace), tạo thêm `RoomRelationAdapter` kế thừa `RelationAdapter<RoomModel>` để xử lý tách và ghép quan hệ.
+   - Tạo `class RoomLocalDataSource extends BaseLocalDataSource<RoomModel, String>` chỉ cần gọi `super` với `entityName: 'rooms'` (**bắt buộc dùng danh từ số nhiều** khớp với `syncModuleName` phía BE), `queryEngine`, `querySchema`, và factory `.fromBoxes(boxes)`.
+   - Nếu module có quan hệ cha-con (ví dụ: Room thuộc Workspace), tạo thêm `RoomRelationAdapter` kế thừa `RelationAdapter<RoomModel>` để xử lý tách và ghép quan hệ (khai báo `syncableStores` với các key số nhiều: `{'rooms': roomStore}`).
 5. **Bước 5 — Bọc `OfflineCrudRepository` trong Repository:**
    - Trong `RoomRepository`, inject `OfflineCrudRepository<RoomModel, String>` kết hợp `RoomRemoteDataSource` (implements `RemoteCrudDataSource`) và `RoomLocalDataSource`.
 
@@ -458,6 +471,8 @@ Hệ thống sử dụng kiến trúc **Generic Offline-First Boilerplate** đ�
 - [ ] Thao tác Cache/Redis phía backend phải qua `CacheService` để đồng bộ persist và fallback DB.
 - [ ] Truy vấn database ưu tiên dùng `createQueryBuilder` (trừ các query cực kỳ đơn giản như `findOneBy`).
 - [ ] Backend response chuẩn theo `CustomResponse.success(res, data, message)` / `CustomResponse.error(res, message, errors)`.
+- [ ] Định danh resource đồng bộ (sync) thống nhất chuẩn số nhiều (`workspaces`, `users`,...) ở cả BE (`syncModuleName`, QueryBuilder alias) và FE (`entityName`, `syncableStores`).
+- [ ] Xử lý sync theo mô hình Two-Phase Commit để bảo toàn dữ liệu, tuyệt đối không nuốt lỗi parse (`catch (_) {}`).
 - [ ] Typecheck (`npm run typecheck`) / analyze (`flutter analyze`) / test (`flutter test`) đều pass.
 - [ ] Có migration nếu đổi schema.
 - [ ] Không lộ secret, không hardcode cấu hình.

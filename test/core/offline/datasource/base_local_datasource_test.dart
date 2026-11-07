@@ -31,7 +31,7 @@ class _FakeItem {
   }
 }
 
-class _FakeCodec implements EntityCodec<_FakeItem, String> {
+class _FakeCodec extends EntityCodec<_FakeItem, String> {
   @override
   String getId(_FakeItem entity) => entity.id;
 

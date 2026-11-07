@@ -5,7 +5,7 @@ export { syncable } from "../modules/general/syncRegistry.js";
 
 export interface SyncableService<Entity extends ObjectLiteral>
   extends Partial<RelationJoin<Entity>> {
-  /** Tên định danh module khi sync (ví dụ: "workspace", "user", "room") */
+  /** Tên định danh chuẩn số nhiều của resource khi sync (ví dụ: "workspaces", "users", "rooms") */
   readonly syncModuleName: string;
 
   /** Entity TypeORM tương ứng */

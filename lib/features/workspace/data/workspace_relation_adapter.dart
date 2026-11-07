@@ -16,7 +16,7 @@ class WorkspaceRelationAdapter extends RelationAdapter<WorkspaceModel> {
   });
 
   @override
-  Map<String, EntityStore> get syncableStores => {'user': userStore};
+  Map<String, EntityStore> get syncableStores => {'users': userStore};
 
   @override
   Future<void> saveRelations(

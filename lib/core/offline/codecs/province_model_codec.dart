@@ -1,7 +1,7 @@
 import 'package:roomee/core/models/province_model.dart';
 import 'package:roomee/core/offline/contracts/entity_codec.dart';
 
-class ProvinceModelCodec implements EntityCodec<ProvinceModel, int> {
+class ProvinceModelCodec extends EntityCodec<ProvinceModel, int> {
   const ProvinceModelCodec();
 
   @override

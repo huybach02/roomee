@@ -29,7 +29,7 @@ export class SyncRegistry {
       try {
         const instance = container.resolve<SyncableService<any>>(serviceClass);
         if (instance && instance.syncModuleName) {
-          this.services.set(instance.syncModuleName, instance);
+          this.register(instance);
         }
       } catch (err) {
         console.error(
@@ -41,18 +41,12 @@ export class SyncRegistry {
   }
 
   public register(service: SyncableService<any>): void {
+    if (!service.syncModuleName) return;
     this.services.set(service.syncModuleName, service);
   }
 
   public get(moduleName: string): SyncableService<any> | undefined {
     this.ensureInitialized();
-
-    if (this.services.has(moduleName)) {
-      return this.services.get(moduleName);
-    }
-    const singular = moduleName.endsWith("s")
-      ? moduleName.slice(0, -1)
-      : moduleName;
-    return this.services.get(singular);
+    return this.services.get(moduleName);
   }
 }
