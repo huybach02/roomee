@@ -449,6 +449,9 @@ Hệ thống sử dụng kiến trúc **Generic Offline-First Boilerplate** đ�
     - **Version-Aware Upsert & Tombstone Protection:** `HiveEntityStore` so sánh `updatedAt` trước khi ghi (Last-Write-Wins), chặn dữ liệu cũ ghi đè dữ liệu mới. Khi xóa bản ghi (`delete` hoặc sync `needDelete`), hệ thống cắm bia mộ (`tombstone:$id`) để ngăn chặn vĩnh viễn việc hồi sinh bản ghi đã xóa từ các response cũ (Resurrection Bug). Chỉ cho phép tái sinh khi timestamp mới hơn thời điểm cắm bia mộ.
     - **Two-Phase Commit trong `applySync`:** Phải parse và validate 100% dữ liệu `needUpdate` trước khi thực hiện bất kỳ mutation nào xuống store. Nếu có lỗi parse: log chi tiết, ném `FormatException` và giữ nguyên vẹn dữ liệu cũ, tuyệt đối **không nuốt lỗi `catch (_) {}`** làm rách dữ liệu.
     - **Trailing-edge Coalescing & Cooldown:** `OfflineCrudRepository` tự động gom các request sync phát sinh dồn dập khi cuộn trang (Infinite Scroll / Load more) thành tối đa 1 lượt sync nối tiếp (trailing run) và áp dụng cooldown (mặc định 15s) nhằm triệt tiêu hoàn toàn nguy cơ bão request (Sync Storm).
+    - **Quy tắc Nâng cấp Model & Cache Version (`cacheFormatVersion`):**
+      - Mặc định khi thêm/sửa trường trong Model: Bắt buộc viết `fromJson` và `EntityCodec` có tính tương thích ngược (dùng nullable `?`, fallback mặc định `??`) để tránh làm hỏng cache cũ.
+      - **Chỉ tăng `cacheFormatVersion` (từ 1 lên 2, 3...)** khi có Breaking Change: đổi kiểu dữ liệu trường có sẵn, thay đổi cấu trúc quan hệ con, hoặc thêm trường bắt buộc không thể fallback. Khi đó hệ thống sẽ tự động purge cache cũ an toàn qua `_checkFormatVersion`.
 
 #### 2. Quy trình 5 bước chuẩn khi cấu hình Offline Mode cho 1 Module mới (ví dụ: `Room`):
 1. **Bước 1 — Khai báo tên và cấu hình Box (Chỉ 1 dòng duy nhất):**
@@ -494,6 +497,7 @@ Hệ thống sử dụng kiến trúc **Generic Offline-First Boilerplate** đ�
 - [ ] Backend response chuẩn theo `CustomResponse.success(res, data, message)` / `CustomResponse.error(res, message, errors)`.
 - [ ] Định danh resource đồng bộ (sync) thống nhất chuẩn số nhiều (`workspaces`, `users`,...) ở cả BE (`syncModuleName`, QueryBuilder alias) và FE (`entityName`, `syncableStores`).
 - [ ] CRUD offline lưu mutation vào `SyncMutationStore` với coalescing, khóa chính UUID v4 sinh phía client (`AppUuid.v4()`).
+- [ ] Khi sửa Model mobile: bảo đảm tương thích ngược cho `fromJson`/`EntityCodec` (fallback/nullable) hoặc nâng `cacheFormatVersion` nếu có breaking change.
 - [ ] Banner trạng thái đồng bộ sử dụng `AppMiniBanner.syncStatus`, theo dõi `syncSuccessNotifier` để chỉ báo thành công khi đối soát thực tế không gặp lỗi mạng.
 - [ ] Xử lý sync theo mô hình Two-Phase Commit để bảo toàn dữ liệu, tuyệt đối không nuốt lỗi parse (`catch (_) {}`).
 - [ ] Typecheck (`npm run typecheck`) / analyze (`flutter analyze`) / test (`flutter test`) đều pass.

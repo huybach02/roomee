@@ -17,6 +17,9 @@ final String apiBaseUrl = _resolveApiBaseUrl();
 
 final String logoAssetPath = 'assets/images/logo.png';
 
+const int defaultPage = 1;
+const int defaultLimit = 20;
+
 enum UserRole { staff, landlord, tenant, admin }
 
 enum Gender { male, female, other }

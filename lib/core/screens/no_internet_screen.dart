@@ -13,10 +13,7 @@ import 'package:roomee/core/widgets/app_notification.dart';
 class NoInternetScreen extends StatefulWidget {
   final VoidCallback? onRetrySuccess;
 
-  const NoInternetScreen({
-    super.key,
-    this.onRetrySuccess,
-  });
+  const NoInternetScreen({super.key, this.onRetrySuccess});
 
   static bool _isShowing = false;
 
@@ -76,8 +73,11 @@ class _NoInternetScreenState extends State<NoInternetScreen> {
     try {
       // 1. Kiểm tra kết nối Internet thực tế bằng cách ping endpoint health check của server
       final client = ApiClient.instance;
+      final healthUrl = Uri.parse(client.dio.options.baseUrl)
+          .replace(path: '/api/health')
+          .toString();
       await client.dio.get(
-        '/api/health',
+        healthUrl,
         options: Options(
           sendTimeout: const Duration(seconds: 4),
           receiveTimeout: const Duration(seconds: 4),
@@ -96,10 +96,7 @@ class _NoInternetScreenState extends State<NoInternetScreen> {
       NoInternetScreen.hide(context);
       widget.onRetrySuccess?.call();
 
-      AppNotification.showSuccess(
-        context,
-        t('errors.connectionRestored'),
-      );
+      AppNotification.showSuccess(context, t('errors.connectionRestored'));
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -107,10 +104,7 @@ class _NoInternetScreenState extends State<NoInternetScreen> {
       });
 
       // Vẫn chưa có kết nối mạng thực tế
-      AppNotification.showWarning(
-        context,
-        t('errors.stillNoInternet'),
-      );
+      AppNotification.showWarning(context, t('errors.stillNoInternet'));
     }
   }
 
@@ -122,7 +116,10 @@ class _NoInternetScreenState extends State<NoInternetScreen> {
         backgroundColor: DefaultColors.surface,
         body: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 24.0,
+              vertical: 20.0,
+            ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [

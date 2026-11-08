@@ -6,6 +6,7 @@ import 'package:roomee/core/models/models.dart';
 import 'package:roomee/core/network/api_exceptions.dart';
 import 'package:roomee/core/offline/query/offline_page.dart';
 import 'package:roomee/features/workspace/data/workspace_repository.dart';
+import 'package:roomee/utils/constanst.dart';
 
 part 'workspace_event.dart';
 part 'workspace_state.dart';
@@ -51,8 +52,8 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
 
     try {
       final params = Map<String, dynamic>.from(event.queryParameters ?? {});
-      params['page'] = params['page'] ?? 1;
-      params['limit'] = params['limit'] ?? 20;
+      params['page'] = params['page'] ?? defaultPage;
+      params['limit'] = params['limit'] ?? defaultLimit;
 
       final pagination = await _workspaceRepository.getWorkspaces(
         queryParameters: params,
@@ -113,7 +114,7 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
     try {
       final params = Map<String, dynamic>.from(event.queryParameters ?? {});
       params['page'] = currentState.page + 1;
-      params['limit'] = params['limit'] ?? 20;
+      params['limit'] = params['limit'] ?? defaultLimit;
 
       final pagination = await _workspaceRepository.getWorkspaces(
         queryParameters: params,
