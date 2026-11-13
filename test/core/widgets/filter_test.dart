@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:roomee/core/localization/app_localizations.dart';
 import 'package:roomee/core/widgets/filter/app_filter_drawer.dart';
+import 'package:roomee/core/widgets/filter/app_filter_section.dart';
 import 'package:roomee/core/widgets/filter/app_search_app_bar.dart';
 import 'package:roomee/core/widgets/filter/filter_field_config.dart';
 
@@ -167,6 +168,72 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(appliedFilters['status'], equals(0));
+    });
+  });
+
+  group('AppFilterSection range Tests', () {
+    testWidgets('emits min/max map and null after clearing both fields',
+        (tester) async {
+      dynamic lastValue;
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          child: Scaffold(
+            body: AppFilterSection(
+              config: const FilterFieldConfig.range(
+                key: 'area',
+                title: 'Diện tích',
+                minKey: 'areaMin',
+                maxKey: 'areaMax',
+                unit: 'm²',
+              ),
+              currentValue: lastValue,
+              onChanged: (value) => lastValue = value,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Hai ô nhập phải gọn ngang tầm chip (không phình to như form thường).
+      expect(
+        tester.getSize(find.byType(TextFormField).first).height,
+        lessThan(40),
+      );
+
+      await tester.enterText(find.byType(TextFormField).first, '20');
+      expect(lastValue, {'min': 20});
+
+      await tester.enterText(find.byType(TextFormField).last, '50');
+      expect(lastValue, {'min': 20, 'max': 50});
+
+      await tester.enterText(find.byType(TextFormField).first, '');
+      await tester.enterText(find.byType(TextFormField).last, '');
+      expect(lastValue, isNull);
+    });
+
+    testWidgets('renders compact dropdown', (tester) async {
+      await tester.pumpWidget(
+        _buildTestApp(
+          child: Scaffold(
+            body: AppFilterSection(
+              config: FilterFieldConfig.dropdown(
+                key: 'provinceId',
+                title: 'Tỉnh/Thành phố',
+                loadOptionsAsync: () async => const [],
+              ),
+              currentValue: null,
+              onChanged: (_) {},
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.getSize(find.byType(TextFormField)).height,
+        lessThan(40),
+      );
     });
   });
 }

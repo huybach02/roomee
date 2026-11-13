@@ -16,9 +16,12 @@ class LocalFilterField<T> {
   final Set<LocalFilterOperator> operators;
   final bool Function(Object value) accepts;
 
+  final LocalFilterOperator defaultOperator;
+
   const LocalFilterField({
     required this.valueOf,
     required this.operators,
     required this.accepts,
+    this.defaultOperator = LocalFilterOperator.equals,
   });
 }

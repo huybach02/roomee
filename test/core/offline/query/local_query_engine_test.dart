@@ -66,6 +66,18 @@ final _schema = LocalQuerySchema<_Workspace>(
       },
       accepts: (v) => v is String,
     ),
+    'areaMin': LocalFilterField(
+      valueOf: (workspace) => workspace.area,
+      operators: {LocalFilterOperator.greaterThanOrEquals},
+      accepts: (v) => v is num,
+      defaultOperator: LocalFilterOperator.greaterThanOrEquals,
+    ),
+    'areaMax': LocalFilterField(
+      valueOf: (workspace) => workspace.area,
+      operators: {LocalFilterOperator.lessThanOrEquals},
+      accepts: (v) => v is num,
+      defaultOperator: LocalFilterOperator.lessThanOrEquals,
+    ),
     'address': LocalFilterField(
       valueOf: (workspace) => workspace.address,
       operators: {
@@ -225,6 +237,20 @@ void main() {
       schema: _schema,
     );
     expect(isNull.data.single.id, 'w2');
+  });
+
+  test('applies default operator when query value is a scalar', () {
+    final page = engine.query(
+      items: _workspaces,
+      queryParameters: {'areaMin': 50, 'areaMax': 100},
+      schema: _schema,
+    );
+
+    expect(page.data.map((workspace) => workspace.id).toSet(), {
+      'w1',
+      'w2',
+      'w3',
+    });
   });
 
   test('ignores numeric ordering filters on null field values', () {

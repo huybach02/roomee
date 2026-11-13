@@ -30,6 +30,8 @@ const WORKSPACE_FILTER_SCHEMA: FilterSchema<WorkspaceQueryDto> = {
   status: { operator: "eq", field: "workspaces.status" },
   provinceId: { operator: "eq", field: "workspaces.provinceId" },
   wardId: { operator: "eq", field: "workspaces.wardId" },
+  areaMin: { operator: "gte", field: "workspaces.area" },
+  areaMax: { operator: "lte", field: "workspaces.area" },
 };
 
 const WORKSPACE_SORT_MAP: Record<string, string> = {

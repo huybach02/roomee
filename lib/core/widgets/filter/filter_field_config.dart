@@ -100,13 +100,13 @@ class FilterFieldConfig {
         isSort = false;
 
   const FilterFieldConfig.range({
+    required this.key,
     required this.title,
     required this.minKey,
     required this.maxKey,
     this.unit,
     this.defaultValue,
-  })  : key = '',
-        type = FilterType.range,
+  })  : type = FilterType.range,
         options = null,
         loadOptionsAsync = null,
         isSort = false;

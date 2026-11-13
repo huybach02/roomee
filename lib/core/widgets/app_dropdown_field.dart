@@ -25,6 +25,8 @@ class AppDropdownField<T> extends StatefulWidget {
   final AutovalidateMode? autovalidateMode;
   final String? initialLabel;
 
+  final bool dense;
+
   const AppDropdownField({
     super.key,
     this.value,
@@ -41,6 +43,7 @@ class AppDropdownField<T> extends StatefulWidget {
     this.isLoading = false,
     this.autovalidateMode,
     this.initialLabel,
+    this.dense = false,
   });
 
   @override
@@ -162,12 +165,14 @@ class _AppDropdownFieldState<T> extends State<AppDropdownField<T>> {
                 ),
               ),
             )
-          : const Icon(
+          : Icon(
               Icons.arrow_drop_down,
+              size: widget.dense ? 20 : 24,
               color: DefaultColors.textSecondary,
             ),
       validator: widget.validator,
       autovalidateMode: widget.autovalidateMode,
+      dense: widget.dense,
     );
   }
 }

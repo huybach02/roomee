@@ -192,6 +192,8 @@
   "filterReset": "Reset",
   "filterApply": "Apply",
   "filterAll": "All",
+  "filterRangeFrom": "From",
+  "filterRangeTo": "To",
   "sortBy": "Sort by",
   "sortByScale": "Sort by scale",
   "sortNewest": "Newest",

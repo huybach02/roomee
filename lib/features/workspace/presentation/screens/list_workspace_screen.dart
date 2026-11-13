@@ -92,7 +92,12 @@ class _ListWorkspaceScreenState extends State<ListWorkspaceScreen> {
       final val = _filters[config.key];
       if (val == null || (val is String && val.isEmpty)) continue;
 
-      if (config.isSort) {
+      if (config.type == FilterType.range && val is Map) {
+        final min = val['min'];
+        final max = val['max'];
+        if (min != null) queryParams[config.minKey!] = min;
+        if (max != null) queryParams[config.maxKey!] = max;
+      } else if (config.isSort) {
         sortList.add(val.toString());
       } else {
         queryParams[config.key] = val;
@@ -178,6 +183,12 @@ class _ListWorkspaceScreenState extends State<ListWorkspaceScreen> {
             value: WorkspaceType.dormitory.value,
           ),
         ],
+      ),
+      FilterFieldConfig.range(
+        key: 'area',
+        title: t('fields.workspaceArea'),
+        minKey: 'areaMin',
+        maxKey: 'areaMax',
       ),
       FilterFieldConfig.dropdown(
         key: 'provinceId',

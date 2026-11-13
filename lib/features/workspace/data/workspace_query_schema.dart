@@ -15,49 +15,36 @@ final workspaceQuerySchema = LocalQuerySchema<WorkspaceModel>(
   filterFields: {
     'status': LocalFilterField(
       valueOf: (ws) => ws.status,
-      operators: const {
-        LocalFilterOperator.equals,
-        LocalFilterOperator.notEquals,
-        LocalFilterOperator.inList,
-      },
+      operators: const {LocalFilterOperator.equals},
       accepts: (v) => v is int,
     ),
     'type': LocalFilterField(
       valueOf: (ws) => ws.type.value,
-      operators: const {
-        LocalFilterOperator.equals,
-        LocalFilterOperator.inList,
-      },
+      operators: const {LocalFilterOperator.equals},
       accepts: (v) =>
           v is String && WorkspaceType.values.any((t) => t.value == v),
     ),
     'provinceId': LocalFilterField(
       valueOf: (ws) => ws.provinceId,
-      operators: const {
-        LocalFilterOperator.equals,
-        LocalFilterOperator.inList,
-      },
+      operators: const {LocalFilterOperator.equals},
       accepts: (v) => v is int,
     ),
     'wardId': LocalFilterField(
       valueOf: (ws) => ws.wardId,
-      operators: const {
-        LocalFilterOperator.equals,
-        LocalFilterOperator.inList,
-      },
+      operators: const {LocalFilterOperator.equals},
       accepts: (v) => v is int,
     ),
-    'area': LocalFilterField(
+    'areaMin': LocalFilterField(
       valueOf: (ws) => ws.area,
-      operators: const {
-        LocalFilterOperator.equals,
-        LocalFilterOperator.greaterThan,
-        LocalFilterOperator.greaterThanOrEquals,
-        LocalFilterOperator.lessThan,
-        LocalFilterOperator.lessThanOrEquals,
-        LocalFilterOperator.between,
-      },
+      operators: const {LocalFilterOperator.greaterThanOrEquals},
       accepts: (v) => v is num,
+      defaultOperator: LocalFilterOperator.greaterThanOrEquals,
+    ),
+    'areaMax': LocalFilterField(
+      valueOf: (ws) => ws.area,
+      operators: const {LocalFilterOperator.lessThanOrEquals},
+      accepts: (v) => v is num,
+      defaultOperator: LocalFilterOperator.lessThanOrEquals,
     ),
   },
   sortFields: {

@@ -192,6 +192,8 @@
   "filterReset": "Thiết lập lại",
   "filterApply": "Áp dụng",
   "filterAll": "Tất cả",
+  "filterRangeFrom": "Từ",
+  "filterRangeTo": "Đến",
   "sortBy": "Sắp xếp theo",
   "sortByScale": "Sắp xếp theo quy mô",
   "sortNewest": "Mới nhất",

@@ -46,6 +46,8 @@ export const workspaceQuerySchema = baseQuerySchema.extend({
   status: z.coerce.number().int().min(0).max(1).optional(),
   provinceId: z.coerce.number().int().optional(),
   wardId: z.coerce.number().int().optional(),
+  areaMin: z.coerce.number().min(0).optional(),
+  areaMax: z.coerce.number().min(0).optional(),
 });
 
 export type WorkspaceQueryDto = z.infer<typeof workspaceQuerySchema>;

@@ -35,7 +35,7 @@ class LocalQueryEngine<T> {
       final field = schema.filterFields[entry.key];
       if (field == null) continue;
 
-      final rule = _parseFilter(entry.value);
+      final rule = _parseFilter(entry.value, field);
       if (rule == null ||
           !field.operators.contains(rule.operator) ||
           !_hasValidValueShape(rule) ||
@@ -100,7 +100,7 @@ class LocalQueryEngine<T> {
     );
   }
 
-  _FilterRule? _parseFilter(Object? raw) {
+  _FilterRule? _parseFilter(Object? raw, LocalFilterField<T> field) {
     if (raw is Map) {
       final operatorName = raw['operator'];
       if (operatorName is! String) return null;
@@ -114,7 +114,7 @@ class LocalQueryEngine<T> {
       if (!raw.containsKey('value')) return null;
       return _FilterRule(operator, raw['value']);
     }
-    return _FilterRule(LocalFilterOperator.equals, raw);
+    return _FilterRule(field.defaultOperator, raw);
   }
 
   bool _acceptsRule(LocalFilterField<T> field, _FilterRule rule) {

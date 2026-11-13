@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:roomee/core/configs/app_theme.dart';
+import 'package:roomee/core/localization/app_localizations.dart';
 import 'package:roomee/core/widgets/app_dropdown_field.dart';
+import 'package:roomee/core/widgets/app_text_field.dart';
 import 'package:roomee/core/widgets/filter/filter_field_config.dart';
 
 class AppFilterSection extends StatefulWidget {
@@ -20,8 +23,14 @@ class AppFilterSection extends StatefulWidget {
 }
 
 class _AppFilterSectionState extends State<AppFilterSection> {
+  static final _rangeInputFormatter = FilteringTextInputFormatter.allow(
+    RegExp(r'[0-9.]'),
+  );
+
   List<FilterOption>? _asyncOptions;
   bool _isLoadingAsync = false;
+  TextEditingController? _minController;
+  TextEditingController? _maxController;
 
   @override
   void initState() {
@@ -30,6 +39,56 @@ class _AppFilterSectionState extends State<AppFilterSection> {
         widget.config.loadOptionsAsync != null) {
       _loadAsyncOptions();
     }
+    if (widget.config.type == FilterType.range) {
+      _initRangeControllers();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant AppFilterSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.config.type == FilterType.range &&
+        widget.currentValue != oldWidget.currentValue) {
+      _syncRangeControllers();
+    }
+  }
+
+  @override
+  void dispose() {
+    _minController?.dispose();
+    _maxController?.dispose();
+    super.dispose();
+  }
+
+  void _initRangeControllers() {
+    _minController = TextEditingController();
+    _maxController = TextEditingController();
+    _syncRangeControllers();
+  }
+
+  void _syncRangeControllers() {
+    final value = widget.currentValue;
+    final min = value is Map ? value['min'] : null;
+    final max = value is Map ? value['max'] : null;
+    _applyText(_minController, min);
+    _applyText(_maxController, max);
+  }
+
+  void _applyText(TextEditingController? controller, Object? value) {
+    if (controller == null) return;
+    final current = num.tryParse(controller.text.trim());
+    final incoming = num.tryParse(value?.toString() ?? '');
+    if (current == incoming) return;
+    controller.text = value?.toString() ?? '';
+  }
+
+  void _emitRange() {
+    final min = num.tryParse(_minController?.text.trim() ?? '');
+    final max = num.tryParse(_maxController?.text.trim() ?? '');
+    final range = <String, num>{};
+    if (min != null) range['min'] = min;
+    if (max != null) range['max'] = max;
+    widget.onChanged(range.isEmpty ? null : range);
   }
 
   Future<void> _loadAsyncOptions() async {
@@ -98,8 +157,9 @@ class _AppFilterSectionState extends State<AppFilterSection> {
                     option.label,
                     style: TextStyle(
                       fontSize: 12,
-                      fontWeight:
-                          isSelected ? FontWeight.bold : FontWeight.w500,
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.w500,
                       color: isSelected
                           ? DefaultColors.primary
                           : DefaultColors.textSecondary,
@@ -169,8 +229,9 @@ class _AppFilterSectionState extends State<AppFilterSection> {
                     option.label,
                     style: TextStyle(
                       fontSize: 12,
-                      fontWeight:
-                          isSelected ? FontWeight.bold : FontWeight.w500,
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.w500,
                       color: isSelected
                           ? DefaultColors.primary
                           : DefaultColors.textSecondary,
@@ -185,16 +246,47 @@ class _AppFilterSectionState extends State<AppFilterSection> {
     );
   }
 
+  Widget _buildRange() {
+    return Row(
+      children: [
+        Expanded(
+          child: AppTextField(
+            controller: _minController,
+            hintText: t('filterRangeFrom'),
+            dense: true,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [_rangeInputFormatter],
+            onChanged: (_) => _emitRange(),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: AppTextField(
+            controller: _maxController,
+            hintText: t('filterRangeTo'),
+            dense: true,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [_rangeInputFormatter],
+            onChanged: (_) => _emitRange(),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildDropdown() {
     final options = _asyncOptions ?? widget.config.options ?? [];
     return AppDropdownField<dynamic>(
       value: widget.currentValue,
       isLoading: _isLoadingAsync,
       options: options
-          .map((opt) =>
-              AppDropdownOption<dynamic>(value: opt.value, label: opt.label))
+          .map(
+            (opt) =>
+                AppDropdownOption<dynamic>(value: opt.value, label: opt.label),
+          )
           .toList(),
       onChanged: (val) => widget.onChanged(val),
+      dense: true,
     );
   }
 
@@ -219,6 +311,7 @@ class _AppFilterSectionState extends State<AppFilterSection> {
             widget.config.options != null)
           _buildMultiChips(widget.config.options!),
         if (widget.config.type == FilterType.dropdown) _buildDropdown(),
+        if (widget.config.type == FilterType.range) _buildRange(),
       ],
     );
   }

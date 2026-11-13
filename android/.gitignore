@@ -1,5 +1,7 @@
 gradle-wrapper.jar
 /.gradle
+/.gradle_corrupted/
+/build/
 /captures/
 /gradlew
 /gradlew.bat

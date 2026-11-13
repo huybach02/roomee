@@ -23,6 +23,8 @@ class AppTextField extends StatelessWidget {
   final List<TextInputFormatter>? inputFormatters;
   final AutovalidateMode? autovalidateMode;
 
+  final bool dense;
+
   const AppTextField({
     super.key,
     this.controller,
@@ -44,10 +46,14 @@ class AppTextField extends StatelessWidget {
     this.autofocus = false,
     this.inputFormatters,
     this.autovalidateMode,
+    this.dense = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final fontSize = dense ? FontSizes.small : FontSizes.standard;
+    final radius = BorderRadius.circular(dense ? 6 : 12);
+
     return TextFormField(
       controller: controller,
       focusNode: focusNode,
@@ -63,57 +69,57 @@ class AppTextField extends StatelessWidget {
       validator: validator,
       inputFormatters: inputFormatters,
       autovalidateMode: autovalidateMode,
-      style: const TextStyle(
-        fontSize: FontSizes.standard,
-        color: DefaultColors.textPrimary,
-      ),
+      style: TextStyle(fontSize: fontSize, color: DefaultColors.textPrimary),
       decoration: InputDecoration(
         labelText: labelText,
         hintText: hintText,
         helperText: helperText,
-        labelStyle: const TextStyle(
-          fontSize: FontSizes.standard,
+        labelStyle: TextStyle(
+          fontSize: fontSize,
           color: DefaultColors.textSecondary,
         ),
-        hintStyle: const TextStyle(
-          fontSize: FontSizes.standard,
-          color: DefaultColors.textHint,
-        ),
+        hintStyle: TextStyle(fontSize: fontSize, color: DefaultColors.textHint),
         prefixIcon: prefixIcon,
         suffixIcon: suffixIcon,
+        isDense: dense,
         filled: true,
         fillColor: enabled
-            ? DefaultColors.background
+            ? (dense ? DefaultColors.white : DefaultColors.background)
             : DefaultColors.disabled.withValues(alpha: 0.1),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 14,
-        ),
+        suffixIconConstraints: dense
+            ? const BoxConstraints(minWidth: 30, minHeight: 30)
+            : null,
+        prefixIconConstraints: dense
+            ? const BoxConstraints(minWidth: 30, minHeight: 30)
+            : null,
+        contentPadding: dense
+            ? const EdgeInsets.symmetric(horizontal: 10, vertical: 8)
+            : const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: radius,
           borderSide: const BorderSide(color: DefaultColors.border),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: radius,
           borderSide: const BorderSide(color: DefaultColors.border),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: radius,
           borderSide: const BorderSide(
             color: DefaultColors.primary,
             width: 1.5,
           ),
         ),
         disabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: radius,
           borderSide: const BorderSide(color: DefaultColors.border),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: radius,
           borderSide: const BorderSide(color: DefaultColors.danger),
         ),
         focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: radius,
           borderSide: const BorderSide(color: DefaultColors.danger, width: 1.5),
         ),
       ),
