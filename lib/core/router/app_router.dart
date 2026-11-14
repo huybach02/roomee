@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart' show CupertinoPage;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:roomee/core/screens/cache_inspector_screen.dart';
 import 'package:roomee/core/screens/home_screen.dart';
 import 'package:roomee/core/screens/landlord_screen.dart';
 import 'package:roomee/core/screens/tenant_screen.dart';
@@ -33,6 +34,7 @@ class AppRoutes {
   static const String createWorkspace = '/workspace/create';
   static const String editWorkspace = '/workspace/edit';
   static const String workspaceDetail = '/workspace/detail';
+  static const String cacheInspector = '/debug/cache-inspector';
 }
 
 Page<void> _buildSlidePage(GoRouterState state, Widget child) {
@@ -162,6 +164,14 @@ GoRouter createAppRouter({
             DetailWorkspaceScreen(workspace: workspace),
           );
         },
+      ),
+      GoRoute(
+        path: AppRoutes.cacheInspector,
+        name: 'cacheInspector',
+        pageBuilder: (context, state) => _buildSlidePage(
+          state,
+          const CacheInspectorScreen(),
+        ),
       ),
     ],
   );

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -170,6 +171,17 @@ class _LandlordScreenState extends State<LandlordScreen> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
+              actions: [
+                if (kDebugMode)
+                  IconButton(
+                    icon: const Icon(
+                      Icons.storage_rounded,
+                      color: DefaultColors.primary,
+                    ),
+                    tooltip: 'Hive Cache Inspector',
+                    onPressed: () => context.push(AppRoutes.cacheInspector),
+                  ),
+              ],
             ),
       body: IndexedStack(
         index: _selectedIndex,
