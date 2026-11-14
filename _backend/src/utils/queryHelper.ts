@@ -218,7 +218,7 @@ export class QueryHelper {
   }
 
   /**
-   * 4. Sắp xếp an toàn (Tránh SQL Injection bằng Whitelist, hỗ trợ sắp xếp đa tiêu chí)
+   * 4. Sắp xếp an toàn (Tránh SQL Injection bằng Whitelist, hỗ trợ sắp xếp đa tiêu chí và Deterministic Tie-breaker)
    */
   public static applySorting<T extends ObjectLiteral>(
     qb: SelectQueryBuilder<T>,
@@ -226,9 +226,10 @@ export class QueryHelper {
     sortOrderOrAllowed?: string | Record<string, string>,
     allowedSortFieldsInput: Record<string, string> = {},
     defaultSort: { field: string; order: "ASC" | "DESC" } = {
-      field: "workspace.createdAt",
+      field: "workspaces.createdAt",
       order: "DESC",
     },
+    tieBreakerColumn?: string,
   ): SelectQueryBuilder<T> {
     let allowed: Record<string, string> = {};
 
@@ -243,18 +244,29 @@ export class QueryHelper {
 
     if (validSorts.length === 0) {
       qb.orderBy(defaultSort.field, defaultSort.order);
-      return qb;
+    } else {
+      validSorts.forEach((sort, idx) => {
+        const order = sort.order?.toUpperCase() === "ASC" ? "ASC" : "DESC";
+        const column = allowed[sort.field!];
+        if (idx === 0) {
+          qb.orderBy(column, order);
+        } else {
+          qb.addOrderBy(column, order);
+        }
+      });
     }
 
-    validSorts.forEach((sort, idx) => {
-      const order = sort.order?.toUpperCase() === "ASC" ? "ASC" : "DESC";
-      const column = allowed[sort.field!];
-      if (idx === 0) {
-        qb.orderBy(column, order);
-      } else {
-        qb.addOrderBy(column, order);
+    const tieBreaker =
+      tieBreakerColumn || (qb.alias ? `${qb.alias}.id` : undefined);
+    if (tieBreaker) {
+      const alreadySortedByTieBreaker =
+        (validSorts.length === 0 && defaultSort.field === tieBreaker) ||
+        validSorts.some((s) => allowed[s.field!] === tieBreaker);
+
+      if (!alreadySortedByTieBreaker) {
+        qb.addOrderBy(tieBreaker, "ASC");
       }
-    });
+    }
 
     return qb;
   }
