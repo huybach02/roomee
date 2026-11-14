@@ -84,7 +84,7 @@ class AppTextField extends StatelessWidget {
         isDense: dense,
         filled: true,
         fillColor: enabled
-            ? (dense ? DefaultColors.white : DefaultColors.background)
+            ? DefaultColors.white
             : DefaultColors.disabled.withValues(alpha: 0.1),
         suffixIconConstraints: dense
             ? const BoxConstraints(minWidth: 30, minHeight: 30)

@@ -115,7 +115,7 @@ class AppCardSelect<T> extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: isSelected
                           ? DefaultColors.primary.withValues(alpha: 0.06)
-                          : DefaultColors.background,
+                          : DefaultColors.white,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: borderColor,

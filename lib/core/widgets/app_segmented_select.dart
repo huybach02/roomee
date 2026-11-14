@@ -111,7 +111,7 @@ class AppSegmentedSelect<T> extends StatelessWidget {
                     duration: const Duration(milliseconds: 150),
                     padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
                     decoration: BoxDecoration(
-                      color: isSelected ? DefaultColors.primary : DefaultColors.background,
+                      color: isSelected ? DefaultColors.primary : DefaultColors.white,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
                         color: borderColor,
