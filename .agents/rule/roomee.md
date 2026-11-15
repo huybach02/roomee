@@ -283,7 +283,7 @@ lib/
       api_client.dart
       api_exceptions.dart
       api_response.dart
-      network_sentinel.dart      # Lính canh mạng trung tâm: connectivity_plus thời gian thực, auto 2-way sync
+      network_sentinel.dart      # Lính canh mạng trung tâm: connectivity_plus + probe /api/health, auto 2-way sync
     offline/                     # Hạ tầng Offline Mode & 2-Way Sync dùng chung
       codecs/                    # Codec thực thể lõi (province, ward, user)
       contracts/                 # app_uuid, entity_codec, entity_store, relation_adapter, sync_dtos
@@ -434,7 +434,7 @@ Hệ thống sử dụng kiến trúc **Generic Offline-First Boilerplate** đ�
   - Khi kéo làm mới (Refresh) trên danh sách đã có dữ liệu: giữ nguyên danh sách cũ, bật cờ `isRefreshing: true` trong `WorkspaceLoaded`, không emit `WorkspaceLoading()` làm trắng màn hình.
   - Sử dụng `Completer<void>` trong `WorkspaceLoadEvent` để đồng bộ chính xác vòng xoay của `RefreshIndicator`.
   - Hiển thị thanh thông báo nhỏ `AppMiniBanner.syncStatus` (`lib/core/widgets/app_mini_banner.dart`) phía trên Bottom Bar, tự động điều phối trạng thái Syncing (xoay nhẹ) -> Thành công (tích xanh 1.5s) -> Ngoại tuyến -> Tự ẩn khi bình thường.
-  - **Lính canh mạng trung tâm (`NetworkSentinel` - `lib/core/network/network_sentinel.dart`):** Sử dụng `connectivity_plus` bắt sự kiện interface mạng (Wifi/4G) theo thời gian thực. Khi mạng hồi phục từ offline -> online: tự động kích hoạt 2-way sync trong `OfflineCrudRepository` (cooldown 5s) và tự động đóng `NoInternetScreen`.
+  - **Lính canh mạng trung tâm (`NetworkSentinel` - `lib/core/network/network_sentinel.dart`):** Sử dụng `connectivity_plus` bắt sự kiện interface mạng (Wifi/4G) theo thời gian thực, sau đó **probe `/api/health`** để xác nhận có Internet thật (tránh false-positive do captive portal, router mất uplink, hết data). Probe dùng **Dio riêng** (`_probeDio`) không gắn `AuthInterceptor`/`LoggingInterceptor` để không dính luồng refresh token và không gửi kèm access token; nhận **bất kỳ HTTP response nào** (kể cả 4xx/5xx) là đã ra được Internet, chỉ lỗi tầng mạng (timeout, DNS, socket) mới coi là offline. Không có interface (`none`) → offline ngay, không probe. Kết quả probe về muộn bị hủy qua bộ đếm `_statusSeq`. Khi mạng hồi phục từ offline -> online: tự động kích hoạt 2-way sync trong `OfflineCrudRepository` (cooldown 5s) và tự động đóng `NoInternetScreen`.
   - **Bảo vệ xác minh Sync thật (`syncSuccessNotifier`):** `OfflineCrudRepository` theo dõi cờ `syncSuccessNotifier`. Chỉ khi máy chủ trả về `success: true` và hoàn tất đối soát thì mới hiển thị "Đã đồng bộ dữ liệu". Tuyệt đối không hiển thị thành công giả khi sync gặp lỗi kết nối.
   - **Source Guard khi Tải thêm (Load More):** Đang xem trang online mà cuộn tải thêm bị rớt mạng $\rightarrow$ chặn không nối dữ liệu local vào online để tránh nhảy cóc/trùng lặp ID.
   - **Cơ chế CRUD Offline & Hàng đợi Mutation (`SyncMutationStore`):**

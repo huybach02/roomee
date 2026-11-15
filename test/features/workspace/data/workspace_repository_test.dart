@@ -238,6 +238,23 @@ void main() {
     expect(local.cached.any((w) => w.id == 'ws-new'), isTrue);
   });
 
+  test('createWorkspace offline fallback assigns userId from accountId', () async {
+    remote.errorToThrow = const NoInternetException();
+
+    final created = await repository.createWorkspace({
+      'name': 'Khu Trọ Offline',
+      'provinceId': 92,
+      'wardId': 310,
+      'address': 'Đường 30/4',
+      'contactName': 'Chủ Trọ A',
+      'contactPhone': '0901',
+    });
+
+    expect(created.name, 'Khu Trọ Offline');
+    expect(created.userId, 'user-1');
+    expect(local.cached.first.userId, 'user-1');
+  });
+
   test('updateWorkspace delegates to crud repository and updates cache', () async {
     local.cached = [sampleWs];
 

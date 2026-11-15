@@ -195,6 +195,9 @@ class OfflineCrudRepository<T, ID> {
       final offlineData = <String, dynamic>{
         ...data,
         'id': entityId,
+        if (data['userId'] == null ||
+            (data['userId'] is String && (data['userId'] as String).isEmpty))
+          'userId': accountId,
         'createdAt': data['createdAt'] ?? nowIso,
         'updatedAt': nowIso,
       };
@@ -261,6 +264,13 @@ class OfflineCrudRepository<T, ID> {
         ...currentJson,
         ...data,
         'id': id.toString(),
+        if ((currentJson['userId'] == null ||
+                (currentJson['userId'] is String &&
+                    (currentJson['userId'] as String).isEmpty)) &&
+            (data['userId'] == null ||
+                (data['userId'] is String &&
+                    (data['userId'] as String).isEmpty)))
+          'userId': accountId,
         'updatedAt': nowIso,
       };
 
