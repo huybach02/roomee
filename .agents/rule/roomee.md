@@ -429,7 +429,18 @@ Hệ thống sử dụng kiến trúc **Generic Offline-First Boilerplate** đ�
   - **Tuyệt đối KHÔNG fallback:** `UnauthorizedException` (401), `ForbiddenException` (403), `ClientException` (400, 422), `NotFoundException` (404), lỗi JSON parsing $\rightarrow$ rethrow lập tức.
   - **Bảo vệ Empty Cache:** Khi mất mạng mà local cache hoàn toàn rỗng $\rightarrow$ rethrow lỗi mạng ban đầu để UI hiển thị màn hình báo mất mạng, tránh hiển thị nhầm "Chưa có dữ liệu".
 - **Bảo mật & Mã hóa:** `CacheBoxes` (`lib/core/offline/hive/cache_boxes.dart`) tự động mở các Box dữ liệu cá nhân (`workspaces`, `users`) với mã hóa AES-256 (`HiveAesCipher`), khóa 256-bit sinh ngẫu nhiên và lưu an toàn trong `FlutterSecureStorage` qua `HiveCipherManager`. Các Box danh mục chung (`provinces`, `wards`) không mã hóa để tối ưu tốc độ.
-- **Đăng xuất (Logout Cache Clear):** Khi người dùng đăng xuất, `AuthRepository.logout()` tự động gọi `CacheBoxes.clearAccountData(userId)` quét toàn bộ các Box và xóa sạch các key có tiền tố `account:$accountId:` và `$accountId:`, đồng thời phát `WorkspaceResetEvent` để đưa state trong RAM về `WorkspaceInitial()`. Tuyệt đối không xóa danh mục dùng chung `provinces`/`wards`.
+- **Đăng xuất an toàn (Logout Cache Clear & Bảo toàn thay đổi chưa gửi):**
+  - `AuthRepository.logout({bool preservePendingChanges = false})` gọi `CacheBoxes.clearAccountData(userId, preserveSyncMutations: preservePendingChanges)`, quét toàn bộ các Box và xóa sạch các key có tiền tố `account:$accountId:` và `$accountId:`, đồng thời phát `WorkspaceResetEvent` để đưa state trong RAM về `WorkspaceInitial()`. Tuyệt đối không xóa danh mục dùng chung `provinces`/`wards`.
+  - **Đăng xuất thủ công (`confirmAndLogout` — `lib/features/auth/presentation/logout_helper.dart`):** Mọi nút Đăng xuất trên UI **bắt buộc** đi qua helper này thay vì dispatch trực tiếp `AuthLogoutEvent()`:
+    1. Không còn phiếu chờ (`pendingMutationCount() == 0`) $\rightarrow$ đăng xuất ngay.
+    2. Còn phiếu $\rightarrow$ hiện `LoadingScreen` và gọi `flushPendingMutations()` (chỉ push mutation, gửi `entities: const {}`, không kéo/đối soát).
+    3. Sổ rỗng sau khi đẩy $\rightarrow$ đăng xuất bình thường (xoá sạch kho + sổ).
+    4. Vẫn còn phiếu $\rightarrow$ hiện `AppConfirmDialog` cho người dùng chọn **Giữ lại** (giữ sổ theo accountId, gửi tiếp khi đăng nhập lại) hoặc **Xoá**.
+  - **Đăng xuất tự động do hết phiên (`onUnauthorized` tại `main.dart`):** LUÔN dispatch `AuthLogoutEvent(preservePendingChanges: true)` — người dùng không làm gì sai nên không được mất dữ liệu. Chỉ xoá cache entity, giữ nguyên box `cache_sync_mutations`.
+  - **Chỉ báo đăng xuất thủ công vs tự động:** `AuthLogoutEvent({bool preservePendingChanges = false})` — có default để giữ `const` và không phá các call site cũ.
+  - **Đăng xuất do `_onAuthCheck` gặp 401/403** (`auth_bloc.dart`) chỉ emit `Unauthenticated()`, **KHÔNG** gọi `logout()` và **KHÔNG** xoá Hive — tuyệt đối không "đồng bộ hoá" nhánh này theo hướng xoá dữ liệu.
+  - **TTL dọn phiếu tồn đọng:** Hằng số `syncMutationTtl = Duration(days: 30)` (`lib/utils/constanst.dart`); `HiveSyncMutationStore.purgeExpired(maxAge:)` chạy lúc khởi động trong `main()` để dọn phiếu cũ (kể cả phiếu hỏng không parse được). Không dọn phiếu của account khác khi account mới đăng nhập — key đã tách theo `accountId` và TTL là cơ chế thu hồi duy nhất.
+  - **API hỗ trợ trên `OfflineCrudRepository`:** `pendingMutationCount()`, `flushPendingMutations()`, `discardPendingMutations()`. Không sửa `syncNow()`/`_reconcile()` (nhánh dùng chung, nuốt lỗi) cho mục đích đăng xuất.
 - **Trải nghiệm Người dùng (UX):**
   - Khi kéo làm mới (Refresh) trên danh sách đã có dữ liệu: giữ nguyên danh sách cũ, bật cờ `isRefreshing: true` trong `WorkspaceLoaded`, không emit `WorkspaceLoading()` làm trắng màn hình.
   - Sử dụng `Completer<void>` trong `WorkspaceLoadEvent` để đồng bộ chính xác vòng xoay của `RefreshIndicator`.
@@ -444,7 +455,7 @@ Hệ thống sử dụng kiến trúc **Generic Offline-First Boilerplate** đ�
       - `create` + `delete` $\rightarrow$ tự hủy cả 2 mutation khỏi hàng đợi.
       - `update` + `update` $\rightarrow$ merge các trường update liên tiếp.
       - `update` + `delete` $\rightarrow$ thay thế bằng `delete`.
-    - Box `cache_sync_mutations` tự động dọn dẹp theo `accountId` khi đăng xuất (`clearAccountData`).
+    - Box `cache_sync_mutations` **chỉ** bị dọn khi đăng xuất thủ công và người dùng chọn Xoá, hoặc do TTL 30 ngày (`purgeExpired`). Đăng xuất do hết phiên giữ nguyên sổ để gửi tiếp khi đăng nhập lại cùng tài khoản.
   - **Bảo toàn Toàn vẹn Dữ liệu Đồng bộ (Data Integrity & Conflict Resolution):**
     - **Version-Aware Upsert & Tombstone Protection:** `HiveEntityStore` so sánh `updatedAt` trước khi ghi (Last-Write-Wins), chặn dữ liệu cũ ghi đè dữ liệu mới. Khi xóa bản ghi (`delete` hoặc sync `needDelete`), hệ thống cắm bia mộ (`tombstone:$id`) để ngăn chặn vĩnh viễn việc hồi sinh bản ghi đã xóa từ các response cũ (Resurrection Bug). Chỉ cho phép tái sinh khi timestamp mới hơn thời điểm cắm bia mộ.
     - **Two-Phase Commit trong `applySync`:** Phải parse và validate 100% dữ liệu `needUpdate` trước khi thực hiện bất kỳ mutation nào xuống store. Nếu có lỗi parse: log chi tiết, ném `FormatException` và giữ nguyên vẹn dữ liệu cũ, tuyệt đối **không nuốt lỗi `catch (_) {}`** làm rách dữ liệu.
@@ -497,6 +508,7 @@ Hệ thống sử dụng kiến trúc **Generic Offline-First Boilerplate** đ�
 - [ ] Backend response chuẩn theo `CustomResponse.success(res, data, message)` / `CustomResponse.error(res, message, errors)`.
 - [ ] Định danh resource đồng bộ (sync) thống nhất chuẩn số nhiều (`workspaces`, `users`,...) ở cả BE (`syncModuleName`, QueryBuilder alias) và FE (`entityName`, `syncableStores`).
 - [ ] CRUD offline lưu mutation vào `SyncMutationStore` với coalescing, khóa chính UUID v4 sinh phía client (`AppUuid.v4()`).
+- [ ] Mọi nút Đăng xuất thủ công đi qua `confirmAndLogout` (thử `flushPendingMutations` trước, thất bại thì hỏi Giữ/Xoá); đăng xuất tự động do hết phiên dùng `AuthLogoutEvent(preservePendingChanges: true)`.
 - [ ] Khi sửa Model mobile: bảo đảm tương thích ngược cho `fromJson`/`EntityCodec` (fallback/nullable) hoặc nâng `cacheFormatVersion` nếu có breaking change.
 - [ ] Banner trạng thái đồng bộ sử dụng `AppMiniBanner.syncStatus`, theo dõi `syncSuccessNotifier` để chỉ báo thành công khi đối soát thực tế không gặp lỗi mạng.
 - [ ] Xử lý sync theo mô hình Two-Phase Commit để bảo toàn dữ liệu, tuyệt đối không nuốt lỗi parse (`catch (_) {}`).

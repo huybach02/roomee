@@ -207,6 +207,38 @@ void main() {
         expect(find.byIcon(Icons.wifi_off_rounded), findsOneWidget);
         expect(find.text(t('common.offlineModeNotice')), findsOneWidget);
       });
+
+      testWidgets(
+          'shows warning banner when failedCount > 0 and triggers onTapFailed',
+          (tester) async {
+        final failedCount = ValueNotifier<int>(2);
+        var tapped = false;
+
+        await tester.pumpWidget(
+          wrapWithMaterial(
+            AppMiniBanner.syncStatus(
+              failedCountListenable: failedCount,
+              onTapFailed: () => tapped = true,
+              networkStatusListenable:
+                  ValueNotifier<NetworkStatus>(NetworkStatus.online),
+            ),
+          ),
+        );
+
+        expect(find.byIcon(Icons.warning_amber_rounded), findsOneWidget);
+        expect(
+          find.text(t('common.syncFailedNotice', {'count': '2'})),
+          findsOneWidget,
+        );
+        expect(find.byIcon(Icons.chevron_right_rounded), findsOneWidget);
+
+        await tester.tap(find.byType(AppMiniBanner));
+        expect(tapped, isTrue);
+
+        failedCount.value = 0;
+        await tester.pump();
+        expect(find.byIcon(Icons.warning_amber_rounded), findsNothing);
+      });
     });
   });
 }

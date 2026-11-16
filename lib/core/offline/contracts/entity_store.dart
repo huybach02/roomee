@@ -6,7 +6,11 @@ abstract interface class EntityStore<T, ID> {
 
   Future<void> put({required String accountId, required T entity});
 
-  Future<void> putMany({required String accountId, required List<T> entities});
+  Future<void> putMany({
+    required String accountId,
+    required List<T> entities,
+    bool force = false,
+  });
 
   Future<T?> getById({required String accountId, required ID id});
 

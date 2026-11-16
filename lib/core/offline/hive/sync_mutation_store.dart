@@ -10,6 +10,7 @@ abstract interface class ISyncMutationStore {
   Future<List<SyncMutation>> getMutations({
     required String accountId,
     String? module,
+    SyncMutationStatus? status,
   });
 
   Future<void> removeMutations({
@@ -17,9 +18,38 @@ abstract interface class ISyncMutationStore {
     required List<String> mutationIds,
   });
 
+  Future<void> markMutationsAsInFlight({
+    required String accountId,
+    required List<String> mutationIds,
+  });
+
+  Future<void> resetInFlightMutations({
+    String? accountId,
+  });
+
+  Future<void> markMutationsAsFailed({
+    required String accountId,
+    required List<SyncRejectedMutationDto> failures,
+  });
+
+  Future<void> resetMutationToPending({
+    required String accountId,
+    required String mutationId,
+    Map<String, dynamic>? updatedData,
+  });
+
+  Future<Set<String>> getProtectedCreateEntityIds({
+    required String accountId,
+    String? module,
+  });
+
   Future<void> clearAccount({
     required String accountId,
   });
+
+  /// Xóa các phiếu chờ đồng bộ đã cũ hơn [maxAge] (tính từ lúc tạo).
+  /// Trả về số phiếu đã xóa.
+  Future<int> purgeExpired({required Duration maxAge});
 }
 
 class HiveSyncMutationStore implements ISyncMutationStore {
@@ -43,8 +73,13 @@ class HiveSyncMutationStore implements ISyncMutationStore {
     );
 
     // Tìm mutation trước đó của cùng entityId nếu có (Coalescing)
-    final existingIndex =
-        existingList.indexWhere((m) => m.entityId == mutation.entityId);
+    // CHÚ Ý: Chỉ gộp vào mutation đang ở trạng thái pending!
+    // Tuyệt đối KHÔNG gộp vào mutation đang inFlight (vì payload cũ đang/đã được gửi lên server).
+    final existingIndex = existingList.lastIndexWhere(
+      (m) =>
+          m.entityId == mutation.entityId &&
+          m.status == SyncMutationStatus.pending,
+    );
 
     if (existingIndex != -1) {
       final existing = existingList[existingIndex];
@@ -64,6 +99,7 @@ class HiveSyncMutationStore implements ISyncMutationStore {
             entityId: existing.entityId,
             data: mergedData,
             createdAt: existing.createdAt,
+            status: SyncMutationStatus.pending,
           );
           await box.put(
             _mutationKey(accountId, existing.id),
@@ -92,6 +128,7 @@ class HiveSyncMutationStore implements ISyncMutationStore {
             entityId: existing.entityId,
             data: mergedData,
             createdAt: existing.createdAt,
+            status: SyncMutationStatus.pending,
           );
           await box.put(
             _mutationKey(accountId, existing.id),
@@ -118,6 +155,7 @@ class HiveSyncMutationStore implements ISyncMutationStore {
   Future<List<SyncMutation>> getMutations({
     required String accountId,
     String? module,
+    SyncMutationStatus? status,
   }) async {
     final prefix = _accountPrefix(accountId);
     final mutations = <SyncMutation>[];
@@ -129,7 +167,8 @@ class HiveSyncMutationStore implements ISyncMutationStore {
           try {
             final mutation =
                 SyncMutation.fromJson(Map<String, dynamic>.from(raw));
-            if (module == null || mutation.module == module) {
+            if ((module == null || mutation.module == module) &&
+                (status == null || mutation.status == status)) {
               mutations.add(mutation);
             }
           } catch (_) {}
@@ -152,6 +191,125 @@ class HiveSyncMutationStore implements ISyncMutationStore {
   }
 
   @override
+  Future<void> markMutationsAsInFlight({
+    required String accountId,
+    required List<String> mutationIds,
+  }) async {
+    if (mutationIds.isEmpty) return;
+    for (final id in mutationIds) {
+      final key = _mutationKey(accountId, id);
+      final raw = box.get(key);
+      if (raw != null) {
+        try {
+          final current =
+              SyncMutation.fromJson(Map<String, dynamic>.from(raw));
+          if (current.status == SyncMutationStatus.pending) {
+            final updated =
+                current.copyWith(status: SyncMutationStatus.inFlight);
+            await box.put(key, updated.toJson());
+          }
+        } catch (_) {}
+      }
+    }
+  }
+
+  @override
+  Future<void> resetInFlightMutations({String? accountId}) async {
+    final prefix = accountId != null ? _accountPrefix(accountId) : 'account:';
+    for (final key in box.keys) {
+      if (key is String &&
+          key.startsWith(prefix) &&
+          key.contains(':mutation:')) {
+        final raw = box.get(key);
+        if (raw != null) {
+          try {
+            final current =
+                SyncMutation.fromJson(Map<String, dynamic>.from(raw));
+            if (current.status == SyncMutationStatus.inFlight) {
+              final updated =
+                  current.copyWith(status: SyncMutationStatus.pending);
+              await box.put(key, updated.toJson());
+            }
+          } catch (_) {}
+        }
+      }
+    }
+  }
+
+  @override
+  Future<void> markMutationsAsFailed({
+    required String accountId,
+    required List<SyncRejectedMutationDto> failures,
+  }) async {
+    if (failures.isEmpty) return;
+    final now = DateTime.now();
+
+    for (final failure in failures) {
+      final key = _mutationKey(accountId, failure.id);
+      final raw = box.get(key);
+      if (raw != null) {
+        try {
+          final current =
+              SyncMutation.fromJson(Map<String, dynamic>.from(raw));
+          final updated = current.copyWith(
+            status: SyncMutationStatus.failed,
+            errorMessage: failure.reason,
+            statusCode: failure.statusCode,
+            errorDetails: failure.details,
+            failedAt: now,
+          );
+          await box.put(key, updated.toJson());
+        } catch (_) {}
+      }
+    }
+  }
+
+  @override
+  Future<void> resetMutationToPending({
+    required String accountId,
+    required String mutationId,
+    Map<String, dynamic>? updatedData,
+  }) async {
+    final key = _mutationKey(accountId, mutationId);
+    final raw = box.get(key);
+    if (raw != null) {
+      final current =
+          SyncMutation.fromJson(Map<String, dynamic>.from(raw));
+      final updated = current.copyWith(
+        status: SyncMutationStatus.pending,
+        data: updatedData ?? current.data,
+      );
+      await box.put(key, updated.toJson());
+    }
+  }
+
+  @override
+  Future<Set<String>> getProtectedCreateEntityIds({
+    required String accountId,
+    String? module,
+  }) async {
+    final prefix = _accountPrefix(accountId);
+    final protectedIds = <String>{};
+
+    for (final key in box.keys) {
+      if (key is String && key.startsWith(prefix)) {
+        final raw = box.get(key);
+        if (raw != null) {
+          try {
+            final mutation =
+                SyncMutation.fromJson(Map<String, dynamic>.from(raw));
+            if (mutation.action == SyncMutationAction.create &&
+                (module == null || mutation.module == module)) {
+              protectedIds.add(mutation.entityId);
+            }
+          } catch (_) {}
+        }
+      }
+    }
+    return protectedIds;
+  }
+
+  @override
   Future<void> clearAccount({required String accountId}) async {
     final prefix = _accountPrefix(accountId);
     final keysToDelete =
@@ -159,5 +317,33 @@ class HiveSyncMutationStore implements ISyncMutationStore {
     if (keysToDelete.isNotEmpty) {
       await box.deleteAll(keysToDelete);
     }
+  }
+
+  @override
+  Future<int> purgeExpired({required Duration maxAge}) async {
+    // Khôi phục mọi phiếu inFlight mồ côi (từ phiên trước bị crash) về pending
+    await resetInFlightMutations();
+
+    final cutoff = DateTime.now().subtract(maxAge);
+    final keysToDelete = <dynamic>[];
+
+    for (final key in box.keys) {
+      final raw = box.get(key);
+      if (raw == null) continue;
+      try {
+        final mutation = SyncMutation.fromJson(Map<String, dynamic>.from(raw));
+        if (mutation.createdAt.isBefore(cutoff)) {
+          keysToDelete.add(key);
+        }
+      } catch (_) {
+        // Phiếu hỏng không đọc được -> dọn luôn để không kẹt vĩnh viễn
+        keysToDelete.add(key);
+      }
+    }
+
+    if (keysToDelete.isNotEmpty) {
+      await box.deleteAll(keysToDelete);
+    }
+    return keysToDelete.length;
   }
 }

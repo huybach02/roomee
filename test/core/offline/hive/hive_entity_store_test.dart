@@ -352,5 +352,39 @@ void main() {
         expect(preserved?.name, 'Original Item');
       },
     );
+
+    test(
+        'applySync overrides local record even when local clock is ahead in the future',
+        () async {
+      // Giả lập đồng hồ điện thoại chạy nhanh 1 giờ: local box có updatedAt là 14:00
+      final futureTime = DateTime.parse('2026-11-05T14:00:00Z');
+      await timestampedStore.put(
+        accountId: 'acc-1',
+        entity: _TimestampedRecord('w1', 'Local Offline Edit', futureTime),
+      );
+
+      // Máy chủ trả về bản ghi chính thức lúc 13:00 (chuẩn server)
+      final serverTime = DateTime.parse('2026-11-05T13:00:00Z');
+      await timestampedStore.applySync(
+        accountId: 'acc-1',
+        result: SyncResultDto(
+          needUpdate: [
+            {
+              'id': 'w1',
+              'name': 'Server Canonical Record',
+              'updatedAt': serverTime.toIso8601String(),
+            },
+          ],
+        ),
+      );
+
+      final updated = await timestampedStore.getById(
+        accountId: 'acc-1',
+        id: 'w1',
+      );
+      // applySync với force: true phải ghi đè thành công, xóa bỏ thời gian tương lai của client
+      expect(updated?.name, 'Server Canonical Record');
+      expect(updated?.updatedAt, serverTime);
+    });
   });
 }

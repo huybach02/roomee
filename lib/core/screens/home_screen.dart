@@ -7,6 +7,7 @@ import 'package:roomee/core/localization/app_localizations.dart';
 import 'package:roomee/core/router/app_router.dart';
 import 'package:roomee/core/widgets/app_button.dart';
 import 'package:roomee/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:roomee/features/auth/presentation/logout_helper.dart';
 
 /// Màn hình Home dành cho Người thuê trọ CHƯA có hợp đồng thuê trọ (hasContract = false).
 /// Sau này sẽ là màn hình tìm kiếm phòng trọ, danh sách tin đăng cho thuê...
@@ -117,9 +118,7 @@ class HomeScreen extends StatelessWidget {
                     AppButton(
                       text: t('logout'),
                       type: AppButtonType.outline,
-                      onPressed: () {
-                        context.read<AuthBloc>().add(const AuthLogoutEvent());
-                      },
+                      onPressed: () => confirmAndLogout(context),
                     ),
                   ],
                 ),

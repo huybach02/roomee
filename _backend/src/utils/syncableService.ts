@@ -1,4 +1,5 @@
 import type { ObjectLiteral, SelectQueryBuilder, EntityTarget } from "typeorm";
+import type { ZodType } from "zod";
 import type { RelationJoin } from "./relationJoin.js";
 
 export { syncable } from "../modules/general/syncRegistry.js";
@@ -25,6 +26,12 @@ export interface SyncableService<Entity extends ObjectLiteral>
   relationJoin?(
     queryBuilder: SelectQueryBuilder<Entity>,
   ): SelectQueryBuilder<Entity>;
+
+  /** Schema validate dữ liệu mutation create (bắt buộc nếu khai báo create) */
+  readonly createSchema?: ZodType;
+
+  /** Schema validate dữ liệu mutation update (bắt buộc nếu khai báo update) */
+  readonly updateSchema?: ZodType;
 
   /** Phương thức tạo mới thực thể khi sync (tùy chọn) */
   create?(userId: string, data: any): Promise<any>;

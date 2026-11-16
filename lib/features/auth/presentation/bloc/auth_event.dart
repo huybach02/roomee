@@ -46,7 +46,9 @@ final class AuthRegisterEvent extends AuthEvent {
 
 /// Yêu cầu đăng xuất tài khoản
 final class AuthLogoutEvent extends AuthEvent {
-  const AuthLogoutEvent();
+  final bool preservePendingChanges;
+
+  const AuthLogoutEvent({this.preservePendingChanges = false});
 }
 
 /// Yêu cầu xác thực mã OTP

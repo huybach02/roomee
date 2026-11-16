@@ -10,14 +10,14 @@ export const workspaceParamSchema = z.object({
 export type WorkspaceParam = z.infer<typeof workspaceParamSchema>;
 
 /**
- * Schema validate body khi tạo mới Workspace
+ * Các trường nghiệp vụ dùng chung cho tạo mới và cập nhật.
+ * Không đặt default tại đây để `updateWorkspaceSchema.partial()` không tự sinh
+ * giá trị mặc định khi client chỉ gửi một phần dữ liệu (ví dụ chỉ đổi status).
  */
-export const createWorkspaceSchema = z.object({
-  id: ruleValidates.uuidRule().optional(),
+const workspaceCoreSchema = z.object({
   name: ruleValidates.requiredString({ max: 255 }),
   type: z.nativeEnum(WorkspaceType),
   area: ruleValidates.positiveNumber(),
-  numberOfRooms: ruleValidates.nonNegativeNumber({ int: true }).default(0),
   provinceId: ruleValidates.idRule(),
   wardId: ruleValidates.idRule(),
   address: ruleValidates.requiredString({ max: 255 }),
@@ -25,15 +25,27 @@ export const createWorkspaceSchema = z.object({
   contactName: ruleValidates.requiredString({ max: 100 }),
   contactPhone: ruleValidates.phoneRule(),
   contactZalo: ruleValidates.phoneRule().nullish(),
+});
+
+/**
+ * Schema validate body khi tạo mới Workspace
+ */
+export const createWorkspaceSchema = workspaceCoreSchema.extend({
+  id: ruleValidates.uuidRule().optional(),
+  numberOfRooms: ruleValidates.nonNegativeNumber({ int: true }).default(0),
   status: ruleValidates.statusRule(),
 });
 
 export type CreateWorkspaceDto = z.infer<typeof createWorkspaceSchema>;
 
 /**
- * Schema validate body khi cập nhật Workspace
+ * Schema validate body khi cập nhật Workspace.
+ * Không cho phép đổi `id`; bỏ default của `status` để tránh reset trạng thái.
  */
-export const updateWorkspaceSchema = createWorkspaceSchema.partial();
+export const updateWorkspaceSchema = workspaceCoreSchema.partial().extend({
+  numberOfRooms: ruleValidates.nonNegativeNumber({ int: true }).optional(),
+  status: ruleValidates.statusRule().removeDefault().optional(),
+});
 
 export type UpdateWorkspaceDto = z.infer<typeof updateWorkspaceSchema>;
 

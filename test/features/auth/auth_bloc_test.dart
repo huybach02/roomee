@@ -83,7 +83,7 @@ class _FakeAuthRepository implements IAuthRepository {
   }
 
   @override
-  Future<void> logout() async {
+  Future<void> logout({bool preservePendingChanges = false}) async {
     loggedIn = false;
     currentUser = null;
     token = null;

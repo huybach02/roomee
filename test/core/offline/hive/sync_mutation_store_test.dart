@@ -235,5 +235,349 @@ void main() {
       expect(await store.getMutations(accountId: 'acc-1'), isEmpty);
       expect((await store.getMutations(accountId: 'acc-2')).length, 1);
     });
+
+    test('purgeExpired removes only mutations older than maxAge', () async {
+      final now = DateTime.now();
+      await store.addMutation(
+        accountId: 'acc-1',
+        mutation: SyncMutation(
+          id: 'old-mut',
+          module: 'workspaces',
+          action: SyncMutationAction.create,
+          entityId: 'ws-old',
+          createdAt: now.subtract(const Duration(days: 31)),
+        ),
+      );
+      await store.addMutation(
+        accountId: 'acc-1',
+        mutation: SyncMutation(
+          id: 'fresh-mut',
+          module: 'workspaces',
+          action: SyncMutationAction.create,
+          entityId: 'ws-fresh',
+          createdAt: now,
+        ),
+      );
+
+      final purged = await store.purgeExpired(maxAge: const Duration(days: 30));
+
+      expect(purged, 1);
+      final remaining = await store.getMutations(accountId: 'acc-1');
+      expect(remaining.length, 1);
+      expect(remaining.first.id, 'fresh-mut');
+    });
+
+    test('markMutationsAsFailed updates status, error info and timestamp',
+        () async {
+      await store.addMutation(
+        accountId: 'acc-1',
+        mutation: SyncMutation(
+          id: 'mut-1',
+          module: 'workspaces',
+          action: SyncMutationAction.create,
+          entityId: 'ws-1',
+        ),
+      );
+
+      await store.markMutationsAsFailed(
+        accountId: 'acc-1',
+        failures: [
+          const SyncRejectedMutationDto(
+            id: 'mut-1',
+            module: 'workspaces',
+            action: 'create',
+            entityId: 'ws-1',
+            statusCode: 400,
+            reason: 'Name must not be empty',
+            details: {'field': 'name'},
+          ),
+        ],
+      );
+
+      final failed = await store.getMutations(
+        accountId: 'acc-1',
+        status: SyncMutationStatus.failed,
+      );
+      expect(failed.length, 1);
+      expect(failed.first.id, 'mut-1');
+      expect(failed.first.status, SyncMutationStatus.failed);
+      expect(failed.first.errorMessage, 'Name must not be empty');
+      expect(failed.first.statusCode, 400);
+      expect(failed.first.errorDetails, {'field': 'name'});
+      expect(failed.first.failedAt, isNotNull);
+
+      // pending list rỗng
+      final pending = await store.getMutations(
+        accountId: 'acc-1',
+        status: SyncMutationStatus.pending,
+      );
+      expect(pending, isEmpty);
+    });
+
+    test('getProtectedCreateEntityIds returns all create entity IDs', () async {
+      await store.addMutation(
+        accountId: 'acc-1',
+        mutation: SyncMutation(
+          id: 'mut-create',
+          module: 'workspaces',
+          action: SyncMutationAction.create,
+          entityId: 'ws-create',
+        ),
+      );
+      await store.addMutation(
+        accountId: 'acc-1',
+        mutation: SyncMutation(
+          id: 'mut-update',
+          module: 'workspaces',
+          action: SyncMutationAction.update,
+          entityId: 'ws-update',
+        ),
+      );
+
+      final protectedIds =
+          await store.getProtectedCreateEntityIds(accountId: 'acc-1');
+      expect(protectedIds, {'ws-create'});
+      expect(protectedIds.contains('ws-update'), isFalse);
+    });
+
+    test('resetMutationToPending resets failed mutation back to pending',
+        () async {
+      await store.addMutation(
+        accountId: 'acc-1',
+        mutation: SyncMutation(
+          id: 'mut-1',
+          module: 'workspaces',
+          action: SyncMutationAction.create,
+          entityId: 'ws-1',
+          status: SyncMutationStatus.failed,
+          errorMessage: 'Bad input',
+          data: {'name': 'Old'},
+        ),
+      );
+
+      await store.resetMutationToPending(
+        accountId: 'acc-1',
+        mutationId: 'mut-1',
+        updatedData: {'name': 'New'},
+      );
+
+      final mutations = await store.getMutations(
+        accountId: 'acc-1',
+        status: SyncMutationStatus.pending,
+      );
+      expect(mutations.length, 1);
+      expect(mutations.first.status, SyncMutationStatus.pending);
+      expect(mutations.first.data?['name'], 'New');
+    });
+
+    test('markMutationsAsInFlight marks pending mutations as inFlight',
+        () async {
+      await store.addMutation(
+        accountId: 'acc-1',
+        mutation: SyncMutation(
+          id: 'mut-1',
+          module: 'workspaces',
+          action: SyncMutationAction.create,
+          entityId: 'ws-1',
+          data: {'name': 'Ws 1'},
+        ),
+      );
+
+      await store.markMutationsAsInFlight(
+        accountId: 'acc-1',
+        mutationIds: ['mut-1'],
+      );
+
+      final inFlight = await store.getMutations(
+        accountId: 'acc-1',
+        status: SyncMutationStatus.inFlight,
+      );
+      expect(inFlight.length, 1);
+      expect(inFlight.first.id, 'mut-1');
+      expect(inFlight.first.status, SyncMutationStatus.inFlight);
+
+      final pending = await store.getMutations(
+        accountId: 'acc-1',
+        status: SyncMutationStatus.pending,
+      );
+      expect(pending, isEmpty);
+    });
+
+    test('resetInFlightMutations resets inFlight mutations back to pending',
+        () async {
+      await store.addMutation(
+        accountId: 'acc-1',
+        mutation: SyncMutation(
+          id: 'mut-1',
+          module: 'workspaces',
+          action: SyncMutationAction.create,
+          entityId: 'ws-1',
+        ),
+      );
+      await store.markMutationsAsInFlight(
+        accountId: 'acc-1',
+        mutationIds: ['mut-1'],
+      );
+
+      await store.resetInFlightMutations(accountId: 'acc-1');
+
+      final pending = await store.getMutations(
+        accountId: 'acc-1',
+        status: SyncMutationStatus.pending,
+      );
+      expect(pending.length, 1);
+      expect(pending.first.id, 'mut-1');
+      expect(pending.first.status, SyncMutationStatus.pending);
+    });
+
+    test(
+        'does not coalesce update into in-flight mutation, creates separate pending mutation',
+        () async {
+      // 1. Tạo phiếu P1 và chuyển sang inFlight (đang bay trên mạng)
+      await store.addMutation(
+        accountId: 'acc-1',
+        mutation: SyncMutation(
+          id: 'mut-p1',
+          module: 'workspaces',
+          action: SyncMutationAction.create,
+          entityId: 'ws-race',
+          data: {'name': 'Hoa Lan'},
+        ),
+      );
+      await store.markMutationsAsInFlight(
+        accountId: 'acc-1',
+        mutationIds: ['mut-p1'],
+      );
+
+      // 2. Người dùng sửa tiếp thành "Hoa Sứ" trong lúc P1 đang bay
+      await store.addMutation(
+        accountId: 'acc-1',
+        mutation: SyncMutation(
+          id: 'mut-p2',
+          module: 'workspaces',
+          action: SyncMutationAction.update,
+          entityId: 'ws-race',
+          data: {'name': 'Hoa Sứ'},
+        ),
+      );
+
+      // P1 phải còn nguyên trạng thái inFlight và tên cũ
+      final inFlight = await store.getMutations(
+        accountId: 'acc-1',
+        status: SyncMutationStatus.inFlight,
+      );
+      expect(inFlight.length, 1);
+      expect(inFlight.first.id, 'mut-p1');
+      expect(inFlight.first.data?['name'], 'Hoa Lan');
+
+      // P2 được lưu thành 1 phiếu update pending độc lập
+      final pending = await store.getMutations(
+        accountId: 'acc-1',
+        status: SyncMutationStatus.pending,
+      );
+      expect(pending.length, 1);
+      expect(pending.first.id, 'mut-p2');
+      expect(pending.first.action, SyncMutationAction.update);
+      expect(pending.first.data?['name'], 'Hoa Sứ');
+
+      // Khi P1 xong và bị xóa, P2 vẫn an toàn trong sổ
+      await store.removeMutations(accountId: 'acc-1', mutationIds: ['mut-p1']);
+      final remaining = await store.getMutations(accountId: 'acc-1');
+      expect(remaining.length, 1);
+      expect(remaining.first.id, 'mut-p2');
+      expect(remaining.first.data?['name'], 'Hoa Sứ');
+    });
+
+    test(
+        'coalesces subsequent update into the pending mutation while in-flight mutation remains isolated',
+        () async {
+      await store.addMutation(
+        accountId: 'acc-1',
+        mutation: SyncMutation(
+          id: 'mut-p1',
+          module: 'workspaces',
+          action: SyncMutationAction.create,
+          entityId: 'ws-multi',
+          data: {'name': 'V1', 'area': 50},
+        ),
+      );
+      await store.markMutationsAsInFlight(
+        accountId: 'acc-1',
+        mutationIds: ['mut-p1'],
+      );
+
+      // Lần sửa 1: tạo P2 pending
+      await store.addMutation(
+        accountId: 'acc-1',
+        mutation: SyncMutation(
+          id: 'mut-p2',
+          module: 'workspaces',
+          action: SyncMutationAction.update,
+          entityId: 'ws-multi',
+          data: {'name': 'V2'},
+        ),
+      );
+
+      // Lần sửa 2: gộp tiếp vào P2 pending
+      await store.addMutation(
+        accountId: 'acc-1',
+        mutation: SyncMutation(
+          id: 'mut-p3',
+          module: 'workspaces',
+          action: SyncMutationAction.update,
+          entityId: 'ws-multi',
+          data: {'area': 100},
+        ),
+      );
+
+      final inFlight = await store.getMutations(
+        accountId: 'acc-1',
+        status: SyncMutationStatus.inFlight,
+      );
+      expect(inFlight.length, 1);
+      expect(inFlight.first.id, 'mut-p1');
+
+      final pending = await store.getMutations(
+        accountId: 'acc-1',
+        status: SyncMutationStatus.pending,
+      );
+      expect(pending.length, 1);
+      expect(pending.first.id, 'mut-p2');
+      expect(pending.first.data?['name'], 'V2');
+      expect(pending.first.data?['area'], 100);
+    });
+
+    test('purgeExpired automatically resets orphan inFlight mutations',
+        () async {
+      await store.addMutation(
+        accountId: 'acc-1',
+        mutation: SyncMutation(
+          id: 'mut-orphan',
+          module: 'workspaces',
+          action: SyncMutationAction.create,
+          entityId: 'ws-orphan',
+        ),
+      );
+      await store.markMutationsAsInFlight(
+        accountId: 'acc-1',
+        mutationIds: ['mut-orphan'],
+      );
+
+      // Giả lập app mở lại và gọi purgeExpired
+      await store.purgeExpired(maxAge: const Duration(days: 30));
+
+      final inFlight = await store.getMutations(
+        accountId: 'acc-1',
+        status: SyncMutationStatus.inFlight,
+      );
+      expect(inFlight, isEmpty);
+
+      final pending = await store.getMutations(
+        accountId: 'acc-1',
+        status: SyncMutationStatus.pending,
+      );
+      expect(pending.length, 1);
+      expect(pending.first.id, 'mut-orphan');
+    });
   });
 }

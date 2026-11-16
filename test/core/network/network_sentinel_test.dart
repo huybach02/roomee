@@ -26,6 +26,8 @@ class _FakeConnectivity implements Connectivity {
 class _MockAdapter implements HttpClientAdapter {
   final List<String> requestedPaths = [];
   bool shouldFail = false;
+  bool Function(RequestOptions options)? failMatcher;
+  DioExceptionType failType = DioExceptionType.connectionError;
   int statusCode = 200;
 
   @override
@@ -35,7 +37,15 @@ class _MockAdapter implements HttpClientAdapter {
     Future<void>? cancelFuture,
   ) async {
     requestedPaths.add(options.uri.path);
-    if (shouldFail) {
+    final isFailed =
+        shouldFail || (failMatcher != null && failMatcher!(options));
+    if (isFailed) {
+      if (failType == DioExceptionType.connectionTimeout) {
+        throw DioException.connectionTimeout(
+          timeout: const Duration(seconds: 4),
+          requestOptions: options,
+        );
+      }
       throw DioException.connectionError(
         requestOptions: options,
         reason: 'no internet',
@@ -140,7 +150,68 @@ void main() {
       expect(sentinel.isOnline, isFalse);
       expect(sentinel.status, NetworkStatus.offline);
       expect(syncTriggeredCount, 0);
-      expect(adapter.requestedPaths, ['/api/health']);
+      expect(adapter.requestedPaths, ['/api/health', '']);
+    });
+
+    test(
+        'falls back to google.com when server /api/health fails and reports online',
+        () async {
+      // /api/health fails (server down / connection error), but google.com succeeds
+      adapter.failMatcher = (opt) => opt.uri.path == '/api/health';
+      sentinel.initialize();
+
+      var syncTriggeredCount = 0;
+      sentinel.registerSyncCallback(() async {
+        syncTriggeredCount++;
+      });
+
+      fakeConnectivity.emit([ConnectivityResult.wifi]);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      expect(sentinel.isOnline, isTrue);
+      expect(sentinel.status, NetworkStatus.online);
+      expect(syncTriggeredCount, 1);
+      expect(adapter.requestedPaths, ['/api/health', '']);
+    });
+
+    test('treats probeTimeout as unknown and preserves current online status',
+        () async {
+      fakeConnectivity.current = [ConnectivityResult.wifi];
+      sentinel = NetworkSentinel(
+        connectivity: fakeConnectivity,
+        probeDio: buildProbeDio(),
+        initialStatus: NetworkStatus.online,
+        syncCooldown: Duration.zero,
+      );
+      sentinel.initialize();
+
+      adapter.shouldFail = true;
+      adapter.failType = DioExceptionType.connectionTimeout;
+
+      fakeConnectivity.emit([ConnectivityResult.wifi]);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      // Không bị vội vàng chuyển thành offline khi bị timeout
+      expect(sentinel.isOnline, isTrue);
+      expect(sentinel.status, NetworkStatus.online);
+    });
+
+    test('triggerSync triggers registered callbacks when online', () async {
+      sentinel = NetworkSentinel(
+        connectivity: fakeConnectivity,
+        probeDio: buildProbeDio(),
+        initialStatus: NetworkStatus.online,
+        syncCooldown: Duration.zero,
+      );
+
+      var syncTriggeredCount = 0;
+      sentinel.registerSyncCallback(() async {
+        syncTriggeredCount++;
+      });
+
+      sentinel.triggerSync(force: true);
+
+      expect(syncTriggeredCount, 1);
     });
 
     test('treats any HTTP response as online even when server errors',
@@ -186,6 +257,43 @@ void main() {
       final offlineStatus = await sentinel.checkStatus();
 
       expect(offlineStatus, NetworkStatus.offline);
+    });
+
+    test(
+        'schedules trailing sync when network flips online within syncCooldown',
+        () async {
+      sentinel = NetworkSentinel(
+        connectivity: fakeConnectivity,
+        probeDio: buildProbeDio(),
+        initialStatus: NetworkStatus.offline,
+        syncCooldown: const Duration(milliseconds: 80),
+      );
+      sentinel.initialize();
+
+      var syncTriggeredCount = 0;
+      sentinel.registerSyncCallback(() async {
+        syncTriggeredCount++;
+      });
+
+      // Lần 1: offline -> online
+      fakeConnectivity.emit([ConnectivityResult.wifi]);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(syncTriggeredCount, 1);
+
+      // Chập chờn: online -> offline -> online trong vòng 80ms
+      fakeConnectivity.emit([ConnectivityResult.none]);
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      fakeConnectivity.emit([ConnectivityResult.wifi]);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      // Ở 50ms (< 80ms): Lần 2 chưa kích hoạt do cooldown
+      expect(syncTriggeredCount, 1);
+
+      // Chờ hết cooldown 80ms (chờ thêm 80ms = 130ms)
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+
+      // Lần 2 đã được tự động kích hoạt bởi trailing timer!
+      expect(syncTriggeredCount, 2);
     });
   });
 }

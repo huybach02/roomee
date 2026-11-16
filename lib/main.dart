@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -10,6 +12,7 @@ import 'package:roomee/core/network/network_sentinel.dart';
 import 'package:roomee/core/network/api_client.dart';
 import 'package:roomee/core/offline/hive/cache_boxes.dart';
 import 'package:roomee/core/offline/hive/hive_initializer.dart';
+import 'package:roomee/core/offline/hive/sync_mutation_store.dart';
 import 'package:roomee/core/router/app_router.dart';
 import 'package:roomee/core/screens/no_internet_screen.dart';
 import 'package:roomee/features/auth/data/auth_repository.dart';
@@ -17,6 +20,7 @@ import 'package:roomee/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:roomee/features/general/presentation/bloc/general_bloc.dart';
 import 'package:roomee/features/workspace/data/workspace_repository.dart';
 import 'package:roomee/features/workspace/presentation/bloc/workspace_bloc.dart';
+import 'package:roomee/utils/constanst.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,6 +34,13 @@ void main() async {
     initialLocale = Locale(savedCode!);
   }
 
+  // Dọn các phiếu đồng bộ quá hạn (TTL) để không tồn đọng dữ liệu cũ trên máy
+  unawaited(
+    HiveSyncMutationStore(
+      box: cacheBoxes[HiveBoxNames.syncMutations],
+    ).purgeExpired(maxAge: syncMutationTtl),
+  );
+
   final authRepository = AuthRepository(cacheBoxes: cacheBoxes);
   final authBloc = AuthBloc(authRepository: authRepository)
     ..add(const AuthCheckEvent());
@@ -38,7 +49,8 @@ void main() async {
   // và hiển thị màn hình NoInternetScreen khi mất mạng mà không bị đăng xuất
   ApiClient(
     onUnauthorized: () {
-      authBloc.add(const AuthLogoutEvent());
+      // Hết phiên tự động: giữ lại sổ phiếu để gửi tiếp khi đăng nhập lại
+      authBloc.add(const AuthLogoutEvent(preservePendingChanges: true));
     },
     onNetworkError: () {
       final context = rootNavigatorKey.currentContext;

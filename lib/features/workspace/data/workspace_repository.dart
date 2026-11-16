@@ -20,6 +20,12 @@ abstract class IWorkspaceRepository {
   Future<WorkspaceModel> createWorkspace(Map<String, dynamic> data);
   Future<WorkspaceModel> updateWorkspace(String id, Map<String, dynamic> data);
   Future<void> deleteWorkspace(String id);
+
+  Future<int> pendingMutationCount() async => 0;
+
+  Future<void> flushPendingMutations() async {}
+
+  Future<void> syncIfPending() async {}
 }
 
 class WorkspaceRepository implements IWorkspaceRepository {
@@ -32,18 +38,19 @@ class WorkspaceRepository implements IWorkspaceRepository {
     ISyncMutationStore? syncMutationStore,
     NetworkSentinel? networkSentinel,
     OfflineCrudRepository<WorkspaceModel, String>? crudRepository,
-  }) : _crudRepository = crudRepository ??
-            OfflineCrudRepository<WorkspaceModel, String>(
-              remote: remoteDataSource ?? WorkspaceRemoteDataSource(),
-              local: localDataSource,
-              syncMutationStore: syncMutationStore,
-              networkSentinel: networkSentinel,
-              getAccountId: () async {
-                final auth = authLocalDataSource ?? AuthLocalDataSource();
-                final user = await auth.getUser();
-                return user?.id;
-              },
-            );
+  }) : _crudRepository =
+           crudRepository ??
+           OfflineCrudRepository<WorkspaceModel, String>(
+             remote: remoteDataSource ?? WorkspaceRemoteDataSource(),
+             local: localDataSource,
+             syncMutationStore: syncMutationStore,
+             networkSentinel: networkSentinel,
+             getAccountId: () async {
+               final auth = authLocalDataSource ?? AuthLocalDataSource();
+               final user = await auth.getUser();
+               return user?.id;
+             },
+           );
 
   factory WorkspaceRepository.fromBoxes(
     CacheBoxes boxes, {
@@ -63,7 +70,8 @@ class WorkspaceRepository implements IWorkspaceRepository {
   }
 
   @override
-  ValueListenable<bool> get isSyncingNotifier => _crudRepository.isSyncingNotifier;
+  ValueListenable<bool> get isSyncingNotifier =>
+      _crudRepository.isSyncingNotifier;
 
   @override
   ValueListenable<bool?> get syncSuccessNotifier =>
@@ -95,4 +103,14 @@ class WorkspaceRepository implements IWorkspaceRepository {
   Future<void> deleteWorkspace(String id) {
     return _crudRepository.deleteById(id);
   }
+
+  @override
+  Future<int> pendingMutationCount() => _crudRepository.pendingMutationCount();
+
+  @override
+  Future<void> flushPendingMutations() =>
+      _crudRepository.flushPendingMutations();
+
+  @override
+  Future<void> syncIfPending() => _crudRepository.syncIfPending();
 }

@@ -107,12 +107,14 @@ class AppMiniBanner extends StatelessWidget {
     );
   }
 
-  /// Widget thông minh tự động điều phối trạng thái Sync (Syncing, Success 1.5s, Offline)
+  /// Widget thông minh tự động điều phối trạng thái Sync (Syncing, Success 1.5s, Offline, Failed Warning)
   static Widget syncStatus({
     Key? key,
     bool isSyncing = false,
     ValueListenable<bool>? isSyncingListenable,
     ValueListenable<bool?>? syncSuccessListenable,
+    ValueListenable<int>? failedCountListenable,
+    VoidCallback? onTapFailed,
     bool isOffline = false,
     ValueListenable<NetworkStatus>? networkStatusListenable,
     DateTime? lastFetchedAt,
@@ -124,6 +126,8 @@ class AppMiniBanner extends StatelessWidget {
       isSyncing: isSyncing,
       isSyncingListenable: isSyncingListenable,
       syncSuccessListenable: syncSuccessListenable,
+      failedCountListenable: failedCountListenable,
+      onTapFailed: onTapFailed,
       isOffline: isOffline,
       networkStatusListenable:
           networkStatusListenable ?? NetworkSentinel.instance.statusNotifier,
@@ -247,6 +251,8 @@ class _AppSyncStatusMiniBanner extends StatefulWidget {
   final bool isSyncing;
   final ValueListenable<bool>? isSyncingListenable;
   final ValueListenable<bool?>? syncSuccessListenable;
+  final ValueListenable<int>? failedCountListenable;
+  final VoidCallback? onTapFailed;
   final bool isOffline;
   final ValueListenable<NetworkStatus>? networkStatusListenable;
   final DateTime? lastFetchedAt;
@@ -258,6 +264,8 @@ class _AppSyncStatusMiniBanner extends StatefulWidget {
     this.isSyncing = false,
     this.isSyncingListenable,
     this.syncSuccessListenable,
+    this.failedCountListenable,
+    this.onTapFailed,
     this.isOffline = false,
     this.networkStatusListenable,
     this.lastFetchedAt,
@@ -273,6 +281,7 @@ class _AppSyncStatusMiniBanner extends StatefulWidget {
 class _AppSyncStatusMiniBannerState extends State<_AppSyncStatusMiniBanner> {
   bool _isSyncing = false;
   bool _showSuccessBriefly = false;
+  int _failedCount = 0;
   NetworkStatus _networkStatus = NetworkStatus.online;
   Timer? _hideSuccessTimer;
 
@@ -282,10 +291,21 @@ class _AppSyncStatusMiniBannerState extends State<_AppSyncStatusMiniBanner> {
     _isSyncing = widget.isSyncingListenable?.value ?? widget.isSyncing;
     widget.isSyncingListenable?.addListener(_handleSyncingChanged);
 
+    _failedCount = widget.failedCountListenable?.value ?? 0;
+    widget.failedCountListenable?.addListener(_handleFailedCountChanged);
+
     _networkStatus =
         widget.networkStatusListenable?.value ??
         (widget.isOffline ? NetworkStatus.offline : NetworkStatus.online);
     widget.networkStatusListenable?.addListener(_handleNetworkStatusChanged);
+  }
+
+  void _handleFailedCountChanged() {
+    if (mounted) {
+      setState(() {
+        _failedCount = widget.failedCountListenable?.value ?? 0;
+      });
+    }
   }
 
   void _handleNetworkStatusChanged() {
@@ -309,6 +329,12 @@ class _AppSyncStatusMiniBannerState extends State<_AppSyncStatusMiniBanner> {
       _updateSyncing(widget.isSyncing);
     }
 
+    if (oldWidget.failedCountListenable != widget.failedCountListenable) {
+      oldWidget.failedCountListenable?.removeListener(_handleFailedCountChanged);
+      widget.failedCountListenable?.addListener(_handleFailedCountChanged);
+      _failedCount = widget.failedCountListenable?.value ?? 0;
+    }
+
     if (oldWidget.networkStatusListenable != widget.networkStatusListenable) {
       oldWidget.networkStatusListenable?.removeListener(
         _handleNetworkStatusChanged,
@@ -330,7 +356,7 @@ class _AppSyncStatusMiniBannerState extends State<_AppSyncStatusMiniBanner> {
       _isSyncing = false;
 
       // CHỈ hiển thị "Đã đồng bộ dữ liệu" khi sync THỰC SỰ THÀNH CÔNG!
-      // Nếu sync thất bại (lỗi kết nối, không có mạng), tuyệt đối không hiển thị thành công giả!
+      // Nếu sync thất bại (lỗi kết nối, không có mạng, có phiếu bị reject), tuyệt đối không hiển thị thành công giả!
       final didSucceed = widget.syncSuccessListenable != null
           ? widget.syncSuccessListenable!.value == true
           : true;
@@ -366,6 +392,7 @@ class _AppSyncStatusMiniBannerState extends State<_AppSyncStatusMiniBanner> {
   @override
   void dispose() {
     widget.isSyncingListenable?.removeListener(_handleSyncingChanged);
+    widget.failedCountListenable?.removeListener(_handleFailedCountChanged);
     widget.networkStatusListenable?.removeListener(_handleNetworkStatusChanged);
     _hideSuccessTimer?.cancel();
     super.dispose();
@@ -378,10 +405,17 @@ class _AppSyncStatusMiniBannerState extends State<_AppSyncStatusMiniBanner> {
 
     final shouldShowSyncing = _isSyncing;
     final shouldShowSuccess = _showSuccessBriefly;
-    final shouldShowOffline =
-        isEffectivelyOffline && !shouldShowSyncing && !shouldShowSuccess;
+    final shouldShowFailed =
+        _failedCount > 0 && !shouldShowSyncing && !shouldShowSuccess;
+    final shouldShowOffline = isEffectivelyOffline &&
+        !shouldShowSyncing &&
+        !shouldShowSuccess &&
+        !shouldShowFailed;
 
-    if (!shouldShowSyncing && !shouldShowSuccess && !shouldShowOffline) {
+    if (!shouldShowSyncing &&
+        !shouldShowSuccess &&
+        !shouldShowFailed &&
+        !shouldShowOffline) {
       return const SizedBox.shrink();
     }
 
@@ -389,6 +423,18 @@ class _AppSyncStatusMiniBannerState extends State<_AppSyncStatusMiniBanner> {
       return AppMiniBanner.syncing(message: widget.syncingMessage);
     } else if (shouldShowSuccess) {
       return AppMiniBanner.success(message: t('common.syncCompleted'));
+    } else if (shouldShowFailed) {
+      return AppMiniBanner.warning(
+        message: t('common.syncFailedNotice', {'count': '$_failedCount'}),
+        trailing: widget.onTapFailed != null
+            ? const Icon(
+                Icons.chevron_right_rounded,
+                size: 16,
+                color: DefaultColors.secondary,
+              )
+            : null,
+        onTap: widget.onTapFailed,
+      );
     } else {
       return AppMiniBanner.offline(
         lastFetchedAt: widget.lastFetchedAt,

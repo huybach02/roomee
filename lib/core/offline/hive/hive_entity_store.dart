@@ -30,6 +30,7 @@ class HiveEntityStore<T, ID> implements EntityStore<T, ID> {
   Future<void> putMany({
     required String accountId,
     required List<T> entities,
+    bool force = false,
   }) async {
     if (entities.isEmpty) return;
 
@@ -61,13 +62,17 @@ class HiveEntityStore<T, ID> implements EntityStore<T, ID> {
       }
 
       // 2. So sánh với dữ liệu hiện tại trong local box (Chống ghi đè dữ liệu mới bằng dữ liệu cũ)
-      final currentJson = box.get(key);
-      if (currentJson != null && incomingUpdatedAt != null) {
-        final currentUpdatedAt = codec.extractUpdatedAtFromJson(currentJson);
-        if (currentUpdatedAt != null &&
-            incomingUpdatedAt.isBefore(currentUpdatedAt)) {
-          // Dữ liệu local mới hơn incoming -> Bỏ qua không ghi đè
-          continue;
+      // Khi force == true (ví dụ từ applySync của Server): luôn tin tưởng dữ liệu chính thức từ server,
+      // loại bỏ nguy cơ đồng hồ điện thoại chạy nhanh làm kẹt bản ghi
+      if (!force) {
+        final currentJson = box.get(key);
+        if (currentJson != null && incomingUpdatedAt != null) {
+          final currentUpdatedAt = codec.extractUpdatedAtFromJson(currentJson);
+          if (currentUpdatedAt != null &&
+              incomingUpdatedAt.isBefore(currentUpdatedAt)) {
+            // Dữ liệu local mới hơn incoming -> Bỏ qua không ghi đè
+            continue;
+          }
         }
       }
 
@@ -195,9 +200,16 @@ class HiveEntityStore<T, ID> implements EntityStore<T, ID> {
 
     // -----------------------------------------------------------------
     // Giai đoạn 2: Thực hiện Mutation khi toàn bộ dữ liệu hợp lệ
+    // Kết quả needUpdate từ đối soát server là nguồn chân lý (Source of Truth),
+    // sử dụng force: true để cập nhật lại updatedAt chuẩn của server vào local box,
+    // loại bỏ hoàn toàn timestamp chạy nhanh của đồng hồ điện thoại.
     // -----------------------------------------------------------------
     if (updatedEntities.isNotEmpty) {
-      await putMany(accountId: accountId, entities: updatedEntities);
+      await putMany(
+        accountId: accountId,
+        entities: updatedEntities,
+        force: true,
+      );
     }
 
     if (result.needDelete.isNotEmpty) {

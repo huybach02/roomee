@@ -37,7 +37,7 @@ class _FakeLogoutAuthRepo extends Fake implements IAuthRepository {
   @override
   Future<UserModel?> syncUserProfile() async => null;
   @override
-  Future<void> logout() async {}
+  Future<void> logout({bool preservePendingChanges = false}) async {}
 }
 
 class _FakeGeneralRepository implements IGeneralRepository {

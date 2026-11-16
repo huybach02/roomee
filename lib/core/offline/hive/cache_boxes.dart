@@ -55,13 +55,23 @@ class CacheBoxes {
     return CacheBoxes(opened);
   }
 
-  /// Tự động quét và dọn sạch dữ liệu thuộc accountId trên toàn bộ các Box
-  Future<void> clearAccountData(String accountId) async {
+  /// Tự động quét và dọn sạch dữ liệu thuộc accountId trên toàn bộ các Box.
+  ///
+  /// Khi [preserveSyncMutations] = true, giữ nguyên box sổ hàng đợi đồng bộ
+  /// để gửi tiếp khi người dùng đăng nhập lại cùng tài khoản.
+  Future<void> clearAccountData(
+    String accountId, {
+    bool preserveSyncMutations = false,
+  }) async {
     final accountPrefix = 'account:$accountId:';
     final metaPrefix = '$accountId:';
 
     await Future.wait(
-      all.map((box) async {
+      _boxes.entries.map((entry) async {
+        if (preserveSyncMutations && entry.key == HiveBoxNames.syncMutations) {
+          return;
+        }
+        final box = entry.value;
         final keysToDelete = box.keys
             .where(
               (k) =>

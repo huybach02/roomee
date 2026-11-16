@@ -56,6 +56,32 @@ void main() {
     expect(boxes[HiveBoxNames.wards].get(CacheKeyBuilder.entity('global', '310')), isNotNull);
   });
 
+  test('clearAccountData preserves sync mutations when requested', () async {
+    await boxes[HiveBoxNames.workspaces].put(
+      CacheKeyBuilder.entity('acc-a', 'ws-1'),
+      {'name': 'Ws A1'},
+    );
+    await boxes[HiveBoxNames.syncMutations].put(
+      'account:acc-a:mutation:mut-1',
+      {'id': 'mut-1'},
+    );
+
+    await boxes.clearAccountData('acc-a', preserveSyncMutations: true);
+
+    // Dữ liệu cache bị xóa như thường
+    expect(
+      boxes[HiveBoxNames.workspaces].get(
+        CacheKeyBuilder.entity('acc-a', 'ws-1'),
+      ),
+      isNull,
+    );
+    // Sổ phiếu được giữ lại để gửi tiếp khi đăng nhập lại
+    expect(
+      boxes[HiveBoxNames.syncMutations].get('account:acc-a:mutation:mut-1'),
+      isNotNull,
+    );
+  });
+
   test('CacheBoxes.configs configures all boxes and operator [] returns correct box', () {
     expect(CacheBoxes.configs[HiveBoxNames.workspaces], isTrue);
     expect(CacheBoxes.configs[HiveBoxNames.users], isTrue);

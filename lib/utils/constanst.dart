@@ -20,6 +20,8 @@ final String logoAssetPath = 'assets/images/logo.png';
 const int defaultPage = 1;
 const int defaultLimit = 20;
 
+const Duration syncMutationTtl = Duration(days: 30);
+
 enum UserRole { staff, landlord, tenant, admin }
 
 enum Gender { male, female, other }

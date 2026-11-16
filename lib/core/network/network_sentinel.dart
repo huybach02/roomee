@@ -10,6 +10,12 @@ enum NetworkStatus {
   offline,
 }
 
+enum ProbeResult {
+  online,
+  offline,
+  timeout,
+}
+
 /// Lính canh mạng trung tâm (Network Sentinel) của ứng dụng Mobile.
 ///
 /// Sử dụng [connectivity_plus] để bắt sự kiện kết nối mạng theo thời gian thực,
@@ -32,6 +38,7 @@ class NetworkSentinel {
   DateTime? _lastSyncTriggeredAt;
   Duration syncCooldown;
   Duration probeTimeout;
+  final String fallbackUrl;
 
   /// Tăng mỗi lần xử lý sự kiện mạng để bỏ qua kết quả probe cũ về muộn
   int _statusSeq = 0;
@@ -42,6 +49,7 @@ class NetworkSentinel {
     NetworkStatus initialStatus = NetworkStatus.online,
     this.syncCooldown = const Duration(seconds: 5),
     this.probeTimeout = const Duration(seconds: 4),
+    this.fallbackUrl = 'https://www.google.com',
   })  : _connectivity = connectivity ?? Connectivity(),
         _probeDio = probeDio ??
             Dio(
@@ -125,22 +133,35 @@ class NetworkSentinel {
       return status;
     }
 
-    // Có interface chưa chắc ra được Internet -> xác nhận bằng health check
-    final hasInternet = await _probeInternet();
+    // Có interface chưa chắc ra được Internet -> xác nhận bằng probe
+    final probeResult = await _probeInternet();
 
     // Một sự kiện mạng mới hơn đã được xử lý trong lúc probe -> bỏ qua kết quả cũ
     if (seq != _statusSeq) return status;
 
-    _updateStatus(hasInternet ? NetworkStatus.online : NetworkStatus.offline);
+    if (probeResult == ProbeResult.online) {
+      _updateStatus(NetworkStatus.online);
+    } else if (probeResult == ProbeResult.offline) {
+      _updateStatus(NetworkStatus.offline);
+    }
+    // Nếu probeResult == ProbeResult.timeout: coi là "chưa biết", giữ nguyên trạng thái
+    // hiện tại, không vội vàng phán đoán offline làm giật UI banner.
+
     return status;
   }
 
   /// Ping endpoint health check của server để xác nhận kết nối Internet thực tế.
   ///
-  /// Nhận được BẤT KỲ HTTP response nào (kể cả 4xx/5xx) cũng chứng minh đã ra
-  /// được Internet thật. Chỉ lỗi tầng mạng (timeout, DNS, socket, mất kết nối)
-  /// mới được coi là offline.
-  Future<bool> _probeInternet() async {
+  /// 1. Gọi /api/health của máy chủ Roomee. Bất kỳ HTTP response nào cũng chứng minh
+  ///    đã kết nối được tới server và Internet.
+  /// 2. Nếu server Roomee bị lỗi mạng (server tắt/bảo trì, connection refused, DNS lỗi),
+  ///    fallback ping tới [fallbackUrl] (mặc định https://www.google.com) để xác nhận
+  ///    thiết bị có thực sự ra Internet hay không (tránh coi server lỗi thành mất mạng).
+  /// 3. Nếu cả hai đều timeout (probeTimeout hết hạn), coi là [ProbeResult.timeout]
+  ///    ("chưa biết") chứ chưa hẳn offline để tránh vội vã chuyển trạng thái giật lag UI banner.
+  Future<ProbeResult> _probeInternet() async {
+    bool healthTimedOut = false;
+
     try {
       final healthUrl = Uri.parse(_probeDio.options.baseUrl)
           .replace(path: '/api/health')
@@ -154,12 +175,56 @@ class NetworkSentinel {
           validateStatus: (_) => true,
         ),
       );
-      return true;
+      return ProbeResult.online;
     } on DioException catch (e) {
       // Có response nghĩa là request đã tới được server -> Internet vẫn hoạt động
-      return e.response != null;
-    } catch (_) {
-      return false;
+      if (e.response != null) {
+        return ProbeResult.online;
+      }
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout) {
+        healthTimedOut = true;
+      }
+    } catch (_) {}
+
+    // Fallback: Ping fallbackUrl (mặc định https://www.google.com)
+    try {
+      await _probeDio.get(
+        fallbackUrl,
+        options: Options(
+          sendTimeout: probeTimeout,
+          receiveTimeout: probeTimeout,
+          validateStatus: (_) => true,
+        ),
+      );
+      return ProbeResult.online;
+    } on DioException catch (e) {
+      if (e.response != null) {
+        return ProbeResult.online;
+      }
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout) {
+        return ProbeResult.timeout;
+      }
+    } catch (_) {}
+
+    if (healthTimedOut) {
+      return ProbeResult.timeout;
+    }
+
+    return ProbeResult.offline;
+  }
+
+  /// Kích hoạt chuông đồng bộ chủ động cho tất cả repository đã đăng ký
+  /// (ví dụ: sau khi người dùng đăng nhập xong hoặc app khởi động có sẵn sóng và còn phiếu)
+  void triggerSync({bool force = false}) {
+    if (force) {
+      _lastSyncTriggeredAt = null;
+    }
+    if (isOnline) {
+      _triggerSyncCallbacks();
     }
   }
 
@@ -173,13 +238,25 @@ class NetworkSentinel {
     }
   }
 
+  Timer? _pendingSyncTimer;
+
   /// Kích hoạt các tác vụ sync khi mạng hồi phục (kèm cooldown chống bão gọi)
   void _triggerSyncCallbacks() {
     final now = DateTime.now();
     if (_lastSyncTriggeredAt != null &&
+        syncCooldown > Duration.zero &&
         now.difference(_lastSyncTriggeredAt!) < syncCooldown) {
+      final remaining = syncCooldown - now.difference(_lastSyncTriggeredAt!);
+      _pendingSyncTimer ??= Timer(remaining, () {
+        _pendingSyncTimer = null;
+        if (status == NetworkStatus.online) {
+          _triggerSyncCallbacks();
+        }
+      });
       return;
     }
+    _pendingSyncTimer?.cancel();
+    _pendingSyncTimer = null;
     _lastSyncTriggeredAt = now;
 
     for (final callback in List.of(_syncCallbacks)) {
@@ -194,6 +271,8 @@ class NetworkSentinel {
   void dispose() {
     _subscription?.cancel();
     _subscription = null;
+    _pendingSyncTimer?.cancel();
+    _pendingSyncTimer = null;
     _probeDio.close(force: true);
     statusNotifier.dispose();
     _syncCallbacks.clear();

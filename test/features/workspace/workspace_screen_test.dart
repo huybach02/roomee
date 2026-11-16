@@ -56,7 +56,7 @@ class _FakeAuthRepo implements IAuthRepository {
       );
 
   @override
-  Future<void> logout() async {}
+  Future<void> logout({bool preservePendingChanges = false}) async {}
 
   @override
   Future<void> resendOtp(String email) async {}
@@ -85,9 +85,13 @@ class _FakeWorkspaceRepo implements IWorkspaceRepository {
   ValueListenable<bool>? get isSyncingNotifier => null;
 
   @override
-  ValueListenable<bool?>? get syncSuccessNotifier => null;
+  final ValueListenable<bool?>? syncSuccessNotifier;
 
-  _FakeWorkspaceRepo({this.workspaces = const [], this.pages});
+  _FakeWorkspaceRepo({
+    this.workspaces = const [],
+    this.pages,
+    this.syncSuccessNotifier,
+  });
 
   @override
   Future<OfflinePage<WorkspaceModel>> getWorkspaces({Map<String, dynamic>? queryParameters}) async {
@@ -141,6 +145,15 @@ class _FakeWorkspaceRepo implements IWorkspaceRepository {
 
   @override
   Future<void> deleteWorkspace(String id) async {}
+
+  @override
+  Future<int> pendingMutationCount() async => 0;
+
+  @override
+  Future<void> flushPendingMutations() async {}
+
+  @override
+  Future<void> syncIfPending() async {}
 }
 
 class _FakeLocalSourceWorkspaceRepo extends _FakeWorkspaceRepo {
@@ -351,6 +364,72 @@ void main() {
         emits(isA<WorkspaceInitial>()),
       );
       await bloc.close();
+    });
+
+    test(
+        'WorkspaceBloc reloads list when syncSuccessNotifier emits true in WorkspaceLoaded state',
+        () async {
+      final syncNotifier = ValueNotifier<bool?>(null);
+      const initialWs = WorkspaceModel(
+        id: 'ws-1',
+        userId: 'user-1',
+        name: 'Nhà trọ cũ',
+        area: 100.0,
+        provinceId: 1,
+        wardId: 1,
+        address: 'Đường A',
+        contactName: 'A',
+        contactPhone: '0901',
+      );
+      const updatedWs = WorkspaceModel(
+        id: 'ws-1',
+        userId: 'user-1',
+        name: 'Nhà trọ mới sau đồng bộ',
+        area: 100.0,
+        provinceId: 1,
+        wardId: 1,
+        address: 'Đường A',
+        contactName: 'A',
+        contactPhone: '0901',
+      );
+
+      final fakeWorkspaces = <WorkspaceModel>[initialWs];
+      final repo = _FakeWorkspaceRepo(
+        workspaces: fakeWorkspaces,
+        syncSuccessNotifier: syncNotifier,
+      );
+      final bloc = WorkspaceBloc(repository: repo);
+
+      bloc.add(const WorkspaceLoadEvent());
+      await expectLater(
+        bloc.stream,
+        emitsInOrder([
+          const WorkspaceLoading(),
+          isA<WorkspaceLoaded>().having(
+              (s) => s.workspaces.first.name, 'name', 'Nhà trọ cũ'),
+        ]),
+      );
+
+      // Cập nhật dữ liệu mới trong repo (mô phỏng sync hoàn tất)
+      fakeWorkspaces.clear();
+      fakeWorkspaces.add(updatedWs);
+
+      // Đèn syncSuccess bật sáng (true)
+      syncNotifier.value = true;
+
+      // Bloc phải tự động reload và cập nhật 'Nhà trọ mới sau đồng bộ'
+      await expectLater(
+        bloc.stream,
+        emitsInOrder([
+          isA<WorkspaceLoaded>()
+              .having((s) => s.isRefreshing, 'isRefreshing', isTrue),
+          isA<WorkspaceLoaded>().having(
+              (s) => s.workspaces.first.name, 'name', 'Nhà trọ mới sau đồng bộ'),
+        ]),
+      );
+
+      await bloc.close();
+      syncNotifier.dispose();
     });
 
     test('WorkspaceBloc smooth refresh preserves workspaces and sets isRefreshing without WorkspaceLoading', () async {

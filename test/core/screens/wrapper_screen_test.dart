@@ -48,7 +48,7 @@ class _FakeAuthRepo implements IAuthRepository {
       );
 
   @override
-  Future<void> logout() async {}
+  Future<void> logout({bool preservePendingChanges = false}) async {}
 
   @override
   Future<void> resendOtp(String email) async {}

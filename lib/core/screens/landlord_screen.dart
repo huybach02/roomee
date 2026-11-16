@@ -7,6 +7,7 @@ import 'package:roomee/core/localization/app_localizations.dart';
 import 'package:roomee/core/router/app_router.dart';
 import 'package:roomee/core/widgets/app_button.dart';
 import 'package:roomee/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:roomee/features/auth/presentation/logout_helper.dart';
 import 'package:roomee/features/workspace/presentation/screens/workspace_screen.dart';
 import 'package:roomee/utils/constanst.dart';
 
@@ -140,9 +141,7 @@ class _LandlordScreenState extends State<LandlordScreen> {
                   AppButton(
                     text: t('logout'),
                     type: AppButtonType.outline,
-                    onPressed: () {
-                      context.read<AuthBloc>().add(const AuthLogoutEvent());
-                    },
+                    onPressed: () => confirmAndLogout(context),
                   ),
                 ],
               ),

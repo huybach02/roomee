@@ -27,7 +27,7 @@ abstract class IAuthRepository {
   Future<String?> getToken();
   Future<String?> getRefreshToken();
   Future<RefreshTokenResponse> refreshToken();
-  Future<void> logout();
+  Future<void> logout({bool preservePendingChanges = false});
 }
 
 class AuthRepository implements IAuthRepository {
@@ -194,12 +194,15 @@ class AuthRepository implements IAuthRepository {
   }
 
   @override
-  Future<void> logout() async {
+  Future<void> logout({bool preservePendingChanges = false}) async {
     try {
       final user = await _localDataSource.getUser();
       final boxes = cacheBoxes;
       if (user != null && boxes != null) {
-        await boxes.clearAccountData(user.id);
+        await boxes.clearAccountData(
+          user.id,
+          preserveSyncMutations: preservePendingChanges,
+        );
       }
       await _remoteDataSource.logout();
     } catch (_) {

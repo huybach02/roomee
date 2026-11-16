@@ -36,8 +36,19 @@ export interface SyncModuleResult {
   needDelete: string[];
 }
 
+export interface SyncRejectedMutation {
+  id: string;
+  module: string;
+  action: "create" | "update" | "delete";
+  entityId: string;
+  statusCode: number;
+  reason: string;
+  details?: any;
+}
+
 export interface SyncResponseData {
   appliedMutationIds: string[];
+  rejectedMutations: SyncRejectedMutation[];
   entities: Record<string, SyncModuleResult>;
 }
 

@@ -4,11 +4,15 @@ import { Ward } from "../../entities/ward.js";
 import { ProvinceRepository } from "../../repositories/provinceRepository.js";
 import { WardRepository } from "../../repositories/wardRepository.js";
 import { AppDataSource } from "../../config/data-source.js";
+import { AppError } from "../../utils/appError.js";
 import { UserRole } from "../../utils/constanst.js";
+import { t } from "../../utils/i18n.js";
+import type { SyncableService } from "../../utils/syncableService.js";
 import { SyncRegistry } from "./syncRegistry.js";
 import type {
   SyncItemDto,
   SyncModuleResult,
+  SyncRejectedMutation,
   SyncRequestDto,
   SyncResponseData,
 } from "./generalSchema.js";
@@ -40,6 +44,9 @@ export class GeneralService {
     userRole?: string,
   ): Promise<SyncResponseData> {
     const appliedMutationIds: string[] = [];
+    const rejectedMutations: SyncRejectedMutation[] = [];
+    const failedCreateEntityIds = new Set<string>();
+    const appliedEntityIds = new Set<string>();
 
     // 1. Áp dụng các mutations đẩy từ Mobile lên (Push phase)
     if (
@@ -55,19 +62,27 @@ export class GeneralService {
 
         try {
           if (mutation.action === "create" && handler.create) {
-            await handler.create(userId, {
+            const data = this.parseMutationData(handler, "create", {
               ...(mutation.data || {}),
               id: mutation.entityId,
             });
+            await handler.create(userId, data);
             appliedMutationIds.push(mutation.id);
+            appliedEntityIds.add(mutation.entityId);
           } else if (mutation.action === "update" && handler.update) {
+            const data = this.parseMutationData(
+              handler,
+              "update",
+              mutation.data || {},
+            );
             await handler.update(
               mutation.entityId,
               userId,
               userRole || UserRole.LANDLORD,
-              mutation.data || {},
+              data,
             );
             appliedMutationIds.push(mutation.id);
+            appliedEntityIds.add(mutation.entityId);
           } else if (mutation.action === "delete" && handler.delete) {
             await handler.delete(mutation.entityId, userId);
             appliedMutationIds.push(mutation.id);
@@ -78,7 +93,24 @@ export class GeneralService {
           // Vẫn ghi nhận appliedMutationIds để dọn dẹp hàng đợi phía client
           if (err?.code === "23505" || err?.statusCode === 404) {
             appliedMutationIds.push(mutation.id);
+            if (err?.code === "23505") {
+              appliedEntityIds.add(mutation.entityId);
+            }
           } else {
+            if (mutation.action === "create") {
+              failedCreateEntityIds.add(mutation.entityId);
+            }
+            const statusCode =
+              err?.statusCode || (err instanceof AppError ? err.statusCode : 500);
+            rejectedMutations.push({
+              id: mutation.id,
+              module: mutation.module,
+              action: mutation.action,
+              entityId: mutation.entityId,
+              statusCode: typeof statusCode === "number" ? statusCode : 500,
+              reason: err?.message || "Failed to apply mutation",
+              details: err?.errors || null,
+            });
             console.error(
               `[GeneralService.sync] Failed to apply mutation ${mutation.id} (${mutation.module}.${mutation.action}):`,
               err?.message || err,
@@ -134,8 +166,21 @@ export class GeneralService {
       for (const localItem of items) {
         const serverRecord = serverMap.get(localItem.id);
         if (!serverRecord) {
+          // Bảo vệ dữ liệu offline: Nếu id này thuộc về một phiếu create vừa bị từ chối ở Pha 1,
+          // không đưa vào needDelete để tránh máy khách xóa mất bản ghi cục bộ
+          if (failedCreateEntityIds.has(localItem.id)) {
+            continue;
+          }
           needDelete.push(localItem.id);
         } else {
+          // Nếu bản ghi vừa có phiếu create/update được áp dụng thành công ở Pha 1:
+          // Luôn trả về bản mới nhất từ database bất kể giờ client gửi lên là bao nhiêu,
+          // để máy khách nhận được dữ liệu chuẩn xác của máy chủ (bao gồm updatedAt chuẩn của máy chủ).
+          if (appliedEntityIds.has(localItem.id)) {
+            needUpdate.push(serverRecord);
+            continue;
+          }
+
           const serverTime = serverRecord.updatedAt
             ? new Date(serverRecord.updatedAt).getTime()
             : 0;
@@ -154,8 +199,41 @@ export class GeneralService {
 
     return {
       appliedMutationIds,
+      rejectedMutations,
       entities: entitiesResult,
     };
+  }
+
+  /**
+   * Validate dữ liệu mutation bằng schema khai báo trên service sync.
+   * Fail-closed: service có handler mà thiếu schema thì từ chối phiếu.
+   */
+  private parseMutationData(
+    handler: SyncableService<any>,
+    action: "create" | "update",
+    data: Record<string, unknown>,
+  ): any {
+    const schema =
+      action === "create" ? handler.createSchema : handler.updateSchema;
+
+    if (!schema) {
+      throw AppError.badRequest(
+        `Sync module "${handler.syncModuleName}" does not accept ${action} mutations.`,
+      );
+    }
+
+    const parsed = schema.safeParse(data);
+    if (!parsed.success) {
+      throw AppError.badRequest(
+        t("validation.failed"),
+        parsed.error.issues.map((issue) => ({
+          field: issue.path.join(".") || "data",
+          message: issue.message,
+        })),
+      );
+    }
+
+    return parsed.data;
   }
 }
 

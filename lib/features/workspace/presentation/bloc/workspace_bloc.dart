@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:roomee/core/localization/app_localizations.dart';
@@ -13,16 +14,20 @@ part 'workspace_state.dart';
 
 class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
   final IWorkspaceRepository _workspaceRepository;
+  final ValueListenable<bool?>? _syncSuccessNotifier;
 
   ValueListenable<bool>? get isSyncingNotifier =>
       _workspaceRepository.isSyncingNotifier;
 
-  ValueListenable<bool?>? get syncSuccessNotifier =>
-      _workspaceRepository.syncSuccessNotifier;
+  ValueListenable<bool?>? get syncSuccessNotifier => _syncSuccessNotifier;
 
   WorkspaceBloc({IWorkspaceRepository? repository})
-    : _workspaceRepository = repository ?? WorkspaceRepository(),
-      super(const WorkspaceInitial()) {
+      : this._internal(repository ?? WorkspaceRepository());
+
+  WorkspaceBloc._internal(IWorkspaceRepository repository)
+      : _workspaceRepository = repository,
+        _syncSuccessNotifier = repository.syncSuccessNotifier,
+        super(const WorkspaceInitial()) {
     on<WorkspaceLoadEvent>(_onWorkspaceLoadRequested);
     on<WorkspaceLoadMoreEvent>(_onWorkspaceLoadMoreRequested);
     on<WorkspaceCreateEvent>(_onWorkspaceCreateRequested);
@@ -30,6 +35,23 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
     on<WorkspaceDeleteEvent>(_onWorkspaceDeleteRequested);
     on<WorkspaceToggleStatusEvent>(_onWorkspaceToggleStatusRequested);
     on<WorkspaceResetEvent>(_onWorkspaceResetRequested);
+
+    _syncSuccessNotifier?.addListener(_onSyncSuccessChanged);
+    unawaited(_workspaceRepository.syncIfPending());
+  }
+
+  void _onSyncSuccessChanged() {
+    if (_syncSuccessNotifier?.value == true) {
+      if (state is WorkspaceLoaded) {
+        add(const WorkspaceLoadEvent());
+      }
+    }
+  }
+
+  @override
+  Future<void> close() {
+    _syncSuccessNotifier?.removeListener(_onSyncSuccessChanged);
+    return super.close();
   }
 
   void _onWorkspaceResetRequested(
@@ -38,6 +60,12 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
   ) {
     emit(const WorkspaceInitial());
   }
+
+  Future<int> pendingMutationCount() =>
+      _workspaceRepository.pendingMutationCount();
+
+  Future<void> flushPendingMutations() =>
+      _workspaceRepository.flushPendingMutations();
 
   Future<void> _onWorkspaceLoadRequested(
     WorkspaceLoadEvent event,
@@ -58,34 +86,40 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
       final pagination = await _workspaceRepository.getWorkspaces(
         queryParameters: params,
       );
-      emit(WorkspaceLoaded(
-        workspaces: pagination.data,
-        total: pagination.total,
-        page: pagination.page,
-        totalPages: pagination.totalPages,
-        hasReachedMax: pagination.hasReachedMax,
-        isOffline: pagination.source == DataSourceKind.local,
-        cacheIsComplete: pagination.isComplete,
-        lastFetchedAt: pagination.lastFetchedAt,
-        isLoadingMore: false,
-        isRefreshing: false,
-        errorMessage: null,
-      ));
+      emit(
+        WorkspaceLoaded(
+          workspaces: pagination.data,
+          total: pagination.total,
+          page: pagination.page,
+          totalPages: pagination.totalPages,
+          hasReachedMax: pagination.hasReachedMax,
+          isOffline: pagination.source == DataSourceKind.local,
+          cacheIsComplete: pagination.isComplete,
+          lastFetchedAt: pagination.lastFetchedAt,
+          isLoadingMore: false,
+          isRefreshing: false,
+          errorMessage: null,
+        ),
+      );
     } on ApiException catch (e) {
       if (state is WorkspaceLoaded) {
-        emit((state as WorkspaceLoaded).copyWith(
-          isRefreshing: false,
-          errorMessage: e.message,
-        ));
+        emit(
+          (state as WorkspaceLoaded).copyWith(
+            isRefreshing: false,
+            errorMessage: e.message,
+          ),
+        );
       } else {
         emit(WorkspaceFailure(e.message));
       }
     } catch (e) {
       if (state is WorkspaceLoaded) {
-        emit((state as WorkspaceLoaded).copyWith(
-          isRefreshing: false,
-          errorMessage: e.toString(),
-        ));
+        emit(
+          (state as WorkspaceLoaded).copyWith(
+            isRefreshing: false,
+            errorMessage: e.toString(),
+          ),
+        );
       } else {
         emit(WorkspaceFailure(e.toString()));
       }
@@ -125,28 +159,32 @@ class WorkspaceBloc extends Bloc<WorkspaceEvent, WorkspaceState> {
       // Source Guard: Không nối dữ liệu local vào danh sách online nếu rớt mạng khi load more
       if (!currentState.isOffline &&
           pagination.source == DataSourceKind.local) {
-        emit(currentState.copyWith(
-          isLoadingMore: false,
-          errorMessage: t('errors.cannotLoadMoreOffline'),
-        ));
+        emit(
+          currentState.copyWith(
+            isLoadingMore: false,
+            errorMessage: t('errors.cannotLoadMoreOffline'),
+          ),
+        );
         return;
       }
 
       final updatedList = List<WorkspaceModel>.from(currentState.workspaces)
         ..addAll(pagination.data);
 
-      emit(currentState.copyWith(
-        workspaces: updatedList,
-        total: pagination.total,
-        page: pagination.page,
-        totalPages: pagination.totalPages,
-        hasReachedMax: pagination.hasReachedMax,
-        isOffline: pagination.source == DataSourceKind.local,
-        cacheIsComplete: pagination.isComplete,
-        lastFetchedAt: pagination.lastFetchedAt ?? currentState.lastFetchedAt,
-        isLoadingMore: false,
-        errorMessage: null,
-      ));
+      emit(
+        currentState.copyWith(
+          workspaces: updatedList,
+          total: pagination.total,
+          page: pagination.page,
+          totalPages: pagination.totalPages,
+          hasReachedMax: pagination.hasReachedMax,
+          isOffline: pagination.source == DataSourceKind.local,
+          cacheIsComplete: pagination.isComplete,
+          lastFetchedAt: pagination.lastFetchedAt ?? currentState.lastFetchedAt,
+          isLoadingMore: false,
+          errorMessage: null,
+        ),
+      );
     } catch (_) {
       if (identical(state, loadingMoreState)) {
         emit(currentState.copyWith(isLoadingMore: false));

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:roomee/core/models/models.dart';
 import 'package:roomee/core/network/api_exceptions.dart';
+import 'package:roomee/core/network/network_sentinel.dart';
 import 'package:roomee/features/auth/data/auth_dto.dart';
 import 'package:roomee/features/auth/data/auth_repository.dart';
 
@@ -10,10 +11,14 @@ part 'auth_state.dart';
 
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final IAuthRepository _authRepository;
+  final NetworkSentinel _networkSentinel;
 
-  AuthBloc({IAuthRepository? authRepository})
-    : _authRepository = authRepository ?? AuthRepository(),
-      super(const AuthInitial()) {
+  AuthBloc({
+    IAuthRepository? authRepository,
+    NetworkSentinel? networkSentinel,
+  })  : _authRepository = authRepository ?? AuthRepository(),
+        _networkSentinel = networkSentinel ?? NetworkSentinel.instance,
+        super(const AuthInitial()) {
     on<AuthCheckEvent>(_onAuthCheck);
     on<AuthLoginEvent>(_onAuthLogin);
     on<AuthRegisterEvent>(_onAuthRegister);
@@ -36,6 +41,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         final cachedUser = await _authRepository.getCurrentUser();
         final token = await _authRepository.getToken() ?? '';
         final refreshToken = await _authRepository.getRefreshToken();
+        _networkSentinel.triggerSync(force: true);
         emit(
           Authenticated(
             user: cachedUser,
@@ -90,6 +96,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           ),
         );
       } else {
+        _networkSentinel.triggerSync(force: true);
         emit(
           Authenticated(
             user: authData.user,
@@ -148,7 +155,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     emit(const AuthLoading());
     try {
-      await _authRepository.logout();
+      await _authRepository.logout(
+        preservePendingChanges: event.preservePendingChanges,
+      );
     } finally {
       emit(const Unauthenticated());
     }
@@ -164,6 +173,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         email: event.email,
         otp: event.otp,
       );
+      _networkSentinel.triggerSync(force: true);
       emit(
         Authenticated(
           user: authData.user,
@@ -260,6 +270,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         resetToken: event.resetToken,
         newPassword: event.newPassword,
       );
+      _networkSentinel.triggerSync(force: true);
       emit(
         Authenticated(
           user: authData.user,

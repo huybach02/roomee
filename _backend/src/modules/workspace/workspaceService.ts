@@ -9,6 +9,8 @@ import { AppError } from "../../utils/appError.js";
 import { t } from "../../utils/i18n.js";
 import { QueryHelper, FilterSchema } from "../../utils/queryHelper.js";
 import {
+  createWorkspaceSchema,
+  updateWorkspaceSchema,
   CreateWorkspaceDto,
   UpdateWorkspaceDto,
   WorkspaceQueryDto,
@@ -53,6 +55,9 @@ export class WorkspaceService implements SyncableService<Workspace> {
 
   public readonly syncModuleName = "workspaces";
   public readonly syncEntity = Workspace;
+
+  public readonly createSchema = createWorkspaceSchema;
+  public readonly updateSchema = updateWorkspaceSchema;
 
   public create = this.createWorkspace.bind(this);
   public update = this.updateWorkspace.bind(this);
