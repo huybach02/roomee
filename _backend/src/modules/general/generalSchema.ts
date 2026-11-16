@@ -52,3 +52,9 @@ export interface SyncResponseData {
   entities: Record<string, SyncModuleResult>;
 }
 
+export const lookupQuerySchema = z.object({
+  modules: z.string().optional(),
+});
+
+export type LookupQueryDto = z.infer<typeof lookupQuerySchema>;
+

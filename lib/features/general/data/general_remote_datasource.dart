@@ -1,5 +1,6 @@
 import 'package:roomee/core/models/models.dart';
 import 'package:roomee/core/network/network.dart';
+import 'package:roomee/core/offline/contracts/lookup_option.dart';
 import 'package:roomee/core/offline/contracts/sync_dtos.dart';
 
 class GeneralRemoteDataSource extends BaseService {
@@ -44,6 +45,30 @@ class GeneralRemoteDataSource extends BaseService {
       fromJsonT: (json) {
         if (json is! Map) return const SyncResponseDto();
         return SyncResponseDto.fromJson(Map<String, dynamic>.from(json));
+      },
+    );
+  }
+
+  Future<ApiResponse<Map<String, List<LookupOption>>>> getLookups({
+    List<String>? modules,
+  }) {
+    return getDataAll<Map<String, List<LookupOption>>>(
+      '/general/lookups',
+      queryParameters: {
+        if (modules != null && modules.isNotEmpty) 'modules': modules.join(','),
+      },
+      fromJsonT: (json) {
+        if (json is! Map) return const {};
+        final result = <String, List<LookupOption>>{};
+        json.forEach((key, value) {
+          if (value is List) {
+            result[key.toString()] = value
+                .whereType<Map>()
+                .map((e) => LookupOption.fromJson(Map<String, dynamic>.from(e)))
+                .toList();
+          }
+        });
+        return result;
       },
     );
   }

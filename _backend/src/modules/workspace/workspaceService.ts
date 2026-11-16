@@ -15,7 +15,11 @@ import {
   UpdateWorkspaceDto,
   WorkspaceQueryDto,
 } from "./workspaceSchema.js";
-import { syncable, type SyncableService } from "../../utils/syncableService.js";
+import {
+  syncable,
+  type SyncableService,
+  type LookupOptionDto,
+} from "../../utils/syncableService.js";
 import { SelectQueryBuilder } from "typeorm";
 
 const WORKSPACE_SEARCH_FIELDS = [
@@ -80,6 +84,25 @@ export class WorkspaceService implements SyncableService<Workspace> {
       .leftJoinAndSelect("workspaces.user", "user")
       .leftJoinAndSelect("workspaces.province", "province")
       .leftJoinAndSelect("workspaces.ward", "ward");
+  }
+
+  public async getLookupOptions(
+    userId: string,
+    userRole: string,
+  ): Promise<LookupOptionDto[]> {
+    const qb = this.workspaceRepository
+      .createQueryBuilder("workspaces")
+      .select("workspaces.id", "id")
+      .addSelect("workspaces.name", "label");
+
+    this.syncScope(qb, userId, userRole);
+    qb.orderBy("workspaces.name", "ASC");
+
+    const raw = await qb.getRawMany();
+    return raw.map((r) => ({
+      id: r.id,
+      label: r.label,
+    }));
   }
 
   public async getWorkspaces(

@@ -194,15 +194,13 @@ class _ListWorkspaceScreenState extends State<ListWorkspaceScreen> {
         key: 'provinceId',
         title: t('fields.province'),
         loadOptionsAsync: () async {
-          final generalState = context.read<GeneralBloc>().state;
           List<ProvinceModel> provinces = [];
+          final generalState = context.read<GeneralBloc>().state;
           if (generalState is GeneralLoaded &&
               generalState.provinces.isNotEmpty) {
             provinces = generalState.provinces;
           } else {
-            try {
-              provinces = await GeneralRepository().getProvinces();
-            } catch (_) {}
+            provinces = await GeneralRepository().getProvinces();
           }
           return [
             FilterOption(label: t('filterAll'), value: null),

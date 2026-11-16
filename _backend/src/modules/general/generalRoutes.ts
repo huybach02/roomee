@@ -20,6 +20,11 @@ export class GeneralRoutes {
       "/provinces/:provinceId/wards",
       this.generalController.getWardsByProvince,
     );
+    this.router.get(
+      "/lookups",
+      authMiddleware,
+      this.generalController.getLookups,
+    );
     this.router.post(
       "/sync",
       authMiddleware,

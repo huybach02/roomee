@@ -67,7 +67,6 @@ class _WorkspaceFormScreenState extends State<WorkspaceFormScreen> {
     _selectedProvince = ws?.province;
     _selectedWard = ws?.ward;
 
-    context.read<GeneralBloc>().add(const GeneralProvincesLoadEvent());
     if (ws?.provinceId != null && ws!.provinceId > 0) {
       context.read<GeneralBloc>().add(GeneralWardsLoadEvent(ws.provinceId));
     }

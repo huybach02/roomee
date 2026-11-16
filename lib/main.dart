@@ -10,6 +10,7 @@ import 'package:roomee/core/configs/app_theme.dart';
 import 'package:roomee/core/localization/app_localizations.dart';
 import 'package:roomee/core/network/network_sentinel.dart';
 import 'package:roomee/core/network/api_client.dart';
+import 'package:roomee/core/offline/datasource/data_units_preloader.dart';
 import 'package:roomee/core/offline/hive/cache_boxes.dart';
 import 'package:roomee/core/offline/hive/hive_initializer.dart';
 import 'package:roomee/core/offline/hive/sync_mutation_store.dart';
@@ -17,6 +18,7 @@ import 'package:roomee/core/router/app_router.dart';
 import 'package:roomee/core/screens/no_internet_screen.dart';
 import 'package:roomee/features/auth/data/auth_repository.dart';
 import 'package:roomee/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:roomee/features/general/data/general_repository.dart';
 import 'package:roomee/features/general/presentation/bloc/general_bloc.dart';
 import 'package:roomee/features/workspace/data/workspace_repository.dart';
 import 'package:roomee/features/workspace/presentation/bloc/workspace_bloc.dart';
@@ -26,6 +28,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final cacheBoxes = await HiveInitializer.initialize();
   await AppLocalizations.preload();
+  await DataUnitsPreloader.seedIfEmpty(cacheBoxes);
   Locale initialLocale = const Locale('vi');
 
   const storage = FlutterSecureStorage();
@@ -137,7 +140,14 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         if (widget.generalBloc != null)
           BlocProvider.value(value: widget.generalBloc!)
         else
-          BlocProvider(create: (_) => GeneralBloc()),
+          BlocProvider(
+            lazy: false,
+            create: (_) => GeneralBloc(
+              repository: widget.cacheBoxes != null
+                  ? GeneralRepository.fromBoxes(widget.cacheBoxes!)
+                  : GeneralRepository(),
+            )..add(const GeneralProvincesLoadEvent()),
+          ),
         BlocProvider.value(value: _authBloc),
       ],
       child: BlocBuilder<AuthBloc, AuthState>(

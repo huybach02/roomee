@@ -3,7 +3,9 @@ import 'package:roomee/core/contracts/local_crud_datasource.dart';
 import 'package:roomee/core/contracts/remote_crud_datasource.dart';
 import 'package:roomee/core/models/models.dart';
 import 'package:roomee/core/network/network.dart';
+import 'package:roomee/core/offline/contracts/lookup_option.dart';
 import 'package:roomee/core/offline/contracts/sync_dtos.dart';
+import 'package:roomee/core/offline/datasource/lookup_local_datasource.dart';
 import 'package:roomee/core/offline/hive/sync_mutation_store.dart';
 import 'package:roomee/core/offline/query/offline_page.dart';
 import 'package:roomee/core/offline/repository/offline_crud_repository.dart';
@@ -340,6 +342,53 @@ class _FakeSyncMutationStore implements ISyncMutationStore {
     final before = mutations.length;
     mutations.removeWhere((m) => m.createdAt.isBefore(cutoff));
     return before - mutations.length;
+  }
+}
+
+class _FakeLookupLocalDataSource implements ILookupLocalDataSource {
+  final Map<String, List<LookupOption>> optionsByModule = {};
+
+  @override
+  Future<List<LookupOption>> getOptions({
+    required String accountId,
+    required String module,
+    dynamic parentId,
+  }) async =>
+      optionsByModule[module] ?? [];
+
+  @override
+  Future<void> saveOptions({
+    required String accountId,
+    required String module,
+    required List<LookupOption> options,
+  }) async {
+    optionsByModule[module] = List.from(options);
+  }
+
+  @override
+  Future<void> addOrUpdateOption({
+    required String accountId,
+    required String module,
+    required LookupOption option,
+  }) async {
+    final list = optionsByModule.putIfAbsent(module, () => []);
+    list.removeWhere((o) => o.id.toString() == option.id.toString());
+    list.add(option);
+  }
+
+  @override
+  Future<void> removeOption({
+    required String accountId,
+    required String module,
+    required dynamic id,
+  }) async {
+    final list = optionsByModule[module];
+    list?.removeWhere((o) => o.id.toString() == id.toString());
+  }
+
+  @override
+  Future<void> clearAccount({required String accountId}) async {
+    optionsByModule.clear();
   }
 }
 
@@ -1288,6 +1337,84 @@ void main() {
       expect(fakeGeneral.syncCallCount, 1);
       final remaining = await repo.pendingMutationCount();
       expect(remaining, 0);
+    });
+
+    test(
+        '_reconcile updates lookupLocalDataSource with safeNeedDelete and safeNeedUpdate',
+        () async {
+      final fakeGeneral = _FakeGeneralRemote();
+      fakeGeneral.syncResponse = const ApiResponse(
+        success: true,
+        message: 'OK',
+        data: SyncResponseDto(
+          appliedMutationIds: [],
+          entities: {
+            'fake_items': SyncResultDto(
+              needDelete: ['item-del'],
+              needUpdate: [
+                {'id': 'item-1', 'name': 'Updated via Sync'},
+              ],
+            ),
+          },
+        ),
+      );
+
+      final lookupLocal = _FakeLookupLocalDataSource();
+      lookupLocal.optionsByModule['fake_items'] = [
+        const LookupOption(id: 'item-del', label: 'Item To Delete'),
+        const LookupOption(id: 'item-1', label: 'Old Name'),
+      ];
+
+      local.syncItemsToReturn = [
+        const SyncItemDto(id: 'item-1', updatedAt: '2026-01-01T00:00:00Z'),
+      ];
+
+      final repo = OfflineCrudRepository(
+        remote: remote,
+        local: local,
+        getAccountId: () => 'acc-1',
+        generalRemote: fakeGeneral,
+        syncMutationStore: mutationStore,
+        lookupLocalDataSource: lookupLocal,
+        toLookupOption: (item) => LookupOption(id: item.id, label: item.name),
+      );
+
+      await repo.syncNow();
+
+      final options = lookupLocal.optionsByModule['fake_items']!;
+      expect(options.any((o) => o.id == 'item-del'), isFalse);
+      final updatedOption = options.firstWhere((o) => o.id == 'item-1');
+      expect(updatedOption.label, 'Updated via Sync');
+    });
+
+    test('create, update, deleteById update lookupLocalDataSource', () async {
+      final lookupLocal = _FakeLookupLocalDataSource();
+      final repo = OfflineCrudRepository(
+        remote: remote,
+        local: local,
+        getAccountId: () => 'acc-1',
+        syncMutationStore: mutationStore,
+        lookupLocalDataSource: lookupLocal,
+        toLookupOption: (item) => LookupOption(id: item.id, label: item.name),
+      );
+
+      // Create
+      final created = await repo.create({'name': 'Created Item'});
+      expect(created.name, 'Created Item');
+      var options = lookupLocal.optionsByModule['fake_items']!;
+      expect(options.length, 1);
+      expect(options.first.label, 'Created Item');
+
+      // Update
+      await repo.update('new-id', {'name': 'Updated Item'});
+      options = lookupLocal.optionsByModule['fake_items']!;
+      expect(options.length, 1);
+      expect(options.first.label, 'Updated Item');
+
+      // Delete
+      await repo.deleteById('new-id');
+      options = lookupLocal.optionsByModule['fake_items']!;
+      expect(options.isEmpty, isTrue);
     });
   });
 }

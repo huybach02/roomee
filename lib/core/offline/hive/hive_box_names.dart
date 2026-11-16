@@ -5,4 +5,5 @@ abstract final class HiveBoxNames {
   static const wards = 'cache_wards';
   static const metadata = 'cache_metadata';
   static const syncMutations = 'cache_sync_mutations';
+  static const lookups = 'cache_lookups';
 }

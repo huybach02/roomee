@@ -7,7 +7,10 @@ import { AppDataSource } from "../../config/data-source.js";
 import { AppError } from "../../utils/appError.js";
 import { UserRole } from "../../utils/constanst.js";
 import { t } from "../../utils/i18n.js";
-import type { SyncableService } from "../../utils/syncableService.js";
+import type {
+  SyncableService,
+  LookupOptionDto,
+} from "../../utils/syncableService.js";
 import { SyncRegistry } from "./syncRegistry.js";
 import type {
   SyncItemDto,
@@ -36,6 +39,42 @@ export class GeneralService {
       where: { provinceId },
       order: { fullName: "ASC" },
     });
+  }
+
+  public async getLookups(
+    userId: string,
+    userRole: string,
+    requestedModules?: string[],
+  ): Promise<Record<string, LookupOptionDto[]>> {
+    const result: Record<string, LookupOptionDto[]> = {};
+    const services = this.syncRegistry.getAllServices();
+
+    for (const service of services) {
+      if (
+        requestedModules &&
+        requestedModules.length > 0 &&
+        !requestedModules.includes(service.syncModuleName)
+      ) {
+        continue;
+      }
+
+      if (typeof service.getLookupOptions === "function") {
+        try {
+          result[service.syncModuleName] = await service.getLookupOptions(
+            userId,
+            userRole,
+          );
+        } catch (err) {
+          console.error(
+            `[GeneralService.getLookups] Failed to get lookup options for ${service.syncModuleName}:`,
+            err,
+          );
+          result[service.syncModuleName] = [];
+        }
+      }
+    }
+
+    return result;
   }
 
   public async sync(

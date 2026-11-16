@@ -49,4 +49,9 @@ export class SyncRegistry {
     this.ensureInitialized();
     return this.services.get(moduleName);
   }
+
+  public getAllServices(): SyncableService<any>[] {
+    this.ensureInitialized();
+    return Array.from(this.services.values());
+  }
 }

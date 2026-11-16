@@ -256,6 +256,11 @@ _backend/
   - Endpoint `POST /api/v1/general/sync` nhận `{ mutations: [...], entities: {...} }` và trả về `{ appliedMutationIds: [...], entities: {...} }`:
     - **Pha 1 (Push mutations):** Duyệt các mutation gửi từ client lên (`create`, `update`, `delete`), gọi trực tiếp service tương ứng. Xử lý an toàn tính bất biến (idempotency): nếu gặp lỗi trùng ID (code `23505`) hoặc record không còn (code `404`) do client retry thì vẫn ghi nhận vào `appliedMutationIds` để client dọn dẹp hàng đợi.
     - **Pha 2 (Pull reconcile):** So sánh `updatedAt` để phát hiện dữ liệu cần cập nhật (`needUpdate`) hoặc cần xóa (`needDelete`).
+- **Cơ chế Dữ liệu Nhẹ (Lightweight Data / Lookup Options):**
+  - Mọi service `@syncable()` nên triển khai phương thức `getLookupOptions(userId: string, userRole: string): Promise<LookupOptionDto[]>` (`src/utils/syncableService.ts`).
+  - DTO chuẩn: `LookupOptionDto { id: string | number, label: string, parentId?: string | number | null, extra?: Record<string, any> }`.
+  - Chỉ dùng `createQueryBuilder` select đúng các cột tối thiểu (`workspaces.id` as `id`, `workspaces.name` as `label`), áp dụng `syncScope`, sắp xếp `orderBy(..., 'ASC')`. Tuyệt đối không kéo quan hệ hay dữ liệu nặng khi chỉ phục vụ dropdown/select liên kết giữa các module.
+  - Endpoint gom nhóm tập trung: `GET /api/v1/general/lookups?modules=workspaces,rooms` (`generalRoutes.ts`), validate query params qua `lookupQuerySchema` (`generalSchema.ts`), chuyển tiếp vào `generalService.getLookups(userId, userRole, requestedModules)`.
 
 ## 4. Flutter (root `lib/`)
 
@@ -286,12 +291,12 @@ lib/
       network_sentinel.dart      # Lính canh mạng trung tâm: connectivity_plus + probe /api/health, auto 2-way sync
     offline/                     # Hạ tầng Offline Mode & 2-Way Sync dùng chung
       codecs/                    # Codec thực thể lõi (province, ward, user)
-      contracts/                 # app_uuid, entity_codec, entity_store, relation_adapter, sync_dtos
-      datasource/                # base_local_datasource.dart
+      contracts/                 # app_uuid, entity_codec, entity_store, lookup_option, relation_adapter, sync_dtos
+      datasource/                # base_local_datasource.dart, data_units_preloader.dart, lookup_local_datasource.dart
       hive/                      # cache_boxes, hive_cipher_manager, hive_initializer, hive_entity_store, sync_mutation_store
       policy/                    # offline_error_policy.dart (lọc lỗi mạng cho phép fallback)
       query/                     # local_query_engine, local_query_schema, offline_page, search_normalizer
-      repository/                # offline_crud_repository.dart (điều phối Remote + Local + Policy + 2-Way Sync)
+      repository/                # offline_crud_repository.dart, lookup_repository.dart
     router/
       app_router.dart            # Định nghĩa AppRoutes, hàm createAppRouter() (initialLocation: AppRoutes.wrapper)
     screens/                     # Màn hình gốc & điều phối luồng người dùng
@@ -312,6 +317,7 @@ lib/
       app_card_select.dart       # AppCardSelect (thẻ chọn vai trò/loại có icon và radio check)
       app_date_picker_field.dart # AppDatePickerField (chọn ngày tháng hiển thị theo định dạng)
       app_dropdown_field.dart    # AppDropdownField (chọn danh mục bottom sheet có search)
+      lookup_dropdown_field.dart # LookupDropdownField (chọn lựa chọn dữ liệu nhẹ theo module)
       app_notification.dart      # AppNotification (thông báo SnackBar chuẩn Design System)
       app_mini_banner.dart       # AppMiniBanner (banner nhỏ đa năng: info, warning, success, error, syncing, offline, syncStatus)
       app_segmented_select.dart  # AppSegmentedSelect (chọn nút gạt đơn hoặc .multiple)
@@ -324,6 +330,7 @@ lib/
     constanst.dart               # Hằng số frontend (apiBaseUrl, logoAssetPath, UserRole, Gender)
     function_helper.dart         # Helper chung
 assets/
+  data/                          # data_units.json (dữ liệu đơn vị hành chính tỉnh & phường nạp sẵn)
   images/                        # Logo, icon, ảnh tĩnh
   translations/                  # vi.json, en.json (từ điển dịch cho app mobile)
 test/
@@ -352,6 +359,7 @@ test/
   - Lựa chọn vai trò/thẻ: `AppCardSelect`
   - Chọn ngày: `AppDatePickerField`
   - Chọn danh mục/dropdown: `AppDropdownField`
+  - Chọn danh mục dữ liệu nhẹ liên kết module: `LookupDropdownField` (bọc `AppDropdownField`, nạp `LookupOption` bất đồng bộ từ `LookupRepository`)
   - Lựa chọn phân đoạn/segmented: `AppSegmentedSelect`
   - Thông báo nổi: `AppNotification` (`.showSuccess`, `.showError`, `.showWarning`, `.showInfo`)
   - Banner nhỏ thông báo đa năng: `AppMiniBanner` (`.info`, `.warning`, `.success`, `.error`, `.syncing`, `.offline` và `AppMiniBanner.syncStatus`)
@@ -463,6 +471,31 @@ Hệ thống sử dụng kiến trúc **Generic Offline-First Boilerplate** đ�
     - **Quy tắc Nâng cấp Model & Cache Version (`cacheFormatVersion`):**
       - Mặc định khi thêm/sửa trường trong Model: Bắt buộc viết `fromJson` và `EntityCodec` có tính tương thích ngược (dùng nullable `?`, fallback mặc định `??`) để tránh làm hỏng cache cũ.
       - **Chỉ tăng `cacheFormatVersion` (từ 1 lên 2, 3...)** khi có Breaking Change: đổi kiểu dữ liệu trường có sẵn, thay đổi cấu trúc quan hệ con, hoặc thêm trường bắt buộc không thể fallback. Khi đó hệ thống sẽ tự động purge cache cũ an toàn qua `_checkFormatVersion`.
+  - **Cơ chế Dữ liệu Nhẹ (Lightweight Data / Lookup Options):**
+    - **Mục đích:** Tối ưu hóa triệt để khi chỉ cần hiển thị danh sách lựa chọn trong Dropdown/Select (chọn Workspace khi tạo Phòng, chọn Phòng khi tạo Hợp đồng, chọn Người thuê,...). Tránh tình trạng over-fetching tải cả Model nặng (chứa quan hệ, kiểm toán, mô tả dài).
+    - **DTO & Codec (`LookupOption`):**
+      - Định nghĩa tại `lib/core/offline/contracts/lookup_option.dart`: `id` (`dynamic`), `label` (`String`), `parentId` (`dynamic`), `extra` (`Map<String, dynamic>?`).
+      - Parse an toàn trường `extra`: `json['extra'] is Map ? Map<String, dynamic>.from(json['extra'] as Map) : null` để không bị mất dữ liệu khi đọc từ Hive `Map<dynamic, dynamic>`.
+    - **Lưu trữ & Bảo mật (`cache_lookups`):**
+      - Khai báo `HiveBoxNames.lookups = 'cache_lookups'`, cấu hình mã hóa AES-256 (`HiveBoxNames.lookups: true` trong `CacheBoxes.configs`).
+      - Lưu theo key `account:$accountId:lookups:$module`. Cơ chế `clearAccountData` lúc đăng xuất tự động dọn sạch dữ liệu lookup theo prefix `account:$accountId:`.
+      - Trong `LookupLocalDataSource.addOrUpdateOption`: luôn tự động sắp xếp lại theo thứ tự chữ cái A-Z (`updated.sort((a, b) => a.label.compareTo(b.label))`).
+    - **Chiến lược Stale-While-Revalidate (`LookupRepository`):**
+      - Nếu cache đã có dữ liệu: trả về ngay lập tức (0ms) cho UI, đồng thời kích hoạt `_refreshModule` ngầm nếu có mạng.
+      - Nếu cache rỗng hoặc ép làm mới (`forceRefresh: true`): gọi API `GET /api/v1/general/lookups?modules=...`, lưu vào local cache rồi trả về.
+    - **Tự động Đồng bộ hóa từ CRUD & 2-Way Sync (`OfflineCrudRepository`):**
+      - `OfflineCrudRepository` nhận `lookupLocalDataSource` và callback chuyển đổi `toLookupOption: (T entity) => LookupOption(...)`.
+      - Mọi thao tác Create/Update/Delete (kể cả khi tạo offline trong `SyncMutationStore`, hủy phiếu `discardFailedMutation`, hay khi đối soát 2 chiều `applySync`) đều tự động cập nhật / xóa `LookupOption` trong `cache_lookups` mà không cần viết code lặp lại ở từng module.
+    - **Giao diện chuẩn hóa (`LookupDropdownField`):**
+      - Component `LookupDropdownField` (`lib/core/widgets/lookup_dropdown_field.dart`) bọc `AppDropdownField`, nhận `lookupRepository`, `accountId`, `module`, tự động nạp danh sách và hiển thị bottom sheet tìm kiếm.
+  - **Cơ chế Nạp sẵn Dữ liệu Tĩnh Toàn Cục (Đơn vị Hành chính Tỉnh/Thành & Phường/Xã):**
+    - Tỉnh/Thành và Phường/Xã được đóng gói 100% trong `assets/data/data_units.json` (34 tỉnh, 3321 xã/phường).
+    - Khởi tạo nạp trước tại `main.dart` qua `await DataUnitsPreloader.seedIfEmpty(cacheBoxes)`. Dữ liệu được nạp vào `cache_provinces` và `cache_wards` với `accountId: 'global'`, quản lý theo versioning trong `cache_metadata` (`data_units_version`), 0ms fast-path khi version không đổi.
+    - **Quy tắc bắt buộc tại `main.dart`:** `BlocProvider<GeneralBloc>` phải đặt **`lazy: false`** và `..add(const GeneralProvincesLoadEvent())` để khởi tạo và nạp sẵn 34 tỉnh/thành lên RAM State ngay khi app mở, triệt tiêu hoàn toàn Race Condition khi người dùng mở bộ lọc/form lần đầu.
+    - **Cơ chế Bulletproof Fallback trong `GeneralRepository`:** `GeneralRepository` tự động liên kết tới Box mở sẵn (`_effectiveProvinceStore`), loại bỏ hoàn toàn request mạng cho danh mục tỉnh/phường.
+    - **Quy chuẩn sử dụng trên Màn hình/Form:**
+      - Tỉnh/Thành: Đọc trực tiếp từ `GeneralBloc.state.provinces` (0ms), kết hợp fallback an toàn `await GeneralRepository().getProvinces()`. Không dispatch lại event trong `initState`.
+      - Phường/Xã: Nạp động theo nhu cầu người dùng chọn Tỉnh qua `context.read<GeneralBloc>().add(GeneralWardsLoadEvent(provinceId))`.
 
 #### 2. Quy trình 5 bước chuẩn khi cấu hình Offline Mode cho 1 Module mới (ví dụ: `Room`):
 1. **Bước 1 — Khai báo tên và cấu hình Box (Chỉ 1 dòng duy nhất):**
@@ -476,9 +509,13 @@ Hệ thống sử dụng kiến trúc **Generic Offline-First Boilerplate** đ�
 4. **Bước 4 — Tạo LocalDataSource kế thừa `BaseLocalDataSource` (~25 dòng code):**
    - Tạo `class RoomLocalDataSource extends BaseLocalDataSource<RoomModel, String>` chỉ cần gọi `super` với `entityName: 'rooms'` (**bắt buộc dùng danh từ số nhiều** khớp với `syncModuleName` phía BE), `queryEngine`, `querySchema`, và factory `.fromBoxes(boxes)`.
    - Nếu module có quan hệ cha-con (ví dụ: Room thuộc Workspace), tạo thêm `RoomRelationAdapter` kế thừa `RelationAdapter<RoomModel>` để xử lý tách và ghép quan hệ (khai báo `syncableStores` với các key số nhiều: `{'rooms': roomStore}`).
-5. **Bước 5 — Bọc `OfflineCrudRepository` trong Repository:**
-   - Trong `RoomRepository`, inject `OfflineCrudRepository<RoomModel, String>` kết hợp `RoomRemoteDataSource` (implements `RemoteCrudDataSource`), `RoomLocalDataSource`, `syncMutationStore: HiveSyncMutationStore(box: boxes[HiveBoxNames.syncMutations])` và `networkSentinel: networkSentinel ?? NetworkSentinel.instance`.
-   - Phía Backend: Đặt `@syncable()` trên `RoomService` và khai báo alias 3 hàm nghiệp vụ chuẩn: `create = this.createRoom.bind(this)`, `update = this.updateRoom.bind(this)`, `delete = this.deleteRoom.bind(this)`.
+5. **Bước 5 — Bọc `OfflineCrudRepository` trong Repository & Tích hợp Dữ liệu Nhẹ (Lookups):**
+   - Trong `<module>Repository`:
+     - Inject `OfflineCrudRepository<Model, ID>` kết hợp `RemoteDataSource`, `LocalDataSource`, `syncMutationStore`, `networkSentinel: networkSentinel ?? NetworkSentinel.instance`.
+     - **Tích hợp Lookup:** Truyền thêm `lookupLocalDataSource: LookupLocalDataSource.fromBoxes(boxes)` và `toLookupOption: (item) => LookupOption(id: item.id, label: item.name)` để tự động đồng bộ hóa sang `cache_lookups`.
+   - Phía Backend:
+     - Đặt `@syncable()` trên `<module>Service` và khai báo alias 3 hàm nghiệp vụ chuẩn: `create = this.create<Entity>.bind(this)`, `update = this.update<Entity>.bind(this)`, `delete = this.delete<Entity>.bind(this)`.
+     - **Tích hợp Lookup:** Khai báo phương thức `getLookupOptions(userId, userRole): Promise<LookupOptionDto[]>` sử dụng QueryBuilder chỉ select `id` và `label`, có `syncScope` và `orderBy(..., 'ASC')`.
 
 ## 5. Workflow & Definition of Done
 
@@ -507,6 +544,10 @@ Hệ thống sử dụng kiến trúc **Generic Offline-First Boilerplate** đ�
 - [ ] Truy vấn database ưu tiên dùng `createQueryBuilder` (trừ các query cực kỳ đơn giản như `findOneBy`).
 - [ ] Backend response chuẩn theo `CustomResponse.success(res, data, message)` / `CustomResponse.error(res, message, errors)`.
 - [ ] Định danh resource đồng bộ (sync) thống nhất chuẩn số nhiều (`workspaces`, `users`,...) ở cả BE (`syncModuleName`, QueryBuilder alias) và FE (`entityName`, `syncableStores`).
+- [ ] Module có hỗ trợ dữ liệu nhẹ (Lookups): BE khai báo `getLookupOptions`, FE inject `lookupLocalDataSource` và `toLookupOption` vào `OfflineCrudRepository`.
+- [ ] Màn hình chọn quan hệ giữa các module ưu tiên sử dụng `LookupDropdownField` thay vì nạp toàn bộ Model phức tạp.
+- [ ] `BlocProvider<GeneralBloc>` tại `main.dart` giữ cờ `lazy: false` và `..add(const GeneralProvincesLoadEvent())` để nạp sẵn danh mục tỉnh lúc khởi động.
+- [ ] Danh mục Tỉnh/Thành đọc trực tiếp từ `GeneralBloc.state.provinces` (hoặc fallback `GeneralRepository`), Phường/Xã nạp động qua `GeneralWardsLoadEvent(provinceId)`.
 - [ ] CRUD offline lưu mutation vào `SyncMutationStore` với coalescing, khóa chính UUID v4 sinh phía client (`AppUuid.v4()`).
 - [ ] Mọi nút Đăng xuất thủ công đi qua `confirmAndLogout` (thử `flushPendingMutations` trước, thất bại thì hỏi Giữ/Xoá); đăng xuất tự động do hết phiên dùng `AuthLogoutEvent(preservePendingChanges: true)`.
 - [ ] Khi sửa Model mobile: bảo đảm tương thích ngược cho `fromJson`/`EntityCodec` (fallback/nullable) hoặc nâng `cacheFormatVersion` nếu có breaking change.

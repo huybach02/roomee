@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:roomee/core/models/models.dart';
 import 'package:roomee/core/network/network_sentinel.dart';
+import 'package:roomee/core/offline/contracts/lookup_option.dart';
+import 'package:roomee/core/offline/datasource/lookup_local_datasource.dart';
 import 'package:roomee/core/offline/hive/cache_boxes.dart';
 import 'package:roomee/core/offline/hive/sync_mutation_store.dart';
 import 'package:roomee/core/offline/query/offline_page.dart';
@@ -37,6 +39,7 @@ class WorkspaceRepository implements IWorkspaceRepository {
     AuthLocalDataSource? authLocalDataSource,
     ISyncMutationStore? syncMutationStore,
     NetworkSentinel? networkSentinel,
+    ILookupLocalDataSource? lookupLocalDataSource,
     OfflineCrudRepository<WorkspaceModel, String>? crudRepository,
   }) : _crudRepository =
            crudRepository ??
@@ -45,6 +48,8 @@ class WorkspaceRepository implements IWorkspaceRepository {
              local: localDataSource,
              syncMutationStore: syncMutationStore,
              networkSentinel: networkSentinel,
+             lookupLocalDataSource: lookupLocalDataSource,
+             toLookupOption: (ws) => LookupOption(id: ws.id, label: ws.name),
              getAccountId: () async {
                final auth = authLocalDataSource ?? AuthLocalDataSource();
                final user = await auth.getUser();
@@ -66,6 +71,7 @@ class WorkspaceRepository implements IWorkspaceRepository {
         box: boxes[HiveBoxNames.syncMutations],
       ),
       networkSentinel: networkSentinel ?? NetworkSentinel.instance,
+      lookupLocalDataSource: LookupLocalDataSource.fromBoxes(boxes),
     );
   }
 

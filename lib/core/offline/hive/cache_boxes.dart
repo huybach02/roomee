@@ -14,6 +14,7 @@ class CacheBoxes {
     HiveBoxNames.wards: false,
     HiveBoxNames.metadata: false,
     HiveBoxNames.syncMutations: true,
+    HiveBoxNames.lookups: true,
   };
 
   final Map<String, Box<Map>> _boxes;

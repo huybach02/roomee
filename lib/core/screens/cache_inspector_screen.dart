@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hive_ce_flutter/hive_flutter.dart';
 import 'package:roomee/core/configs/app_theme.dart';
+import 'package:roomee/core/offline/datasource/data_units_preloader.dart';
 import 'package:roomee/core/offline/hive/cache_boxes.dart';
 import 'package:roomee/core/widgets/app_notification.dart';
 
@@ -29,6 +30,7 @@ class _CacheInspectorScreenState extends State<CacheInspectorScreen> {
     HiveBoxNames.metadata,
     HiveBoxNames.provinces,
     HiveBoxNames.wards,
+    HiveBoxNames.lookups,
   ];
 
   @override
@@ -165,7 +167,13 @@ class _CacheInspectorScreenState extends State<CacheInspectorScreen> {
           IconButton(
             icon: const Icon(Icons.refresh_rounded, color: DefaultColors.primary),
             tooltip: 'Tải lại',
-            onPressed: () => setState(() {}),
+            onPressed: () async {
+              try {
+                final cacheBoxes = context.read<CacheBoxes>();
+                await DataUnitsPreloader.seedIfEmpty(cacheBoxes, force: true);
+              } catch (_) {}
+              setState(() {});
+            },
           ),
           IconButton(
             icon: const Icon(Icons.delete_sweep_outlined, color: Colors.red),

@@ -8,7 +8,9 @@ import 'package:roomee/core/localization/app_localizations.dart';
 import 'package:roomee/core/network/api_exceptions.dart';
 import 'package:roomee/core/network/network_sentinel.dart';
 import 'package:roomee/core/offline/contracts/app_uuid.dart';
+import 'package:roomee/core/offline/contracts/lookup_option.dart';
 import 'package:roomee/core/offline/contracts/sync_dtos.dart';
+import 'package:roomee/core/offline/datasource/lookup_local_datasource.dart';
 import 'package:roomee/core/offline/hive/sync_mutation_store.dart';
 import 'package:roomee/core/offline/policy/offline_error_policy.dart';
 import 'package:roomee/core/offline/query/offline_page.dart';
@@ -24,6 +26,8 @@ class OfflineCrudRepository<T, ID> {
   final Duration syncTimeout;
   final ISyncMutationStore? syncMutationStore;
   final NetworkSentinel? networkSentinel;
+  final ILookupLocalDataSource? lookupLocalDataSource;
+  final LookupOption Function(T entity)? toLookupOption;
   final ValueNotifier<bool> isSyncingNotifier = ValueNotifier<bool>(false);
   final ValueNotifier<bool?> syncSuccessNotifier = ValueNotifier<bool?>(null);
   final ValueNotifier<int> failedCountNotifier = ValueNotifier<int>(0);
@@ -49,6 +53,8 @@ class OfflineCrudRepository<T, ID> {
     this.reconcileCooldown = const Duration(seconds: 15),
     this.syncTimeout = const Duration(seconds: 10),
     this.networkSentinel,
+    this.lookupLocalDataSource,
+    this.toLookupOption,
   }) : generalRemote = generalRemote ?? GeneralRemoteDataSource() {
     networkSentinel?.registerSyncCallback(_onNetworkRestored);
   }
@@ -224,6 +230,13 @@ class OfflineCrudRepository<T, ID> {
           final accountId = await getAccountId!();
           if (accountId != null && accountId.isNotEmpty) {
             await local!.cacheCreated(accountId: accountId, item: responseData);
+            if (lookupLocalDataSource != null && toLookupOption != null) {
+              await lookupLocalDataSource!.addOrUpdateOption(
+                accountId: accountId,
+                module: local!.entityName,
+                option: toLookupOption!(responseData),
+              );
+            }
           }
         } catch (_) {}
       }
@@ -255,6 +268,16 @@ class OfflineCrudRepository<T, ID> {
       final offlineItem = local!.itemFromJson(offlineData);
       await local!.cacheCreated(accountId: accountId, item: offlineItem);
 
+      if (lookupLocalDataSource != null && toLookupOption != null) {
+        try {
+          await lookupLocalDataSource!.addOrUpdateOption(
+            accountId: accountId,
+            module: local!.entityName,
+            option: toLookupOption!(offlineItem),
+          );
+        } catch (_) {}
+      }
+
       if (syncMutationStore != null) {
         await syncMutationStore!.addMutation(
           accountId: accountId,
@@ -285,6 +308,13 @@ class OfflineCrudRepository<T, ID> {
           final accountId = await getAccountId!();
           if (accountId != null && accountId.isNotEmpty) {
             await local!.cacheUpdated(accountId: accountId, item: responseData);
+            if (lookupLocalDataSource != null && toLookupOption != null) {
+              await lookupLocalDataSource!.addOrUpdateOption(
+                accountId: accountId,
+                module: local!.entityName,
+                option: toLookupOption!(responseData),
+              );
+            }
           }
         } catch (_) {}
       }
@@ -327,6 +357,16 @@ class OfflineCrudRepository<T, ID> {
       final updatedItem = local!.itemFromJson(updatedData);
       await local!.cacheUpdated(accountId: accountId, item: updatedItem);
 
+      if (lookupLocalDataSource != null && toLookupOption != null) {
+        try {
+          await lookupLocalDataSource!.addOrUpdateOption(
+            accountId: accountId,
+            module: local!.entityName,
+            option: toLookupOption!(updatedItem),
+          );
+        } catch (_) {}
+      }
+
       if (syncMutationStore != null) {
         await syncMutationStore!.addMutation(
           accountId: accountId,
@@ -353,6 +393,13 @@ class OfflineCrudRepository<T, ID> {
           final accountId = await getAccountId!();
           if (accountId != null && accountId.isNotEmpty) {
             await local!.remove(accountId: accountId, id: id);
+            if (lookupLocalDataSource != null) {
+              await lookupLocalDataSource!.removeOption(
+                accountId: accountId,
+                module: local!.entityName,
+                id: id,
+              );
+            }
           }
         } catch (_) {}
       }
@@ -370,6 +417,15 @@ class OfflineCrudRepository<T, ID> {
 
       // Xử lý xóa khi offline
       await local!.remove(accountId: accountId, id: id);
+      if (lookupLocalDataSource != null) {
+        try {
+          await lookupLocalDataSource!.removeOption(
+            accountId: accountId,
+            module: local!.entityName,
+            id: id,
+          );
+        } catch (_) {}
+      }
 
       if (syncMutationStore != null) {
         await syncMutationStore!.addMutation(
@@ -468,6 +524,15 @@ class OfflineCrudRepository<T, ID> {
         target.module == local!.entityName &&
         target.entityId is ID) {
       await local!.remove(accountId: accountId, id: target.entityId as ID);
+      if (lookupLocalDataSource != null) {
+        try {
+          await lookupLocalDataSource!.removeOption(
+            accountId: accountId,
+            module: local!.entityName,
+            id: target.entityId,
+          );
+        } catch (_) {}
+      }
     }
 
     final remainingFailed = await failedMutationCount();
@@ -730,6 +795,30 @@ class OfflineCrudRepository<T, ID> {
             accountId: accountId,
             result: safeMainResult,
           );
+
+          if (lookupLocalDataSource != null) {
+            for (final id in safeNeedDelete) {
+              try {
+                await lookupLocalDataSource!.removeOption(
+                  accountId: accountId,
+                  module: local!.entityName,
+                  id: id,
+                );
+              } catch (_) {}
+            }
+            if (toLookupOption != null) {
+              for (final raw in safeNeedUpdate) {
+                try {
+                  final item = local!.itemFromJson(raw);
+                  await lookupLocalDataSource!.addOrUpdateOption(
+                    accountId: accountId,
+                    module: local!.entityName,
+                    option: toLookupOption!(item),
+                  );
+                } catch (_) {}
+              }
+            }
+          }
         }
 
         final safeResults = <String, SyncResultDto>{};

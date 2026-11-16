@@ -4,6 +4,13 @@ import type { RelationJoin } from "./relationJoin.js";
 
 export { syncable } from "../modules/general/syncRegistry.js";
 
+export interface LookupOptionDto {
+  id: string | number;
+  label: string;
+  parentId?: string | number | null;
+  extra?: Record<string, any>;
+}
+
 export interface SyncableService<Entity extends ObjectLiteral>
   extends Partial<RelationJoin<Entity>> {
   /** Tên định danh chuẩn số nhiều của resource khi sync (ví dụ: "workspaces", "users", "rooms") */
@@ -46,4 +53,10 @@ export interface SyncableService<Entity extends ObjectLiteral>
 
   /** Phương thức xóa thực thể khi sync (tùy chọn) */
   delete?(id: string, userId: string): Promise<any>;
+
+  /** Phương thức lấy danh sách lựa chọn nhẹ (id + label) cho select dropdown */
+  getLookupOptions?(
+    userId: string,
+    userRole: string,
+  ): Promise<LookupOptionDto[]>;
 }
