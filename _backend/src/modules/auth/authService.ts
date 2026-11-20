@@ -20,6 +20,7 @@ import {
   REFRESH_TOKEN_GRACE_PERIOD_MS,
   TTL_ACCESS_TOKEN_SECONDS,
   TTL_OTP_SECONDS,
+  TTL_REFRESH_TOKEN_REPLAY_SECONDS,
   UserRole,
 } from "../../utils/constanst.js";
 import { MailQueue } from "../../queues/mail/mailQueue.js";
@@ -441,8 +442,8 @@ export class AuthService implements SyncableService<User> {
     user.isEmailVerified = true;
     await this.userRepository.save(user);
 
-    // 4. Thu hồi toàn bộ session đăng nhập cũ của user
-    await this.refreshTokenRepository.revokeAllUserSessions(user.id);
+    // 4. Thu hồi toàn bộ session đăng nhập cũ của user và blacklist ngay lập tức trên Redis
+    await this.revokeAllUserSessionsAndBlacklist(user.id);
 
     // 5. Xóa resetToken khỏi Redis & DB (dùng 1 lần duy nhất)
     await this.cacheService.del(tokenKey);
@@ -545,8 +546,12 @@ export class AuthService implements SyncableService<User> {
     }
 
     if (session.isRevoked) {
-      // Session đã bị thu hồi trước đó -> Thu hồi toàn bộ session để bảo vệ tài khoản
-      await this.refreshTokenRepository.revokeAllUserSessions(session.userId);
+      // Session đã bị thu hồi trước đó -> Thu hồi toàn bộ session và blacklist để bảo vệ tài khoản
+      await this.revokeAllUserSessionsAndBlacklist(
+        session.userId,
+        undefined,
+        session.id,
+      );
       throw AppError.unauthorized(t("auth.invalidRefreshToken"));
     }
 
@@ -558,6 +563,13 @@ export class AuthService implements SyncableService<User> {
       throw AppError.forbidden(t("auth.accountInactive"));
     }
 
+    const effectiveDeviceInfo = deviceInfo
+      ? deviceInfo.slice(0, 255)
+      : session.deviceInfo;
+    const effectiveIpAddress = ipAddress
+      ? ipAddress.slice(0, 45)
+      : session.ipAddress;
+
     // 1. Kiểm tra kịch bản DÙNG LẠI TOKEN CŨ (Token Reuse Detection):
     if (session.previousTokenHash === incomingHash) {
       const nowMs = Date.now();
@@ -568,8 +580,31 @@ export class AuthService implements SyncableService<User> {
         nowMs - rotatedAtMs <= REFRESH_TOKEN_GRACE_PERIOD_MS;
 
       if (isWithinGracePeriod) {
-        // Cho phép cấp lại Access Token hợp lệ mà không khóa tài khoản.
-        // Không trả về refreshToken cũ để tránh client ghi đè ngược token đã rotate vào storage.
+        // Kiểm tra Replay Cache trên Redis xem có token mới nhất đã xoay vòng trước đó không
+        const replayKey = `rtr:replay:${session.id}:${incomingHash}`;
+        const cachedTokens = await this.cacheService.get<{
+          accessToken: string;
+          refreshToken: string;
+        }>(replayKey);
+
+        if (
+          cachedTokens &&
+          cachedTokens.accessToken &&
+          cachedTokens.refreshToken
+        ) {
+          return {
+            accessToken: cachedTokens.accessToken,
+            refreshToken: cachedTokens.refreshToken,
+          };
+        }
+
+        // Fallback an toàn (nếu cache bị miss / redis restart):
+        // Xoay tiếp một refresh token mới và cập nhật DB để client có token hợp lệ thay vì nhận chuỗi rỗng
+        const newRawRefreshToken = crypto.randomBytes(32).toString("hex");
+        const newTokenHash = crypto
+          .createHash("sha256")
+          .update(newRawRefreshToken)
+          .digest("hex");
         const reissuedAccessToken = jwt.sign(
           {
             sub: session.user.id,
@@ -584,18 +619,60 @@ export class AuthService implements SyncableService<User> {
           },
         );
 
-        return {
+        await this.refreshTokenRepository
+          .createQueryBuilder()
+          .update(RefreshToken)
+          .set({
+            tokenHash: newTokenHash,
+            lastActiveAt: new Date(),
+          })
+          .where(
+            'id = :id AND "previousTokenHash" = :incomingHash AND "isRevoked" = false',
+            {
+              id: session.id,
+              incomingHash,
+            },
+          )
+          .execute();
+
+        const replayPayload = {
           accessToken: reissuedAccessToken,
-          refreshToken: "",
+          refreshToken: newRawRefreshToken,
         };
+
+        await this.cacheService.set(
+          replayKey,
+          JSON.stringify(replayPayload),
+          TTL_REFRESH_TOKEN_REPLAY_SECONDS,
+        );
+
+        return replayPayload;
       }
 
-      // Vượt quá Grace Period (> 15s): Phát hiện token cũ bị kẻ gian dùng lại!
-      await this.refreshTokenRepository.revokeAllUserSessions(session.userId);
-      await this.cacheService.set(
-        `blacklist:session:${session.id}`,
-        "1",
-        TTL_ACCESS_TOKEN_SECONDS,
+      // Vượt quá Grace Period (> 120s): Kiểm tra ngữ cảnh thiết bị
+      const isSameDevice = Boolean(
+        effectiveDeviceInfo &&
+          session.deviceInfo &&
+          effectiveDeviceInfo === session.deviceInfo,
+      );
+
+      if (isSameDevice) {
+        // Cùng thiết bị: Do rớt mạng / app đóng băng lâu hơn Grace Period chứ không phải kẻ gian đánh cắp từ thiết bị khác.
+        // Chỉ thu hồi phiên hiện tại của thiết bị này, KHÔNG làm ảnh hưởng các phiên trên thiết bị khác.
+        await this.refreshTokenRepository.revokeBySessionId(session.id);
+        await this.cacheService.set(
+          `blacklist:session:${session.id}`,
+          "1",
+          TTL_ACCESS_TOKEN_SECONDS,
+        );
+        throw AppError.unauthorized(t("auth.invalidRefreshToken"));
+      }
+
+      // Khác thiết bị: Phát hiện token cũ bị kẻ gian dùng lại từ nơi khác!
+      await this.revokeAllUserSessionsAndBlacklist(
+        session.userId,
+        undefined,
+        session.id,
       );
       throw AppError.unauthorized(t("auth.invalidRefreshToken"));
     }
@@ -611,13 +688,6 @@ export class AuthService implements SyncableService<User> {
       Date.now() + REFRESH_TOKEN_EXPIRES_IN_DAYS * 24 * 60 * 60 * 1000,
     );
     const now = new Date();
-
-    const effectiveDeviceInfo = deviceInfo
-      ? deviceInfo.slice(0, 255)
-      : session.deviceInfo;
-    const effectiveIpAddress = ipAddress
-      ? ipAddress.slice(0, 45)
-      : session.ipAddress;
 
     // Cập nhật nguyên tử trên DB (chống race condition)
     const updateResult = await this.refreshTokenRepository
@@ -655,6 +725,32 @@ export class AuthService implements SyncableService<User> {
           ? new Date(currentSession.rotatedAt).getTime()
           : 0;
         if (nowMs - rotatedAtMs <= REFRESH_TOKEN_GRACE_PERIOD_MS) {
+          const replayKey = `rtr:replay:${currentSession.id}:${session.tokenHash}`;
+          let cachedTokens = await this.cacheService.get<{
+            accessToken: string;
+            refreshToken: string;
+          }>(replayKey);
+
+          // Nếu request song song đang trong quá trình ghi cache, đợi nhẹ 50ms và đọc lại
+          if (!cachedTokens) {
+            await new Promise((resolve) => setTimeout(resolve, 50));
+            cachedTokens = await this.cacheService.get<{
+              accessToken: string;
+              refreshToken: string;
+            }>(replayKey);
+          }
+
+          if (
+            cachedTokens &&
+            cachedTokens.accessToken &&
+            cachedTokens.refreshToken
+          ) {
+            return {
+              accessToken: cachedTokens.accessToken,
+              refreshToken: cachedTokens.refreshToken,
+            };
+          }
+
           const reissuedAccessToken = jwt.sign(
             {
               sub: session.user.id,
@@ -676,7 +772,26 @@ export class AuthService implements SyncableService<User> {
         }
       }
 
-      await this.refreshTokenRepository.revokeAllUserSessions(session.userId);
+      const isSameDevice = Boolean(
+        effectiveDeviceInfo &&
+          session.deviceInfo &&
+          effectiveDeviceInfo === session.deviceInfo,
+      );
+
+      if (isSameDevice) {
+        await this.refreshTokenRepository.revokeBySessionId(session.id);
+        await this.cacheService.set(
+          `blacklist:session:${session.id}`,
+          "1",
+          TTL_ACCESS_TOKEN_SECONDS,
+        );
+      } else {
+        await this.revokeAllUserSessionsAndBlacklist(
+          session.userId,
+          undefined,
+          session.id,
+        );
+      }
       throw AppError.unauthorized(t("auth.invalidRefreshToken"));
     }
 
@@ -695,9 +810,54 @@ export class AuthService implements SyncableService<User> {
       },
     );
 
+    // Lưu cặp token mới vào Replay Cache với key gắn session.id và session.tokenHash
+    // (session.tokenHash lúc này chính là hash của RT cũ mà client vừa gửi lên)
+    const replayKey = `rtr:replay:${session.id}:${session.tokenHash}`;
+    await this.cacheService.set(
+      replayKey,
+      JSON.stringify({
+        accessToken: newAccessToken,
+        refreshToken: newRawRefreshToken,
+      }),
+      TTL_REFRESH_TOKEN_REPLAY_SECONDS,
+    );
+
     return {
       accessToken: newAccessToken,
       refreshToken: newRawRefreshToken,
     };
+  }
+
+  /**
+   * Thu hồi toàn bộ phiên của người dùng trong DB VÀ đưa đồng loạt các session ID vào Redis blacklist
+   * để chặn đứng tức thì (0ms) các Access Token đang sống trên các thiết bị bị thu hồi.
+   */
+  private async revokeAllUserSessionsAndBlacklist(
+    userId: string,
+    exceptSessionId?: string,
+    extraBlacklistSessionId?: string,
+  ): Promise<void> {
+    const revokedSessionIds =
+      await this.refreshTokenRepository.revokeAllUserSessions(
+        userId,
+        exceptSessionId,
+      );
+
+    const sidsToBlacklist = new Set<string>(revokedSessionIds);
+    if (extraBlacklistSessionId) {
+      sidsToBlacklist.add(extraBlacklistSessionId);
+    }
+
+    if (sidsToBlacklist.size > 0) {
+      await Promise.all(
+        Array.from(sidsToBlacklist).map((sid) =>
+          this.cacheService.set(
+            `blacklist:session:${sid}`,
+            "1",
+            TTL_ACCESS_TOKEN_SECONDS,
+          ),
+        ),
+      );
+    }
   }
 }

@@ -66,10 +66,16 @@ void main() async {
   // Khởi động Lính canh mạng (Network Sentinel) lắng nghe trạng thái kết nối thời gian thực
   final sentinel = NetworkSentinel.instance..initialize();
   sentinel.statusNotifier.addListener(() {
-    if (sentinel.isOnline && NoInternetScreen.isShowing) {
-      final context = rootNavigatorKey.currentContext;
-      if (context != null) {
-        NoInternetScreen.hide(context);
+    if (sentinel.isOnline) {
+      if (NoInternetScreen.isShowing) {
+        final context = rootNavigatorKey.currentContext;
+        if (context != null) {
+          NoInternetScreen.hide(context);
+        }
+      }
+      final interceptor = ApiClient.instance.authInterceptor;
+      if (interceptor != null && interceptor.hasPendingRequests) {
+        unawaited(interceptor.retryPendingQueue());
       }
     }
   });

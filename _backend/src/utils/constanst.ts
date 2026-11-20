@@ -14,7 +14,8 @@ export const ACCESS_TOKEN_EXPIRES_IN = "15m";
 export const TTL_ACCESS_TOKEN_SECONDS = 900; // 15 phút
 export const REFRESH_TOKEN_EXPIRES_IN_DAYS = 7;
 export const TTL_REFRESH_TOKEN_SECONDS = 7 * 24 * 3600; // 7 ngày
-export const REFRESH_TOKEN_GRACE_PERIOD_MS = 15000; // 15 giây Grace Period cho xoay vòng Refresh Token (chống rớt mạng mobile)
+export const REFRESH_TOKEN_GRACE_PERIOD_MS = 120000; // 120 giây (2 phút) Grace Period cho xoay vòng Refresh Token (chống rớt mạng mobile)
+export const TTL_REFRESH_TOKEN_REPLAY_SECONDS = 120; // 2 phút lưu Replay Cache cặp token mới phòng rớt mạng
 
 export const JWT_ALGORITHM: Algorithm = "HS256";
 export const JWT_ALLOWED_ALGORITHMS: Algorithm[] = [JWT_ALGORITHM];
