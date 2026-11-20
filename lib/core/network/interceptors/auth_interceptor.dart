@@ -52,6 +52,8 @@ class AuthInterceptor extends Interceptor {
                 headers: {
                   'Content-Type': 'application/json',
                   'Accept': 'application/json',
+                  if (clientDio?.options.headers['User-Agent'] != null)
+                    'User-Agent': clientDio!.options.headers['User-Agent'],
                 },
               ),
             );

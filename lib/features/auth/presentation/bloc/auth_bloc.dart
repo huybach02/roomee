@@ -13,12 +13,10 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final IAuthRepository _authRepository;
   final NetworkSentinel _networkSentinel;
 
-  AuthBloc({
-    IAuthRepository? authRepository,
-    NetworkSentinel? networkSentinel,
-  })  : _authRepository = authRepository ?? AuthRepository(),
-        _networkSentinel = networkSentinel ?? NetworkSentinel.instance,
-        super(const AuthInitial()) {
+  AuthBloc({IAuthRepository? authRepository, NetworkSentinel? networkSentinel})
+    : _authRepository = authRepository ?? AuthRepository(),
+      _networkSentinel = networkSentinel ?? NetworkSentinel.instance,
+      super(const AuthInitial()) {
     on<AuthCheckEvent>(_onAuthCheck);
     on<AuthLoginEvent>(_onAuthLogin);
     on<AuthRegisterEvent>(_onAuthRegister);
@@ -37,7 +35,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     try {
       final isLoggedIn = await _authRepository.isLoggedIn();
       if (isLoggedIn) {
-        // 1. Stale-While-Revalidate: Đọc ngay cache cũ từ storage để UI hiển thị tức thì (0ms latency)
+        // 1. Stale-While-Revalidate: Đọc ngay cache cũ từ storage để UI hiển thị tức thì
         final cachedUser = await _authRepository.getCurrentUser();
         final token = await _authRepository.getToken() ?? '';
         final refreshToken = await _authRepository.getRefreshToken();

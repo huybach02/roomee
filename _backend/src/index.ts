@@ -10,13 +10,13 @@ const PORT = Number(process.env.PORT) || DEFAULT_PORT;
 
 async function bootstrap() {
   try {
-    console.log("⏳ Initializing TypeORM database connection...");
+    console.log("1. Initializing TypeORM database connection...");
     await AppDataSource.initialize();
-    console.log("📦 Connected to PostgreSQL database via TypeORM successfully");
+    console.log("2. Connected to PostgreSQL database via TypeORM successfully");
 
-    console.log("⏳ Connecting to Redis...");
+    console.log("3. Connecting to Redis...");
     await connectRedis();
-    console.log("🧠 Connected to Redis successfully");
+    console.log("4. Connected to Redis successfully");
 
     startCronJobs();
 

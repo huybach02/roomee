@@ -41,17 +41,33 @@ export class RefreshTokenRepository extends Repository<RefreshToken> {
   public async revokeAllUserSessions(
     userId: string,
     exceptSessionId?: string,
-  ): Promise<void> {
-    const qb = this.createQueryBuilder()
-      .update(RefreshToken)
-      .set({ isRevoked: true })
+  ): Promise<string[]> {
+    const qbSelect = this.createQueryBuilder()
+      .select('"id"', "id")
       .where('"userId" = :userId', { userId })
       .andWhere('"isRevoked" = false');
 
     if (exceptSessionId) {
-      qb.andWhere("id != :exceptSessionId", { exceptSessionId });
+      qbSelect.andWhere('"id" != :exceptSessionId', { exceptSessionId });
     }
 
-    await qb.execute();
+    const activeSessions = await qbSelect.getRawMany<{ id: string }>();
+    const revokedSessionIds = activeSessions.map((s) => s.id);
+
+    if (revokedSessionIds.length > 0) {
+      const qbUpdate = this.createQueryBuilder()
+        .update(RefreshToken)
+        .set({ isRevoked: true })
+        .where('"userId" = :userId', { userId })
+        .andWhere('"isRevoked" = false');
+
+      if (exceptSessionId) {
+        qbUpdate.andWhere('"id" != :exceptSessionId', { exceptSessionId });
+      }
+
+      await qbUpdate.execute();
+    }
+
+    return revokedSessionIds;
   }
 }

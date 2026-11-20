@@ -198,12 +198,15 @@ _backend/
   - **Xoay vòng Token (Refresh Token Rotation - RTR) & Giữ nguyên `sid`:**
     - Mỗi khi gọi `POST /api/v1/auth/refresh-token`, hệ thống **giữ nguyên `sid` (`session.id`)** và cập nhật nguyên tử trên DB: `previousTokenHash = currentTokenHash`, `tokenHash = newTokenHash`, `rotatedAt = NOW()`, gia hạn `expiresAt` thêm 7 ngày.
     - **Không blacklist `sid` khi refresh:** Các request đang bay dở mang Access Token cũ vẫn hoàn tất bình thường vì `sid` của chúng không bị đưa vào blacklist.
-    - **Phát hiện dùng lại Token (Token Reuse Detection) & Grace Period:**
-      - Nếu token gửi lên khớp với `previousTokenHash` trong vòng **15 giây** (`rotatedAt` Grace Period do mạng lag gửi lại): Cấp lại Access Token hợp lệ mà không khóa phiên.
-      - Nếu gửi lại token cũ sau 15 giây hoặc câu update không thành công: Phát hiện kẻ gian đánh cắp token $\rightarrow$ Lập tức thu hồi toàn bộ phiên của người dùng (`revokeAllUserSessions`) và blacklist `sid` ngay lập tức.
+    - **Phát hiện dùng lại Token (Token Reuse Detection), Grace Period & Replay Cache:**
+      - Hệ thống sử dụng **Replay Cache trên Redis** (`rtr:replay:{session.id}:{tokenHash}`, TTL 120 giây) lưu lại cặp `(accessToken, refreshToken)` mới nhất ngay khi xoay vòng.
+      - Nếu token gửi lên khớp với `previousTokenHash` trong vòng **120 giây** (`rotatedAt` Grace Period do mạng lag gửi lại hoặc rớt response): Phát lại (Replay) đúng cặp Access Token và Refresh Token mới đã lưu từ Redis (hoặc fallback xoay mới an toàn nếu cache miss) mà không khóa phiên, bảo đảm client luôn nhận được Refresh Token mới thay vì chuỗi rỗng.
+      - Nếu gửi lại token cũ sau 120 giây hoặc câu update không thành công:
+        - Nếu cùng thiết bị (`deviceInfo` trùng khớp): Khả năng do app bị đóng băng/offline kéo dài $\rightarrow$ Chỉ thu hồi phiên hiện tại (`revokeBySessionId`), bảo vệ phiên của người dùng trên các thiết bị khác.
+        - Nếu khác thiết bị: Phát hiện kẻ gian đánh cắp token từ nơi khác $\rightarrow$ Lập tức thu hồi toàn bộ phiên của người dùng (`revokeAllUserSessions`) và blacklist `sid` ngay lập tức.
 - **Thu hồi phiên tức thời (Instant Revocation qua Redis):**
   - Trong `authMiddleware`, kiểm tra nhanh trong Redis `blacklist:session:${decoded.sid}`.
-  - **Chỉ đưa `sid` vào Redis blacklist khi:** Người dùng chủ động Đăng xuất (`POST /auth/logout`), Admin thu hồi phiên từ xa, hoặc khi phát hiện Token Reuse Attack. Tuyệt đối không blacklist `sid` trong quá trình Refresh Token Rotation thông thường.
+  - **Chỉ đưa `sid` vào Redis blacklist khi:** Người dùng chủ động Đăng xuất (`POST /auth/logout`), Đặt lại mật khẩu (`resetPassword`), Admin thu hồi phiên từ xa, hoặc khi phát hiện Token Reuse Attack. Toàn bộ `sid` bị thu hồi hàng loạt đều được đồng bộ đưa vào Redis blacklist (TTL 15 phút) để lập tức vô hiệu hóa các Access Token đang sống (0ms). Tuyệt đối không blacklist `sid` trong quá trình Refresh Token Rotation thông thường.
 - **Cơ chế Tạm khóa tài khoản (Account Lockout qua Redis - Chống DoS):**
   - Giới hạn: `MAX_LOGIN_ATTEMPTS = 5`.
   - Khóa theo cặp `email + IP`: `login:lockout:{email}:{ip}` (TTL 15p) và `login:attempts:{email}:{ip}`. Nếu kẻ xấu cố tình spam sai mật khẩu, chỉ có IP của kẻ xấu bị khóa, chủ tài khoản thật từ IP khác vẫn đăng nhập bình thường.
@@ -215,7 +218,7 @@ _backend/
 - **Quên mật khẩu (Forgot Password qua OTP + Reset Token):**
   - Bước 1: `POST /auth/forgot-password` -> Gửi mã OTP 6 số qua email (Redis TTL 10p, cooldown 60s, chống user enumeration).
   - Bước 2: `POST /auth/verify-reset-otp` -> Xác thực OTP -> Cấp `resetToken` (UUID, Redis TTL 15p).
-  - Bước 3: `POST /auth/reset-password` -> Đặt mật khẩu mới với `resetToken` (dùng 1 lần duy nhất, cập nhật Argon2, thu hồi toàn bộ session đang đăng nhập qua `revokeAllUserSessions(user.id)`, xóa token và giải phóng lockout).
+  - Bước 3: `POST /auth/reset-password` -> Đặt mật khẩu mới với `resetToken` (dùng 1 lần duy nhất, cập nhật Argon2, thu hồi toàn bộ session đang đăng nhập và blacklist các sid qua `revokeAllUserSessionsAndBlacklist(user.id)`, xóa token và giải phóng lockout).
 - **Đăng xuất (Logout & Thu hồi Phiên):**
   - Endpoint `POST /auth/logout` bảo vệ bằng `authMiddleware`.
   - Server giải mã JWT, lấy `sid` và thời gian sống còn lại (`exp - now`).
