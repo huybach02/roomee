@@ -52,6 +52,7 @@
     "updateSuccess": "Workspace updated successfully.",
     "deleteSuccess": "Workspace deleted successfully.",
     "notFound": "Requested workspace not found.",
+    "conflict": "Workspace already exists.",
     "forbidden": "You do not have permission to manage this workspace.",
     "onlyLandlordCanCreate": "Only landlords are allowed to create workspaces.",
     "provinceNotFound": "Province not found.",

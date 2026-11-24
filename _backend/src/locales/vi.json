@@ -52,6 +52,7 @@
     "updateSuccess": "Cập nhật khu trọ thành công.",
     "deleteSuccess": "Xóa khu trọ thành công.",
     "notFound": "Không tìm thấy khu trọ yêu cầu.",
+    "conflict": "Khu trọ đã tồn tại.",
     "forbidden": "Bạn không có quyền quản lý khu trọ này.",
     "onlyLandlordCanCreate": "Chỉ có chủ trọ mới có quyền tạo khu trọ mới.",
     "provinceNotFound": "Tỉnh/Thành phố không tồn tại.",

@@ -188,6 +188,20 @@ export class WorkspaceService implements SyncableService<Workspace> {
       throw AppError.badRequest(t("workspace.wardNotInProvince"));
     }
 
+    if (dto.id) {
+      const existing = await this.workspaceRepository.findOne({
+        where: { id: dto.id },
+        withDeleted: true,
+      });
+
+      if (existing) {
+        if (existing.userId !== userId) {
+          throw AppError.conflict(t("workspace.conflict"));
+        }
+        return existing;
+      }
+    }
+
     const workspace = this.workspaceRepository.create({
       ...(dto.id ? { id: dto.id } : {}),
       userId,
